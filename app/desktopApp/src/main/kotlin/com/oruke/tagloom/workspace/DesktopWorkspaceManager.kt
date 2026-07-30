@@ -159,6 +159,45 @@ class DesktopWorkspaceManager(
     }
 
     /**
+     * 使用 Recovery Key 认证既有工作区，并为该设备建立新的高熵解锁材料后打开会话。
+     *
+     * 为什么必须先用 Recovery Key 认证再替换密码槽：本机 PIN 只是本机材料的保护层，
+     * 不能成为遗失本机配置后的恢复后门；只有持有独立 Recovery Key 才能重建本机访问。
+     *
+     * @param root 包含 `manifest.enc` 的工作区根目录。
+     * @param recoveryKeyText 用户离线保存的 Recovery Key 文本。
+     * @param newPassword 新生成、不会向用户展示的本机高熵解锁材料。
+     * @return 使用新本机解锁材料重新认证后的打开状态。
+     */
+    suspend fun recoverAndReplacePasswordSlot(
+        root: Path,
+        recoveryKeyText: String,
+        newPassword: String,
+    ): DesktopWorkspaceOpenState {
+        check(activeSession == null) { "必须先锁定当前工作区" }
+        cancelPendingCreation()
+        cryptoProvider.initialize()
+        val lifecycle = JvmWorkspaceLifecycleService(root, manifestService)
+        val recoveryKey = recoveryKeyCodec.decode(recoveryKeyText)
+        val unlocked = try {
+            lifecycle.unlockWithRecovery(recoveryKey)
+        } finally {
+            recoveryKey.destroy()
+        }
+        try {
+            lifecycle.replacePasswordSlot(
+                unlocked = unlocked,
+                newPassword = newPassword,
+                newParameters = argon2idFactory(cryptoProvider.secureRandom(CryptoProtocol.ARGON2_SALT_BYTES)),
+                newPasswordSlotId = idFactory(),
+            )
+        } finally {
+            unlocked.destroy()
+        }
+        return unlock(root, newPassword)
+    }
+
+    /**
      * 在未打开会话时认证旧密码并仅重包主密钥，不重加密对象正文。
      *
      * @param root 既有工作区根目录。
@@ -299,6 +338,31 @@ class DesktopWorkspaceManager(
         cryptoProvider.initialize()
         JvmEncryptedWorkspaceBackupService(targetRoot, manifestService).restoreBackup(archive, targetRoot)
         return unlock(targetRoot, password)
+    }
+
+    /**
+     * 把密文备份恢复到空目录，再使用 Recovery Key 建立新的本机解锁材料。
+     *
+     * 备份本身只保存密文和 manifest；恢复后必须重新认证，不能因文件复制成功就把未认证
+     * 的内容暴露给 UI 或索引。
+     *
+     * @param archive Tagloom 密文备份文件。
+     * @param targetRoot 不存在或为空的恢复目录。
+     * @param recoveryKeyText 用户离线保存的 Recovery Key 文本。
+     * @param newPassword 新生成、不会向用户展示的本机高熵解锁材料。
+     * @return 已认证、完成恢复并建立索引的打开状态。
+     */
+    suspend fun restoreBackupWithRecovery(
+        archive: Path,
+        targetRoot: Path,
+        recoveryKeyText: String,
+        newPassword: String,
+    ): DesktopWorkspaceOpenState {
+        check(activeSession == null) { "恢复备份前必须锁定当前工作区" }
+        cancelPendingCreation()
+        cryptoProvider.initialize()
+        JvmEncryptedWorkspaceBackupService(targetRoot, manifestService).restoreBackup(archive, targetRoot)
+        return recoverAndReplacePasswordSlot(targetRoot, recoveryKeyText, newPassword)
     }
 
     /**

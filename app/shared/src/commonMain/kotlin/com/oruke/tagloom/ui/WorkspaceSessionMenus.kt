@@ -27,6 +27,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.ObjectId
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染页头搜索图标触发的已确认内容搜索浮层。
@@ -84,7 +86,7 @@ internal fun WorkspaceSearchPopover(
                             Box(Modifier.fillMaxWidth()) {
                                 if (controller.searchText.isBlank()) {
                                     Text(
-                                        "搜索已确认内容 · Enter",
+                                        stringResource(Res.string.workspace_search_placeholder),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -122,13 +124,20 @@ internal fun WorkspaceSearchPopover(
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (controller.searchHits.isEmpty()) "仅搜索已确认快照" else "${controller.searchHits.size} 个结果",
+                        if (controller.searchHits.isEmpty()) {
+                            stringResource(Res.string.workspace_search_confirmed_only)
+                        } else {
+                            stringResource(
+                                Res.string.workspace_search_result_count,
+                                controller.searchHits.size,
+                            )
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = onSaveQuery, enabled = controller.searchText.isNotBlank()) {
-                        Text("保存查询")
+                        Text(stringResource(Res.string.workspace_search_save_query))
                     }
                 }
             }
@@ -169,34 +178,47 @@ internal fun WorkspaceMaintenanceMenu(
             onDismissRequest = onDismiss,
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
-            DropdownMenuItem(text = { Text("立即保存    Ctrl+S") }, onClick = {
+            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_save_now)) }, onClick = {
                 invokeAndDismiss(actions.onSave)
             })
             DropdownMenuItem(
-                text = { Text("保存当前搜索") },
+                text = { Text(stringResource(Res.string.workspace_menu_save_current_search)) },
                 enabled = controller.searchText.isNotBlank(),
                 onClick = { invokeAndDismiss(actions.onSaveQuery) },
             )
             controller.savedQueries.take(6).forEach { saved ->
-                DropdownMenuItem(text = { Text("运行：${saved.query.name}") }, onClick = {
+                DropdownMenuItem(text = {
+                    Text(stringResource(Res.string.workspace_menu_run_query, saved.query.name))
+                }, onClick = {
                     invokeAndDismiss { actions.onRunSavedQuery(saved.id) }
                 })
             }
             HorizontalDivider()
-            DropdownMenuItem(text = { Text("创建密文备份") }, onClick = {
+            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_backup)) }, onClick = {
                 invokeAndDismiss(actions.onBackup)
             })
-            DropdownMenuItem(text = { Text("更换密码") }, onClick = {
-                invokeAndDismiss(actions.onChangePassword)
-            })
-            DropdownMenuItem(text = { Text("轮换主密钥") }, onClick = {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (controller.recentWorkspace?.requiresPin == true) {
+                                Res.string.workspace_menu_change_pin
+                            } else {
+                                Res.string.workspace_menu_enable_pin
+                            },
+                        ),
+                    )
+                },
+                onClick = { invokeAndDismiss(actions.onChangePin) },
+            )
+            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_rotate_master_key)) }, onClick = {
                 invokeAndDismiss(actions.onRotateMasterKey)
             })
             HorizontalDivider()
-            DropdownMenuItem(text = { Text("删除当前笔记") }, onClick = {
+            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_delete_note)) }, onClick = {
                 invokeAndDismiss(actions.onDelete)
             })
-            DropdownMenuItem(text = { Text("锁定工作区") }, onClick = {
+            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_lock)) }, onClick = {
                 invokeAndDismiss(actions.onLock)
             })
         }
@@ -215,8 +237,8 @@ internal data class WorkspaceMaintenanceActions(
     val onRunSavedQuery: (ObjectId) -> Unit,
     /** 创建密文备份。 */
     val onBackup: () -> Unit,
-    /** 打开更换密码流程。 */
-    val onChangePassword: () -> Unit,
+    /** 打开更换本机 PIN 流程。 */
+    val onChangePin: () -> Unit,
     /** 打开主密钥轮换流程。 */
     val onRotateMasterKey: () -> Unit,
     /** 打开当前笔记删除确认。 */

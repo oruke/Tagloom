@@ -25,8 +25,9 @@ class DesktopDocumentFileGateway : DocumentFileGateway {
     override suspend fun exportDocument(request: DocumentExportRequest): Boolean {
         val selected = chooseSavePath(request) ?: return false
         val target = selected.withRequiredExtension(request.format)
+        val labels = DesktopDocumentExportLabels.load()
         val bytes = withContext(Dispatchers.IO) {
-            DesktopDocumentRenderer.render(request.note, request.format)
+            DesktopDocumentRenderer.render(request.note, request.format, labels)
         }
         withContext(Dispatchers.IO) {
             writeAtomically(target, bytes)
@@ -42,13 +43,15 @@ class DesktopDocumentFileGateway : DocumentFileGateway {
      * @return 用户确认的规范绝对路径；取消时为空。
      */
     private suspend fun chooseSavePath(request: DocumentExportRequest): Path? = withContext(Dispatchers.Swing) {
-        val descriptor = request.format.descriptor()
+        val extension = request.format.fileExtension()
+        val title = DesktopDocumentDialogText.exportTitle(request.format)
+        val fileTypeDescription = DesktopDocumentDialogText.fileTypeDescription(request.format)
         val chooser = JFileChooser().apply {
-            dialogTitle = "导出 ${descriptor.displayName}"
+            dialogTitle = title
             fileSelectionMode = JFileChooser.FILES_ONLY
             isAcceptAllFileFilterUsed = false
-            fileFilter = FileNameExtensionFilter(descriptor.filterDescription, descriptor.extension)
-            selectedFile = java.io.File("${request.suggestedBaseName}.${descriptor.extension}")
+            fileFilter = FileNameExtensionFilter(fileTypeDescription, extension)
+            selectedFile = java.io.File("${request.suggestedBaseName}.$extension")
         }
         if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
             chooser.selectedFile.toPath().toAbsolutePath().normalize()
@@ -67,7 +70,7 @@ class DesktopDocumentFileGateway : DocumentFileGateway {
         target: Path,
         bytes: ByteArray,
     ) {
-        val parent = target.parent ?: error("导出目标缺少父目录")
+        val parent = target.parent ?: error("export-target-parent-missing")
         Files.createDirectories(parent)
         val temporary = Files.createTempFile(parent, ".tagloom-export-", ".tmp")
         try {
@@ -94,7 +97,7 @@ class DesktopDocumentFileGateway : DocumentFileGateway {
      * @return 保留用户目录且带正确后缀的路径。
      */
     private fun Path.withRequiredExtension(format: DocumentExportFormat): Path {
-        val extension = format.descriptor().extension
+        val extension = format.fileExtension()
         return if (fileName.toString().endsWith(".$extension", ignoreCase = true)) {
             this
         } else {
@@ -104,25 +107,13 @@ class DesktopDocumentFileGateway : DocumentFileGateway {
 }
 
 /**
- * 保存文件选择器需要的格式名称、扩展名和过滤说明。
- */
-private data class DesktopExportFormatDescriptor(
-    /** 面向用户的格式名称。 */
-    val displayName: String,
-    /** 不含点号的标准扩展名。 */
-    val extension: String,
-    /** 文件选择器过滤说明。 */
-    val filterDescription: String,
-)
-
-/**
- * 返回桌面文件选择器使用的格式描述。
+ * 返回桌面导出文件使用的标准扩展名。
  *
- * @return 与格式协议一致的名称、扩展名和过滤说明。
+ * @return 不含点号的标准扩展名。
  */
-private fun DocumentExportFormat.descriptor(): DesktopExportFormatDescriptor = when (this) {
-    DocumentExportFormat.MARKDOWN -> DesktopExportFormatDescriptor("Markdown", "md", "Markdown (*.md)")
-    DocumentExportFormat.HTML -> DesktopExportFormatDescriptor("HTML", "html", "HTML (*.html)")
-    DocumentExportFormat.PDF -> DesktopExportFormatDescriptor("PDF", "pdf", "PDF (*.pdf)")
-    DocumentExportFormat.WORD -> DesktopExportFormatDescriptor("Word", "docx", "Word 文档 (*.docx)")
+private fun DocumentExportFormat.fileExtension(): String = when (this) {
+    DocumentExportFormat.MARKDOWN -> "md"
+    DocumentExportFormat.HTML -> "html"
+    DocumentExportFormat.PDF -> "pdf"
+    DocumentExportFormat.WORD -> "docx"
 }

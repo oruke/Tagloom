@@ -12,8 +12,13 @@ class DocumentIdentityMetadataTest {
      */
     @Test
     fun formatsSnapshotTimestampWithoutChangingSemantics() {
-        assertEquals("2026-07-15 08:23 UTC", "2026-07-15T08:23:46Z".toCompactUtcTimestamp())
-        assertEquals("future-format", "future-format".toCompactUtcTimestamp())
-        assertEquals("尚未保存", "".toCompactUtcTimestamp())
+        assertEquals("2026-07-15 08:23 UTC", "2026-07-15T08:23:46Z".toCompactUtcTimestamp(UNSAVED_TEXT))
+        assertEquals("future-format", "future-format".toCompactUtcTimestamp(UNSAVED_TEXT))
+        assertEquals(UNSAVED_TEXT, "".toCompactUtcTimestamp(UNSAVED_TEXT))
+    }
+
+    private companion object {
+        /** 测试注入的已本地化未保存占位文本。 */
+        const val UNSAVED_TEXT: String = "unsaved-placeholder"
     }
 }

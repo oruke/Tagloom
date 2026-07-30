@@ -7,6 +7,11 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+compose.resources {
+    /** 允许 Desktop 平台适配器复用共享 UI 的同一套本地化资源。 */
+    publicResClass = true
+}
+
 kotlin {
     listOf(
         iosArm64(),

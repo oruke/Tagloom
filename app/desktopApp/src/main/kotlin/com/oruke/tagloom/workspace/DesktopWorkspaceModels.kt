@@ -11,6 +11,7 @@ import com.oruke.tagloom.core.model.KeyId
 import com.oruke.tagloom.core.model.TransactionId
 import com.oruke.tagloom.core.crypto.Argon2idParameters
 import com.oruke.tagloom.core.transaction.TransactionRecoveryReport
+import com.oruke.tagloom.core.workspace.ManifestObjectKind
 
 /**
  * 向创建界面返回一次性 Recovery Key 和待确认工作区身份。
@@ -89,7 +90,7 @@ enum class DesktopIntegrityFailure {
  */
 data class DesktopObjectIntegrityIssue(
     /** manifest 对象类别。 */
-    val kind: String,
+    val kind: ManifestObjectKind,
     /** 不透明对象 ID。 */
     val objectId: String,
     /** 逻辑隔离原因。 */

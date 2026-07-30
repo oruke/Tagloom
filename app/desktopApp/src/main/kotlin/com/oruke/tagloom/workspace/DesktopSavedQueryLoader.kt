@@ -83,7 +83,7 @@ class DesktopSavedQueryLoader(
      */
     private fun com.oruke.tagloom.core.workspace.ManifestObjectRecord.toIssue(
         failure: DesktopIntegrityFailure,
-    ): DesktopObjectIntegrityIssue = DesktopObjectIntegrityIssue(kind.name, objectId, failure)
+    ): DesktopObjectIntegrityIssue = DesktopObjectIntegrityIssue(kind, objectId, failure)
 
     /** 把摘要字节编码为小写十六进制。 */
     private fun ByteArray.toHex(): String = joinToString("") { byte ->

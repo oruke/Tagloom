@@ -26,6 +26,8 @@ import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.PropertyDefinitionDestination
 import com.oruke.tagloom.editor.TagloomEditorState
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染属性类型单选菜单。
@@ -40,7 +42,7 @@ internal fun PropertyTypeSelector(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        PopoverSelectValue(value.displayName()) { expanded = true }
+        PopoverSelectValue(value.localizedDisplayName()) { expanded = true }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -48,7 +50,7 @@ internal fun PropertyTypeSelector(
         ) {
             CREATE_PROPERTY_TYPES.forEach { type ->
                 DropdownMenuItem(
-                    text = { Text(type.displayName()) },
+                    text = { Text(type.localizedDisplayName()) },
                     leadingIcon = { Text(if (type == value) "✓" else "") },
                     onClick = {
                         expanded = false
@@ -73,7 +75,7 @@ internal fun OptionModeSelector(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        PopoverSelectValue(if (value == PropertyOptionInputMode.FREE) "自由输入" else "固定选项") { expanded = true }
+        PopoverSelectValue(value.localizedDisplayName()) { expanded = true }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -81,7 +83,7 @@ internal fun OptionModeSelector(
         ) {
             PropertyOptionInputMode.entries.forEach { mode ->
                 DropdownMenuItem(
-                    text = { Text(if (mode == PropertyOptionInputMode.FREE) "自由输入" else "固定选项") },
+                    text = { Text(mode.localizedDisplayName()) },
                     leadingIcon = { Text(if (mode == value) "✓" else "") },
                     onClick = {
                         expanded = false
@@ -110,12 +112,21 @@ internal fun PropertyDestinationSelector(
 ) {
     val typeId = document.note.objectTypeState(WorkspaceDefaults.DEFAULT_NOTE_TAG_ID).appliedTypeId
     val typeName = typeId?.let { id -> state.tagDefinitions.firstOrNull { definition -> definition.id == id }?.name }
+    val currentNoteLabel = stringResource(Res.string.editor_property_current_note)
+    val typeDestinationLabel = if (typeName == null) {
+        null
+    } else {
+        stringResource(Res.string.editor_property_destination_type, typeName)
+    }
     val destinations = buildList {
-        add(PropertyDefinitionDestination.CurrentNote to "仅当前笔记")
-        if (typeId != null && typeName != null) add(PropertyDefinitionDestination.Tag(typeId) to "应用类型 · $typeName")
+        add(PropertyDefinitionDestination.CurrentNote to currentNoteLabel)
+        if (typeId != null && typeDestinationLabel != null) {
+            add(PropertyDefinitionDestination.Tag(typeId) to typeDestinationLabel)
+        }
     }
     var expanded by remember { mutableStateOf(false) }
-    val label = destinations.firstOrNull { (destination, _) -> destination == value }?.second ?: "仅当前笔记"
+    val label = destinations.firstOrNull { (destination, _) -> destination == value }?.second
+        ?: currentNoteLabel
     Box {
         PopoverSelectValue(label) { expanded = true }
         DropdownMenu(
@@ -176,3 +187,14 @@ private val CREATE_PROPERTY_TYPES: List<String> = listOf(
     PropertyTypes.URL,
     PropertyTypes.EMAIL,
 )
+
+/**
+ * 返回选项输入模式在当前 Locale 下的展示名称。
+ *
+ * @return 自由输入或固定选项对应的资源文本。
+ */
+@Composable
+private fun PropertyOptionInputMode.localizedDisplayName(): String = when (this) {
+    PropertyOptionInputMode.FREE -> stringResource(Res.string.editor_property_option_free)
+    PropertyOptionInputMode.FIXED -> stringResource(Res.string.editor_property_option_fixed)
+}

@@ -2,6 +2,7 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
     alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
 }
@@ -14,6 +15,9 @@ dependencies {
 
     implementation(compose.desktop.currentOs)
     implementation(libs.kotlinx.coroutinesSwing)
+    implementation(libs.kotlinx.serializationJson)
+    implementation(libs.compose.components.resources)
+    implementation(libs.jna.platform)
     implementation(libs.pdfbox)
     implementation(libs.poi.ooxml)
 

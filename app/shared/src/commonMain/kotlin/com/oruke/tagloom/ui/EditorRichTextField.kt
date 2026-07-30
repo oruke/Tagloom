@@ -46,6 +46,8 @@ import com.oruke.tagloom.editor.splitBlock
 import com.oruke.tagloom.editor.turnBlockInto
 import com.oruke.tagloom.editor.toggleSelectionMark
 import com.oruke.tagloom.editor.TextEditDelta
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染一个保持输入法组合、结构化样式、跨块键盘行为和 Slash 菜单的 RichText Block。
@@ -274,7 +276,7 @@ internal fun EditorRichTextField(
         ) {
             if (commands.isEmpty()) {
                 Text(
-                    "没有匹配的块类型",
+                    stringResource(Res.string.editor_block_no_matching_commands),
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

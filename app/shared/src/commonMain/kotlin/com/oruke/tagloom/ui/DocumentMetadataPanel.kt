@@ -27,6 +27,8 @@ import com.oruke.tagloom.editor.buildPropertyDefinitionDraft
 import com.oruke.tagloom.editor.createTagDefinitionDraft
 import com.oruke.tagloom.editor.resolveEffectiveProperties
 import com.oruke.tagloom.editor.setPropertyAttached
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 编排标题下方的身份行、无标签描述和动态属性区。
@@ -65,13 +67,19 @@ internal fun DocumentMetadataPanel(
         DocumentDescription(state = state, document = document)
         Spacer(Modifier.height(24.dp))
         if (effectiveProperties == null) {
-            InlineSchemaMessage("对象类型继承关系无法解析，属性暂时只读。", error = true)
+            InlineSchemaMessage(
+                stringResource(Res.string.editor_schema_inheritance_invalid),
+                error = true,
+            )
         } else {
             effectiveProperties.conflicts.forEach { conflict ->
                 InlineSchemaMessage(conflict.displayMessage(state), error = true)
             }
             effectiveProperties.missingPropertyIds.forEach { propertyId ->
-                InlineSchemaMessage("属性定义 ${propertyId.value} 缺失；原值仍保留，请从类型 schema 修复。", error = true)
+                InlineSchemaMessage(
+                    stringResource(Res.string.editor_schema_missing_property, propertyId.value),
+                    error = true,
+                )
             }
             DocumentPropertySection(
                 state = state,
@@ -158,11 +166,16 @@ private fun InlineSchemaMessage(
  * @param state 当前工作区 schema。
  * @return 不隐藏竞争来源的中文提示。
  */
+@Composable
 private fun PropertyResolutionConflict.displayMessage(state: TagloomEditorState): String {
     val propertyName = state.propertyDefinitions.firstOrNull { definition -> definition.id == propertyId }?.name
         ?: propertyId.value
     val sourceNames = sourceTagIds.map { tagId ->
         state.tagDefinitions.firstOrNull { definition -> definition.id == tagId }?.name ?: tagId.value
     }
-    return "“$propertyName”存在同级类型冲突：${sourceNames.joinToString(" / ")}。请编辑对应类型约束。"
+    return stringResource(
+        Res.string.editor_schema_conflict,
+        propertyName,
+        sourceNames.joinToString(" / "),
+    )
 }

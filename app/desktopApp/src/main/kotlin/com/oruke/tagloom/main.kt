@@ -7,6 +7,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.awt.Dimension
 import kotlinx.coroutines.runBlocking
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 启动桌面窗口；开发预览参数只加载内存示例，不触碰真实工作区。
@@ -17,12 +19,17 @@ fun main(args: Array<String>) = application {
     val previewEditor = PREVIEW_EDITOR_ARGUMENT in args
     val windowState = rememberWindowState(width = 1_280.dp, height = 820.dp)
     val workspaceGateway = if (previewEditor) null else rememberDesktopWorkspaceGateway()
+    val windowTitle = if (previewEditor) {
+        stringResource(Res.string.desktop_window_preview_title)
+    } else {
+        stringResource(Res.string.workspace_app_name)
+    }
     Window(
         onCloseRequest = {
             runBlocking { workspaceGateway?.lock() }
             exitApplication()
         },
-        title = if (previewEditor) "Tagloom · 编辑器预览" else "Tagloom",
+        title = windowTitle,
         state = windowState,
     ) {
         LaunchedEffect(Unit) {

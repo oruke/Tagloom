@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.TagloomEditorState
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染身份行下方无字段标签、无卡片边界的内置描述输入。
@@ -39,7 +41,7 @@ internal fun DocumentDescription(
             Box {
                 if (value.isBlank()) {
                     Text(
-                        text = "添加一句描述…",
+                        text = stringResource(Res.string.editor_document_description_placeholder),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

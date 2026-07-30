@@ -25,22 +25,26 @@ internal object DocumentHtmlRenderer {
      * 生成完整 UTF-8 HTML 文档。
      *
      * @param note 待导出的权威 Note payload。
+     * @param labels 导出内容使用的当前语言静态文本。
      * @return 包含标题、Block、RichText 与加注的 HTML 字节。
      */
-    fun render(note: Note): ByteArray = buildString {
+    fun render(
+        note: Note,
+        labels: DocumentExportLabels,
+    ): ByteArray = buildString {
         appendLine("<!doctype html>")
-        appendLine("<html lang=\"zh-CN\">")
+        appendLine("<html lang=\"${escapeAttribute(labels.htmlLanguageTag)}\">")
         appendLine("<head>")
         appendLine("<meta charset=\"utf-8\">")
         appendLine("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
         appendLine("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'\">")
-        appendLine("<title>${escapeHtml(note.title.ifBlank { "无标题" })}</title>")
+        appendLine("<title>${escapeHtml(note.title.ifBlank { labels.untitled })}</title>")
         appendLine("<style>$DOCUMENT_STYLE</style>")
         appendLine("</head>")
         appendLine("<body><main>")
-        appendLine("<h1 class=\"page-title\">${escapeHtml(note.title.ifBlank { "无标题" })}</h1>")
-        note.blocks.filterNot(Block::deleted).forEach { block -> appendLine(renderBlock(block)) }
-        append(renderAnnotations(note))
+        appendLine("<h1 class=\"page-title\">${escapeHtml(note.title.ifBlank { labels.untitled })}</h1>")
+        note.blocks.filterNot(Block::deleted).forEach { block -> appendLine(renderBlock(block, labels)) }
+        append(renderAnnotations(note, labels))
         appendLine("</main></body></html>")
     }.encodeToByteArray()
 
@@ -48,9 +52,13 @@ internal object DocumentHtmlRenderer {
      * 按 Block 协议生成对应 HTML 结构。
      *
      * @param block 待渲染的活动 Block。
+     * @param labels 导出内容使用的当前语言静态文本。
      * @return 已完成内容转义的 HTML 片段。
      */
-    private fun renderBlock(block: Block): String = when (val content = block.content) {
+    private fun renderBlock(
+        block: Block,
+        labels: DocumentExportLabels,
+    ): String = when (val content = block.content) {
         is HeadingBlockContent -> {
             val level = content.level.coerceIn(1, 6)
             "<h$level>${renderRichText(content.richText)}</h$level>"
@@ -68,11 +76,14 @@ internal object DocumentHtmlRenderer {
         DividerBlockContent -> "<hr>"
         is AttachmentBlockContent -> {
             val label = content.caption.plainText.ifBlank { content.fileName }
-            "<p class=\"attachment\">附件：${escapeHtml(label)}</p>"
+            "<p class=\"attachment\">${escapeHtml(labels.attachmentPrefix + label)}</p>"
         }
 
-        is NoteReferenceBlockContent -> "<p class=\"reference\">Tagloom 笔记引用：${escapeHtml(content.noteId.value)}</p>"
-        is UnknownBlockContent -> "<p class=\"unknown\">未支持的 Block：${escapeHtml(block.type)}</p>"
+        is NoteReferenceBlockContent -> {
+            "<p class=\"reference\">${escapeHtml(labels.noteReferencePrefix + content.noteId.value)}</p>"
+        }
+
+        is UnknownBlockContent -> "<p class=\"unknown\">${escapeHtml(labels.unknownBlockPrefix + block.type)}</p>"
     }
 
     /**
@@ -128,12 +139,16 @@ internal object DocumentHtmlRenderer {
      * 输出当前 Note 中仍存在的独立加注正文。
      *
      * @param note 待导出的 Note。
+     * @param labels 导出内容使用的当前语言静态文本。
      * @return 加注列表 HTML；没有加注时为空字符串。
      */
-    private fun renderAnnotations(note: Note): String {
+    private fun renderAnnotations(
+        note: Note,
+        labels: DocumentExportLabels,
+    ): String {
         if (note.annotations.isEmpty()) return ""
         return buildString {
-            appendLine("<section class=\"annotations\"><h2>加注</h2><ol>")
+            appendLine("<section class=\"annotations\"><h2>${escapeHtml(labels.annotationsTitle)}</h2><ol>")
             note.annotations.values.forEach { annotation ->
                 appendLine("<li id=\"annotation-${escapeAttribute(annotation.id.value)}\">${escapeHtml(annotation.body)}</li>")
             }

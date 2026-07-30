@@ -43,6 +43,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 在标题下方元数据区渲染一项紧凑属性值。
@@ -98,7 +100,7 @@ internal fun WorkspacePropertyValueEditor(
                 onDismissRequest = { menuOpen = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text("编辑属性定义") },
+                    text = { Text(stringResource(Res.string.editor_property_edit_definition)) },
                     onClick = {
                         menuOpen = false
                         onEditDefinition(definition)
@@ -107,7 +109,14 @@ internal fun WorkspacePropertyValueEditor(
                 property.sourceTagId?.let { sourceTagId ->
                     state.tagDefinitions.firstOrNull { tag -> tag.id == sourceTagId }?.let { sourceTag ->
                         DropdownMenuItem(
-                            text = { Text("编辑来源类型 ${sourceTag.name}") },
+                            text = {
+                                Text(
+                                    stringResource(
+                                        Res.string.editor_property_edit_source_type,
+                                        sourceTag.name,
+                                    ),
+                                )
+                            },
                             onClick = {
                                 menuOpen = false
                                 onEditSourceTag(sourceTag)
@@ -117,7 +126,7 @@ internal fun WorkspacePropertyValueEditor(
                 }
                 if (manuallyAttached) {
                     DropdownMenuItem(
-                        text = { Text("从当前笔记移除") },
+                        text = { Text(stringResource(Res.string.editor_property_remove_from_note)) },
                         onClick = {
                             menuOpen = false
                             state.setPropertyAttached(definition.id, attached = false)
@@ -175,7 +184,10 @@ private fun PropertyValueControl(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                "${definition.type.displayName()} · 只读保留",
+                stringResource(
+                    Res.string.editor_property_readonly_preserved,
+                    definition.type.localizedDisplayName(),
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -203,7 +215,7 @@ private fun MetadataTextProperty(
     val value = effectiveValue.stringContent()
     MetadataTextField(
         value = value,
-        placeholder = if (editable) "—" else "只读 · —",
+        placeholder = if (editable) "—" else stringResource(Res.string.editor_property_readonly_placeholder),
         onValueChange = { next -> state.propertyEditor.updateText(definition.id, next) },
         readOnly = !editable,
     )
@@ -231,6 +243,7 @@ private fun MetadataValidatedProperty(
     val displayed = effectiveValue.stringContent()
     var draft by remember(document.id, definition.id, displayed) { mutableStateOf(displayed) }
     var error by remember(document.id, definition.id) { mutableStateOf<String?>(null) }
+    val invalidValueError = stringResource(Res.string.editor_error_invalid_property_value)
 
     /**
      * 校验并提交当前草稿，失败时保留用户输入。
@@ -244,8 +257,8 @@ private fun MetadataValidatedProperty(
             }
         }.onSuccess {
             error = null
-        }.onFailure { failure ->
-            error = failure.message
+        }.onFailure {
+            error = invalidValueError
         }
     }
 
@@ -253,7 +266,7 @@ private fun MetadataValidatedProperty(
         Row(verticalAlignment = Alignment.CenterVertically) {
             MetadataTextField(
                 value = draft,
-                placeholder = mode.placeholder,
+                placeholder = mode.localizedPlaceholder(),
                 onValueChange = { next ->
                     draft = next
                     error = null
@@ -269,7 +282,11 @@ private fun MetadataValidatedProperty(
                 },
             )
             if (editable && draft.trim() != displayed) {
-                MetadataInlineAction(label = "应用", enabled = true, onClick = ::submitDraft)
+                MetadataInlineAction(
+                    label = stringResource(Res.string.editor_action_apply),
+                    enabled = true,
+                    onClick = ::submitDraft,
+                )
             }
         }
         error?.let { message ->
@@ -316,12 +333,19 @@ private fun MetadataBooleanProperty(
             enabled = editable,
         )
         Text(
-            if (value == true) "是" else "否",
+            if (value == true) {
+                stringResource(Res.string.editor_boolean_true)
+            } else {
+                stringResource(Res.string.editor_boolean_false)
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
         if (value != null && editable) {
-            MetadataInlineAction("清除", enabled = true) { state.propertyEditor.updateBoolean(definition.id, null) }
+            MetadataInlineAction(
+                stringResource(Res.string.editor_action_remove),
+                enabled = true,
+            ) { state.propertyEditor.updateBoolean(definition.id, null) }
         }
     }
 }
@@ -392,15 +416,26 @@ internal fun MetadataInlineAction(
 /**
  * 区分紧凑文本控件的提交校验策略。
  *
- * @property placeholder 对应格式提示。
  */
-private enum class ValueValidationMode(val placeholder: String) {
+private enum class ValueValidationMode {
     /** 有限数值。 */
-    NUMBER("输入数字"),
+    NUMBER,
 
     /** ISO 本地日期。 */
-    DATE("YYYY-MM-DD"),
+    DATE,
 
     /** ISO-8601 日期时间。 */
-    DATETIME("ISO-8601"),
+    DATETIME;
+
+    /**
+     * 返回当前校验策略对应的本地化格式提示。
+     *
+     * @return 数值、日期或日期时间的输入提示。
+     */
+    @Composable
+    fun localizedPlaceholder(): String = when (this) {
+        NUMBER -> stringResource(Res.string.editor_property_number_placeholder)
+        DATE -> stringResource(Res.string.editor_property_date_placeholder)
+        DATETIME -> stringResource(Res.string.editor_property_datetime_placeholder)
+    }
 }

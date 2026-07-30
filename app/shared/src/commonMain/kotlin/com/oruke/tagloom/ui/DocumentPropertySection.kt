@@ -25,6 +25,8 @@ import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.PropertyDefinitionDestination
 import com.oruke.tagloom.editor.TagloomEditorState
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染描述下方的默认属性、更多属性与渐进式新增入口。
@@ -67,7 +69,11 @@ internal fun DocumentPropertySection(
         )
         if (more.isNotEmpty()) {
             Text(
-                text = if (moreExpanded) "收起属性" else "更多属性 · ${more.size}",
+                text = if (moreExpanded) {
+                    stringResource(Res.string.editor_properties_hide_more)
+                } else {
+                    stringResource(Res.string.editor_properties_show_more, more.size)
+                },
                 modifier = Modifier.clickable { moreExpanded = !moreExpanded },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

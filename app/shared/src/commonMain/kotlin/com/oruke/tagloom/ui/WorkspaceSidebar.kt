@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.TagloomEditorState
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染只承担搜索、新建和笔记切换的桌面左侧导航。
@@ -64,7 +66,7 @@ internal fun WorkspaceSidebar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "全部笔记",
+                    stringResource(Res.string.editor_sidebar_all_notes),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -90,7 +92,11 @@ internal fun WorkspaceSidebar(
                 if (state.visibleDocuments.isEmpty()) {
                     item(key = "empty-notes") {
                         Text(
-                            if (state.filterText.isBlank()) "还没有笔记" else "没有匹配的笔记",
+                            if (state.filterText.isBlank()) {
+                                stringResource(Res.string.editor_sidebar_empty_notes)
+                            } else {
+                                stringResource(Res.string.editor_sidebar_no_matching_notes)
+                            },
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -127,9 +133,12 @@ private fun WorkspaceIdentity() {
             }
         }
         Column(Modifier.padding(start = 8.dp)) {
-            Text("Tagloom", style = MaterialTheme.typography.titleMedium)
             Text(
-                "织记",
+                stringResource(Res.string.workspace_app_name),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(Res.string.editor_sidebar_tagline),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -167,7 +176,7 @@ private fun SidebarSearchField(
                     Box(Modifier.weight(1f)) {
                         if (state.filterText.isBlank()) {
                             Text(
-                                "搜索笔记",
+                                stringResource(Res.string.editor_sidebar_search_notes),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -202,7 +211,7 @@ private fun NewDocumentAction(onClick: () -> Unit) {
             modifier = Modifier.height(32.dp).padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("+  新建笔记", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(Res.string.editor_sidebar_new_note), style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.weight(1f))
             Text(
                 "Ctrl N",
@@ -240,7 +249,9 @@ private fun SidebarDocumentItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = document.note.title.ifBlank { "无标题" },
+                text = document.note.title.ifBlank {
+                    stringResource(Res.string.editor_sidebar_untitled_note)
+                },
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -275,7 +286,7 @@ private fun SidebarSessionStatus() {
             shape = CircleShape,
         ) {}
         Text(
-            "已解锁 · 仅本地",
+            stringResource(Res.string.editor_sidebar_status_local_unlocked),
             modifier = Modifier.padding(start = 8.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

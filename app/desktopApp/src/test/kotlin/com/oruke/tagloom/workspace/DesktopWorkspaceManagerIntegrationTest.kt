@@ -60,6 +60,38 @@ class DesktopWorkspaceManagerIntegrationTest {
     }
 
     /**
+     * 验证 Recovery Key 可以重建新的高熵本机解锁材料，同时不重写既有对象密文。
+     */
+    @Test
+    fun recoveryKeyReplacesDeviceUnlockMaterialWithoutReencryptingObjects() = withWorkspace { root ->
+        val ids = AtomicInteger()
+        val creationManager = testManager(ids)
+        val prepared = creationManager.prepareCreation(root, TEST_PASSWORD)
+        creationManager.confirmCreation()
+        val saved = requireNotNull(creationManager.sessionOrNull()).saveNote(objectId = null, note = testNote())
+        val noteFile = root.resolve("notes/${saved.id.value}.note.enc")
+        val noteBefore = Files.readAllBytes(noteFile)
+        creationManager.lock()
+
+        val recoveryManager = testManager(ids)
+        val recovered = recoveryManager.recoverAndReplacePasswordSlot(
+            root = root,
+            recoveryKeyText = prepared.recoveryKeyText,
+            newPassword = TEST_DEVICE_UNLOCK_SECRET,
+        )
+
+        assertEquals(saved.id, recovered.notes.single().id)
+        assertTrue(noteBefore.contentEquals(Files.readAllBytes(noteFile)))
+        recoveryManager.lock()
+
+        assertFailsWith<RuntimeException> { testManager(ids).unlock(root, TEST_PASSWORD) }
+        val reopenedManager = testManager(ids)
+        val reopened = reopenedManager.unlock(root, TEST_DEVICE_UNLOCK_SECRET)
+        assertEquals(saved.id, reopened.notes.single().id)
+        reopenedManager.lock()
+    }
+
+    /**
      * 验证两阶段创建、保存、锁定、重新解锁和全文搜索形成完整闭环。
      */
     @Test
@@ -502,6 +534,9 @@ class DesktopWorkspaceManagerIntegrationTest {
 
         /** 更换密码测试使用的脱敏新密码。 */
         const val TEST_NEW_PASSWORD: String = "test-only-new-password"
+
+        /** 模拟桌面端生成、不会展示给用户的高熵本机解锁材料。 */
+        const val TEST_DEVICE_UNLOCK_SECRET: String = "test-only-device-unlock-material-0123456789"
 
         /** 临时目录固定前缀。 */
         const val TEST_DIRECTORY_PREFIX: String = "tagloom-desktop-session-test-"

@@ -146,27 +146,53 @@ class WorkspaceManifestService(
     ): ByteArray {
         val unlocked = unlockWithPassword(manifestBytes, oldPassword)
         return try {
-            val oldHeader = unlocked.file.publicHeader
-            val newSlot = masterKeySlotService.createPasswordSlot(
-                workspaceId = oldHeader.workspaceId,
-                keyId = oldHeader.activeKeyId,
-                slotId = newPasswordSlotId,
-                password = newPassword,
-                parameters = newParameters,
-                workspaceMasterKey = unlocked.workspaceMasterKey,
+            replacePasswordSlot(
+                unlocked = unlocked,
+                newPassword = newPassword,
+                newParameters = newParameters,
+                newPasswordSlotId = newPasswordSlotId,
             )
-            val retainedSlots = oldHeader.unlockSlots.filterNot { slot ->
-                slot.header.keyId == oldHeader.activeKeyId && slot.header.slotType == UnlockSlotType.PASSWORD
-            }
-            val newHeader = oldHeader.copy(unlockSlots = retainedSlots + newSlot)
-            val newPayload = unlocked.payload.copy(
-                publicHeaderSha256 = publicHeaderSha256(newHeader),
-                revision = unlocked.payload.revision + 1L,
-            )
-            encryptManifest(newHeader, newPayload, unlocked.workspaceMasterKey)
         } finally {
             unlocked.destroy()
         }
+    }
+
+    /**
+     * 使用已经认证的 Workspace Master Key 建立新的活动密码槽。
+     *
+     * 该入口用于 Recovery Key 或已授权设备重新建立本机解锁材料。它只替换活动密码槽，
+     * 保留 Recovery Key 槽和全部对象信封，因此不会把恢复流程误实现为重加密业务正文。
+     *
+     * @param unlocked 已通过任意合法解锁方式认证、且仍持有活动主密钥的 manifest。
+     * @param newPassword 新活动密码槽使用的高熵解锁材料。
+     * @param newParameters 新密码槽的 Argon2id 参数与随机 salt。
+     * @param newPasswordSlotId 新密码槽的稳定标识。
+     * @return 可原子替换当前 manifest 的新字节。
+     */
+    suspend fun replacePasswordSlot(
+        unlocked: UnlockedWorkspaceManifest,
+        newPassword: String,
+        newParameters: Argon2idParameters,
+        newPasswordSlotId: String,
+    ): ByteArray {
+        val oldHeader = unlocked.file.publicHeader
+        val newSlot = masterKeySlotService.createPasswordSlot(
+            workspaceId = oldHeader.workspaceId,
+            keyId = oldHeader.activeKeyId,
+            slotId = newPasswordSlotId,
+            password = newPassword,
+            parameters = newParameters,
+            workspaceMasterKey = unlocked.workspaceMasterKey,
+        )
+        val retainedSlots = oldHeader.unlockSlots.filterNot { slot ->
+            slot.header.keyId == oldHeader.activeKeyId && slot.header.slotType == UnlockSlotType.PASSWORD
+        }
+        val newHeader = oldHeader.copy(unlockSlots = retainedSlots + newSlot)
+        val newPayload = unlocked.payload.copy(
+            publicHeaderSha256 = publicHeaderSha256(newHeader),
+            revision = unlocked.payload.revision + 1L,
+        )
+        return encryptManifest(newHeader, newPayload, unlocked.workspaceMasterKey)
     }
 
     /**

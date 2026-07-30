@@ -40,6 +40,8 @@ import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.PropertyDefinitionDestination
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.platform.DocumentExportFormat
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染页面级路径、标题、标题下方元数据和导出入口。
@@ -80,40 +82,56 @@ internal fun PageHeader(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                "笔记",
+                stringResource(Res.string.editor_page_breadcrumb_note),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text("/", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
             Text(
                 when {
-                    saving -> "正在保存"
-                    document.dirty -> "未保存"
-                    else -> "已保存"
+                    saving -> stringResource(Res.string.editor_page_saving)
+                    document.dirty -> stringResource(Res.string.editor_page_unsaved)
+                    else -> stringResource(Res.string.editor_page_saved)
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = if (document.dirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
             Box {
-                PageTextAction("导出") { exportMenuOpen = true }
+                PageTextAction(stringResource(Res.string.editor_page_export)) { exportMenuOpen = true }
                 DropdownMenu(
                     expanded = exportMenuOpen,
                     onDismissRequest = { exportMenuOpen = false },
                 ) {
-                    ExportMenuItem("Markdown", "保留扩展语义", DocumentExportFormat.MARKDOWN) {
+                    ExportMenuItem(
+                        stringResource(Res.string.editor_export_markdown_name),
+                        stringResource(Res.string.editor_export_markdown_description),
+                        DocumentExportFormat.MARKDOWN,
+                    ) {
                         exportMenuOpen = false
                         onExport(it)
                     }
-                    ExportMenuItem("HTML", "浏览器可直接打开", DocumentExportFormat.HTML) {
+                    ExportMenuItem(
+                        stringResource(Res.string.editor_export_html_name),
+                        stringResource(Res.string.editor_export_html_description),
+                        DocumentExportFormat.HTML,
+                    ) {
                         exportMenuOpen = false
                         onExport(it)
                     }
-                    ExportMenuItem("PDF", "适合阅读与打印", DocumentExportFormat.PDF) {
+                    ExportMenuItem(
+                        stringResource(Res.string.editor_export_pdf_name),
+                        stringResource(Res.string.editor_export_pdf_description),
+                        DocumentExportFormat.PDF,
+                    ) {
                         exportMenuOpen = false
                         onExport(it)
                     }
-                    ExportMenuItem("Word", "可继续编辑的 .docx", DocumentExportFormat.WORD) {
+                    ExportMenuItem(
+                        stringResource(Res.string.editor_export_word_name),
+                        stringResource(Res.string.editor_export_word_description),
+                        DocumentExportFormat.WORD,
+                    ) {
                         exportMenuOpen = false
                         onExport(it)
                     }
@@ -151,7 +169,7 @@ internal fun PageHeader(
                 Box(Modifier.fillMaxWidth()) {
                     if (document.note.title.isBlank()) {
                         Text(
-                            "无标题",
+                            stringResource(Res.string.editor_sidebar_untitled_note),
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

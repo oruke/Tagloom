@@ -34,6 +34,8 @@ import com.oruke.tagloom.editor.PropertyDefinitionDestination
 import com.oruke.tagloom.editor.PropertyOptionDraft
 import com.oruke.tagloom.editor.requiresPropertyOptions
 import com.oruke.tagloom.editor.toEditorDraft
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 保存属性定义对话框的编辑目标与新建初始名称。
@@ -86,10 +88,19 @@ internal fun PropertyDefinitionDialog(
         (optionInputMode == PropertyOptionInputMode.FREE || optionDrafts.isNotEmpty()) &&
             !hasBlankOption && !hasDuplicateOption
         )
+    val nextOptionLabel = nextOptionLabel(optionDrafts)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (request.existing == null) "新建属性" else "编辑属性") },
+        title = {
+            Text(
+                if (request.existing == null) {
+                    stringResource(Res.string.editor_property_new)
+                } else {
+                    stringResource(Res.string.editor_property_edit)
+                },
+            )
+        },
         text = {
             Column(
                 modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
@@ -99,7 +110,7 @@ internal fun PropertyDefinitionDialog(
                     value = name,
                     onValueChange = { value -> name = value },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("属性名称") },
+                    label = { Text(stringResource(Res.string.editor_property_name)) },
                     singleLine = true,
                 )
                 PropertyTypePicker(
@@ -111,7 +122,7 @@ internal fun PropertyDefinitionDialog(
                 )
                 if (request.existing != null) {
                     Text(
-                        "已有属性的类型保持不变，避免现有值被静默重解释。",
+                        stringResource(Res.string.editor_property_existing_type_notice),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -137,7 +148,7 @@ internal fun PropertyDefinitionDialog(
                         onAdd = {
                             optionDrafts += PropertyOptionDraft(
                                 id = null,
-                                label = nextOptionLabel(optionDrafts),
+                                label = nextOptionLabel,
                             )
                         },
                     )
@@ -169,7 +180,11 @@ internal fun PropertyDefinitionDialog(
                 Text(destination.confirmLabel(request.existing != null, tagDefinitions))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.workspace_action_cancel))
+            }
+        },
     )
 }
 
@@ -185,15 +200,15 @@ private fun PropertyOptionInputModePicker(
     onModeChange: (PropertyOptionInputMode) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("选项来源", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.editor_property_option_source), style = MaterialTheme.typography.titleSmall)
         OptionInputModeChoice(
-            label = "固定选项",
-            description = "只能选择下方预设值",
+            label = stringResource(Res.string.editor_property_option_fixed),
+            description = stringResource(Res.string.editor_property_option_fixed_description),
             selected = mode == PropertyOptionInputMode.FIXED,
         ) { onModeChange(PropertyOptionInputMode.FIXED) }
         OptionInputModeChoice(
-            label = "允许自由输入",
-            description = "可搜索已有值，也可创建并记录新选项",
+            label = stringResource(Res.string.editor_property_option_free),
+            description = stringResource(Res.string.editor_property_option_free_description),
             selected = mode == PropertyOptionInputMode.FREE,
         ) { onModeChange(PropertyOptionInputMode.FREE) }
     }
@@ -246,16 +261,16 @@ private fun PropertyDestinationPicker(
 ) {
     var tagMenuOpen by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("创建到", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.editor_property_create_to), style = MaterialTheme.typography.titleSmall)
         DestinationChoice(
-            label = "当前笔记",
-            description = "只在这篇笔记建立手动绑定",
+            label = stringResource(Res.string.editor_property_current_note),
+            description = stringResource(Res.string.editor_property_current_note_description),
             selected = scope == PropertyCreationScope.CURRENT_NOTE,
             enabled = true,
         ) { onScopeChange(PropertyCreationScope.CURRENT_NOTE) }
         DestinationChoice(
-            label = "对象类型",
-            description = "所有使用该类型的 Note 都会继承",
+            label = stringResource(Res.string.editor_property_object_type),
+            description = stringResource(Res.string.editor_property_object_type_description),
             selected = scope == PropertyCreationScope.TAG,
             enabled = tagDefinitions.isNotEmpty(),
         ) { onScopeChange(PropertyCreationScope.TAG) }
@@ -263,7 +278,7 @@ private fun PropertyDestinationPicker(
             Box {
                 val selectedName = tagDefinitions.firstOrNull { definition -> definition.id == selectedTagId }?.name
                 OutlinedButton(onClick = { tagMenuOpen = true }) {
-                    Text(selectedName ?: "选择类型")
+                    Text(selectedName ?: stringResource(Res.string.editor_property_choose_type))
                 }
                 DropdownMenu(expanded = tagMenuOpen, onDismissRequest = { tagMenuOpen = false }) {
                     tagDefinitions.forEach { definition ->
@@ -280,8 +295,8 @@ private fun PropertyDestinationPicker(
             }
         }
         DestinationChoice(
-            label = "仅工作区",
-            description = "先保存为可复用 schema，不立即绑定",
+            label = stringResource(Res.string.editor_property_workspace_only),
+            description = stringResource(Res.string.editor_property_workspace_only_description),
             selected = scope == PropertyCreationScope.WORKSPACE,
             enabled = true,
         ) { onScopeChange(PropertyCreationScope.WORKSPACE) }
@@ -325,18 +340,24 @@ private fun DestinationChoice(
  * @param tags 当前标签目录。
  * @return 面向用户的保存动作文本。
  */
+@Composable
 private fun PropertyDefinitionDestination?.confirmLabel(
     editing: Boolean,
     tags: List<TagDefinition>,
 ): String = when {
-    editing -> "保存"
-    this == PropertyDefinitionDestination.CurrentNote -> "创建到当前笔记"
-    this == PropertyDefinitionDestination.Workspace -> "创建到工作区"
-    this is PropertyDefinitionDestination.Tag -> {
-        val name = tags.firstOrNull { definition -> definition.id == tagId }?.name ?: "类型"
-        "创建并绑定 $name"
+    editing -> stringResource(Res.string.workspace_action_save)
+    this == PropertyDefinitionDestination.CurrentNote -> {
+        stringResource(Res.string.editor_property_confirm_current_note)
     }
-    else -> "选择创建位置"
+    this == PropertyDefinitionDestination.Workspace -> {
+        stringResource(Res.string.editor_property_confirm_workspace)
+    }
+    this is PropertyDefinitionDestination.Tag -> {
+        val name = tags.firstOrNull { definition -> definition.id == tagId }?.name
+            ?: stringResource(Res.string.editor_property_object_type)
+        stringResource(Res.string.editor_property_confirm_bind_type, name)
+    }
+    else -> stringResource(Res.string.editor_property_confirm_choose_destination)
 }
 
 /** 区分新属性对话框中的三种创建层级。 */
@@ -373,7 +394,7 @@ private fun PropertyTypePicker(
             onClick = { onExpandedChange(true) },
             enabled = editable,
         ) {
-            Text("类型：${type.displayName()}")
+            Text(stringResource(Res.string.editor_property_type_prefix, type.localizedDisplayName()))
         }
         DropdownMenu(
             expanded = expanded,
@@ -381,7 +402,7 @@ private fun PropertyTypePicker(
         ) {
             EDITABLE_PROPERTY_TYPES.forEach { candidate ->
                 DropdownMenuItem(
-                    text = { Text(candidate.displayName()) },
+                    text = { Text(candidate.localizedDisplayName()) },
                     onClick = {
                         onTypeSelected(candidate)
                         onExpandedChange(false)
@@ -414,7 +435,7 @@ private fun PropertyOptionDraftList(
     onAdd: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("选项", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.editor_property_options), style = MaterialTheme.typography.titleSmall)
         options.forEachIndexed { index, option ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -425,19 +446,21 @@ private fun PropertyOptionDraftList(
                     value = option.label,
                     onValueChange = { label -> onLabelChange(index, label) },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("选项名称") },
+                    placeholder = { Text(stringResource(Res.string.editor_property_option_name)) },
                     singleLine = true,
                 )
-                TextButton(onClick = { onRemove(index) }) { Text("移除") }
+                TextButton(onClick = { onRemove(index) }) {
+                    Text(stringResource(Res.string.editor_action_remove))
+                }
             }
         }
-        OutlinedButton(onClick = onAdd) { Text("+ 新增选项") }
+        OutlinedButton(onClick = onAdd) { Text(stringResource(Res.string.editor_property_add_option)) }
         when {
             options.isEmpty() && inputMode == PropertyOptionInputMode.FIXED -> {
-                PropertyOptionError("固定单选和多选属性至少需要一个选项")
+                PropertyOptionError(stringResource(Res.string.editor_property_option_required))
             }
-            hasBlankOption -> PropertyOptionError("选项名称不能为空")
-            hasDuplicateOption -> PropertyOptionError("选项名称不能重复")
+            hasBlankOption -> PropertyOptionError(stringResource(Res.string.editor_property_option_name_required))
+            hasDuplicateOption -> PropertyOptionError(stringResource(Res.string.editor_property_option_name_duplicate))
         }
     }
 }
@@ -457,18 +480,21 @@ private fun PropertyOptionError(message: String) {
 }
 
 /**
- * 返回不与现有选项重名的默认名称。
+ * 返回不与现有选项重名的本地化默认名称。
  *
  * @param options 当前选项草稿。
- * @return 形如“选项 1”的最小可用名称。
+ * @return 当前 Locale 下最小可用的“选项 N”名称。
  */
+@Composable
 private fun nextOptionLabel(options: List<PropertyOptionDraft>): String {
-    val existing = options.map { option -> option.label.trim().lowercase() }.toSet()
+    val existing = options.map { option -> option.label.trim() }.toSet()
     var number = 1
-    while ("选项 $number".lowercase() in existing) {
+    var candidate = stringResource(Res.string.editor_property_option_default_name, number)
+    while (candidate in existing) {
         number += 1
+        candidate = stringResource(Res.string.editor_property_option_default_name, number)
     }
-    return "选项 $number"
+    return candidate
 }
 
 /** 编辑器当前提供完整值输入的属性类型。 */

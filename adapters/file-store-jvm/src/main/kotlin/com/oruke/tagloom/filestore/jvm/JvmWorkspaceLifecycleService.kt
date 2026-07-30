@@ -111,6 +111,32 @@ class JvmWorkspaceLifecycleService(
     }
 
     /**
+     * 使用已经通过 Recovery Key 或已授权设备认证的会话主密钥原子替换活动密码槽。
+     *
+     * 该操作用于重新建立本机解锁材料。它不重写对象信封，也不改变 Recovery Key，
+     * 因此恢复后的工作区仍保持原有权威快照和独立恢复能力。
+     *
+     * @param unlocked 当前已认证且尚未销毁的 manifest。
+     * @param newPassword 新密码槽使用的高熵本机解锁材料。
+     * @param newParameters 新密码槽的 Argon2id 参数。
+     * @param newPasswordSlotId 新密码槽稳定标识。
+     */
+    suspend fun replacePasswordSlot(
+        unlocked: UnlockedWorkspaceManifest,
+        newPassword: String,
+        newParameters: Argon2idParameters,
+        newPasswordSlotId: String,
+    ) {
+        val changed = manifestService.replacePasswordSlot(
+            unlocked = unlocked,
+            newPassword = newPassword,
+            newParameters = newParameters,
+            newPasswordSlotId = newPasswordSlotId,
+        )
+        atomicFiles.writeAtomically(paths.manifest, changed)
+    }
+
+    /**
      * 锁定工作区并主动清零会话持有的 Workspace Master Key。
      *
      * @param unlocked 当前已解锁会话。

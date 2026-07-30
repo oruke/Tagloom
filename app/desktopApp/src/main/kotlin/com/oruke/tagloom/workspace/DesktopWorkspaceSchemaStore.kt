@@ -171,7 +171,7 @@ class DesktopWorkspaceSchemaStore(
      * @return 脱敏问题。
      */
     private fun ManifestObjectRecord.toIssue(failure: DesktopIntegrityFailure): DesktopObjectIntegrityIssue =
-        DesktopObjectIntegrityIssue(kind.name, objectId, failure)
+        DesktopObjectIntegrityIssue(kind, objectId, failure)
 
     /**
      * 把摘要字节编码为小写十六进制。

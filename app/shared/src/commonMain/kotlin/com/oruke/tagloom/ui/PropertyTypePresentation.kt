@@ -1,24 +1,28 @@
 package com.oruke.tagloom.ui
 
+import androidx.compose.runtime.Composable
 import com.oruke.tagloom.core.model.PropertyTypes
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
- * 返回属性 schema 类型的紧凑中文名称。
+ * 返回属性 schema 类型在当前 Locale 下的紧凑展示名称。
  *
  * @return 用户可识别的属性类型。
  */
-internal fun String.displayName(): String = when (this) {
-    PropertyTypes.TEXT -> "文本"
-    PropertyTypes.NUMBER -> "数字"
-    PropertyTypes.BOOLEAN -> "复选框"
-    PropertyTypes.DATE -> "日期"
-    PropertyTypes.DATETIME -> "日期时间"
-    PropertyTypes.SELECT -> "单选"
-    PropertyTypes.MULTI_SELECT -> "多选"
-    PropertyTypes.URL -> "链接"
-    PropertyTypes.EMAIL -> "邮箱"
-    PropertyTypes.RELATION -> "关系"
-    PropertyTypes.FILE -> "文件"
-    PropertyTypes.FORMULA -> "公式"
+@Composable
+internal fun String.localizedDisplayName(): String = when (this) {
+    PropertyTypes.TEXT -> stringResource(Res.string.editor_property_type_text)
+    PropertyTypes.NUMBER -> stringResource(Res.string.editor_property_type_number)
+    PropertyTypes.BOOLEAN -> stringResource(Res.string.editor_property_type_boolean)
+    PropertyTypes.DATE -> stringResource(Res.string.editor_property_type_date)
+    PropertyTypes.DATETIME -> stringResource(Res.string.editor_property_type_datetime)
+    PropertyTypes.SELECT -> stringResource(Res.string.editor_property_type_select)
+    PropertyTypes.MULTI_SELECT -> stringResource(Res.string.editor_property_type_multi_select)
+    PropertyTypes.URL -> stringResource(Res.string.editor_property_type_url)
+    PropertyTypes.EMAIL -> stringResource(Res.string.editor_property_type_email)
+    PropertyTypes.RELATION -> stringResource(Res.string.editor_property_type_relation)
+    PropertyTypes.FILE -> stringResource(Res.string.editor_property_type_file)
+    PropertyTypes.FORMULA -> stringResource(Res.string.editor_property_type_formula)
     else -> this
 }

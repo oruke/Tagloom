@@ -42,6 +42,8 @@ import com.oruke.tagloom.editor.upsertTagDefinition
 import com.oruke.tagloom.platform.DocumentExportRequest
 import com.oruke.tagloom.platform.DocumentFileGateway
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染左侧导航与中央页面组成的 Tagloom 工作区。
@@ -75,6 +77,30 @@ fun TagloomWorkspaceScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val searchFocusRequester = remember { FocusRequester() }
+    val exportUnavailableMessage = stringResource(Res.string.editor_export_unavailable)
+    val exportFailedMessage = stringResource(Res.string.editor_export_failed)
+    val markdownName = stringResource(Res.string.editor_export_markdown_name)
+    val htmlName = stringResource(Res.string.editor_export_html_name)
+    val pdfName = stringResource(Res.string.editor_export_pdf_name)
+    val wordName = stringResource(Res.string.editor_export_word_name)
+    val exportSuccessMessages = mapOf(
+        com.oruke.tagloom.platform.DocumentExportFormat.MARKDOWN to stringResource(
+            Res.string.editor_export_success,
+            markdownName,
+        ),
+        com.oruke.tagloom.platform.DocumentExportFormat.HTML to stringResource(
+            Res.string.editor_export_success,
+            htmlName,
+        ),
+        com.oruke.tagloom.platform.DocumentExportFormat.PDF to stringResource(
+            Res.string.editor_export_success,
+            pdfName,
+        ),
+        com.oruke.tagloom.platform.DocumentExportFormat.WORD to stringResource(
+            Res.string.editor_export_success,
+            wordName,
+        ),
+    )
     val document = state.selectedDocument
     val saveTagDefinition = onSaveTagDefinition ?: { definition: TagDefinition, attach: Boolean ->
         state.upsertTagDefinition(definition)
@@ -141,7 +167,7 @@ fun TagloomWorkspaceScreen(
                             val gateway = documentFileGateway
                             if (gateway == null) {
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("当前平台尚未提供文档导出能力")
+                                    snackbarHostState.showSnackbar(exportUnavailableMessage)
                                 }
                             } else {
                                 coroutineScope.launch {
@@ -154,11 +180,11 @@ fun TagloomWorkspaceScreen(
                                             ),
                                         )
                                     }.getOrElse {
-                                        snackbarHostState.showSnackbar("导出失败，请检查目标文件是否可写")
+                                        snackbarHostState.showSnackbar(exportFailedMessage)
                                         false
                                     }
                                     if (exported) {
-                                        snackbarHostState.showSnackbar("${format.displayName()} 已导出")
+                                        snackbarHostState.showSnackbar(requireNotNull(exportSuccessMessages[format]))
                                     }
                                 }
                             }
@@ -195,14 +221,14 @@ private fun EmptyWorkspace(
 ) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("开始写下一篇笔记", style = MaterialTheme.typography.headlineMedium)
+            Text(stringResource(Res.string.editor_empty_title), style = MaterialTheme.typography.headlineMedium)
             Text(
-                "内容会保存为本地加密对象快照",
+                stringResource(Res.string.editor_empty_description),
                 modifier = Modifier.padding(top = 8.dp, bottom = 18.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(onClick = onCreate) { Text("新建笔记") }
+            Button(onClick = onCreate) { Text(stringResource(Res.string.editor_action_new_note)) }
         }
     }
 }
@@ -220,16 +246,4 @@ private fun String.toSafeFileBaseName(): String {
         .ifBlank { "tagloom-note" }
         .take(80)
     return safe
-}
-
-/**
- * 返回导出完成提示使用的中文格式名。
- *
- * @return 用户可识别的格式名称。
- */
-private fun com.oruke.tagloom.platform.DocumentExportFormat.displayName(): String = when (this) {
-    com.oruke.tagloom.platform.DocumentExportFormat.MARKDOWN -> "Markdown"
-    com.oruke.tagloom.platform.DocumentExportFormat.HTML -> "HTML"
-    com.oruke.tagloom.platform.DocumentExportFormat.PDF -> "PDF"
-    com.oruke.tagloom.platform.DocumentExportFormat.WORD -> "Word"
 }

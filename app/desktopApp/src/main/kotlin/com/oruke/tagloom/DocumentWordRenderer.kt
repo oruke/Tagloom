@@ -29,22 +29,26 @@ internal object DocumentWordRenderer {
      * 把 Note 编码为真实 DOCX 压缩包。
      *
      * @param note 待导出的权威 Note payload。
+     * @param labels 导出内容使用的当前语言静态文本。
      * @return 可由 Word、LibreOffice 打开的 DOCX 字节。
      */
-    fun render(note: Note): ByteArray {
+    fun render(
+        note: Note,
+        labels: DocumentExportLabels,
+    ): ByteArray {
         val output = ByteArrayOutputStream()
         XWPFDocument().use { document ->
-            document.properties.coreProperties.title = note.title.ifBlank { "无标题" }
+            document.properties.coreProperties.title = note.title.ifBlank { labels.untitled }
             document.createParagraph().apply {
                 style = "Title"
                 createRun().apply {
                     isBold = true
                     fontSize = 24
-                    setText(note.title.ifBlank { "无标题" })
+                    setText(note.title.ifBlank { labels.untitled })
                 }
             }
-            note.blocks.filterNot(Block::deleted).forEach { block -> appendBlock(document, block) }
-            appendAnnotations(document, note)
+            note.blocks.filterNot(Block::deleted).forEach { block -> appendBlock(document, block, labels) }
+            appendAnnotations(document, note, labels)
             document.write(output)
         }
         return output.toByteArray()
@@ -55,10 +59,12 @@ internal object DocumentWordRenderer {
      *
      * @param document 当前 Word 文档。
      * @param block 待输出的活动 Block。
+     * @param labels 导出内容使用的当前语言静态文本。
      */
     private fun appendBlock(
         document: XWPFDocument,
         block: Block,
+        labels: DocumentExportLabels,
     ) {
         when (val content = block.content) {
             is HeadingBlockContent -> document.createParagraph().apply {
@@ -92,14 +98,16 @@ internal object DocumentWordRenderer {
 
             DividerBlockContent -> document.createParagraph().createRun().setText("────────────────────────────────────────")
             is AttachmentBlockContent -> document.createParagraph().createRun().setText(
-                "附件：${content.caption.plainText.ifBlank { content.fileName }}",
+                labels.attachmentPrefix + content.caption.plainText.ifBlank { content.fileName },
             )
 
             is NoteReferenceBlockContent -> document.createParagraph().createRun().setText(
-                "Tagloom 笔记引用：${content.noteId.value}",
+                labels.noteReferencePrefix + content.noteId.value,
             )
 
-            is UnknownBlockContent -> document.createParagraph().createRun().setText("未支持的 Block：${block.type}")
+            is UnknownBlockContent -> document.createParagraph().createRun().setText(
+                labels.unknownBlockPrefix + block.type,
+            )
         }
     }
 
@@ -155,15 +163,17 @@ internal object DocumentWordRenderer {
      *
      * @param document 当前 Word 文档。
      * @param note 待导出的 Note。
+     * @param labels 导出内容使用的当前语言静态文本。
      */
     private fun appendAnnotations(
         document: XWPFDocument,
         note: Note,
+        labels: DocumentExportLabels,
     ) {
         if (note.annotations.isEmpty()) return
         document.createParagraph().apply {
             style = "Heading2"
-            createRun().setText("加注")
+            createRun().setText(labels.annotationsTitle)
         }
         note.annotations.values.forEachIndexed { index, annotation ->
             document.createParagraph().createRun().setText("${index + 1}. ${annotation.body}")

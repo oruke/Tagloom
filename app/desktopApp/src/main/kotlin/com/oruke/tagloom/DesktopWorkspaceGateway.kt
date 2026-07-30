@@ -15,9 +15,9 @@ import com.oruke.tagloom.platform.WorkspaceSearchHit
 import com.oruke.tagloom.platform.WorkspaceSavedQuery
 import com.oruke.tagloom.platform.WorkspaceTagDefinition
 import com.oruke.tagloom.platform.WorkspacePropertyDefinition
-import com.oruke.tagloom.workspace.DesktopStoredNote
+import com.oruke.tagloom.platform.WorkspaceRecentWorkspace
 import com.oruke.tagloom.workspace.DesktopWorkspaceManager
-import com.oruke.tagloom.workspace.DesktopWorkspaceOpenState
+import com.oruke.tagloom.workspace.DesktopWorkspaceLocalAccessService
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
@@ -33,6 +33,8 @@ import kotlinx.coroutines.withContext
 class DesktopWorkspaceGateway(
     /** 持有创建、解锁和活动会话生命周期的 Manager。 */
     private val manager: DesktopWorkspaceManager = DesktopWorkspaceManager(),
+    /** 协调本机访问材料与最近工作区登记的生命周期。 */
+    private val localAccessService: DesktopWorkspaceLocalAccessService = DesktopWorkspaceLocalAccessService(),
 ) : WorkspaceGateway {
     /**
      * 生成不含业务语义的 UUID 文本。
@@ -53,14 +55,54 @@ class DesktopWorkspaceGateway(
     override fun currentUtcTimestamp(): String = Instant.now().toString()
 
     /**
+     * 返回桌面端最近登记工作区的安全展示信息。
+     *
+     * @return 未登记工作区时为空；结果不包含本机路径或解锁材料。
+     */
+    override suspend fun recentWorkspaceOrNull(): WorkspaceRecentWorkspace? =
+        localAccessService.recentWorkspaceOrNull()?.let { access ->
+            WorkspaceRecentWorkspace(
+                displayName = access.displayName,
+                requiresPin = access.requiresPin,
+            )
+        }
+
+    /**
+     * 使用当前 Windows 帐户保护的材料自动打开最近工作区。
+     *
+     * @return 已认证工作区的共享打开结果。
+     */
+    override suspend fun openRecentWorkspace(): WorkspaceOpenResult {
+        return localAccessService.withActiveWorkspaceCredential(pin = null) { root, secret ->
+            manager.unlock(root, secret)
+        }.toSharedWorkspaceOpenResult()
+    }
+
+    /**
+     * 使用本机 PIN 解开最近工作区的高熵材料并打开工作区。
+     *
+     * @param pin 用户输入的本机 PIN。
+     * @return 已认证工作区的共享打开结果。
+     */
+    override suspend fun unlockRecentWorkspace(pin: String): WorkspaceOpenResult {
+        return localAccessService.withActiveWorkspaceCredential(pin) { root, secret ->
+            manager.unlock(root, secret)
+        }.toSharedWorkspaceOpenResult()
+    }
+
+    /**
      * 选择空目录并准备新工作区。
      *
-     * @param password 初始密码。
+     * @param pin 用户为当前设备设置的可选 PIN；为空时不启用 PIN。
      * @return 用户取消时为空，否则返回一次性 Recovery Key。
      */
-    override suspend fun prepareCreation(password: String): WorkspacePreparedCreation? {
-        val root = chooseDirectory("选择空目录创建 Tagloom 工作区") ?: return null
-        val prepared = manager.prepareCreation(root, password)
+    override suspend fun prepareCreation(pin: String?): WorkspacePreparedCreation? {
+        val root = chooseDirectory(DesktopWorkspaceDialogText.createWorkspaceDirectoryTitle()) ?: return null
+        val prepared = localAccessService.preparePendingCreation(
+            root = root,
+            pin = pin,
+            prepare = { secret -> manager.prepareCreation(root, secret) },
+        )
         return WorkspacePreparedCreation(prepared.recoveryKeyText)
     }
 
@@ -69,33 +111,37 @@ class DesktopWorkspaceGateway(
      *
      * @return 已打开工作区。
      */
-    override suspend fun confirmCreation(): WorkspaceOpenResult = manager.confirmCreation().toSharedResult()
+    override suspend fun confirmCreation(): WorkspaceOpenResult {
+        return localAccessService.confirmPendingCreation(
+            confirm = manager::confirmCreation,
+            onRegistrationFailure = manager::lock,
+        ).toSharedWorkspaceOpenResult()
+    }
 
     /** 放弃尚未确认的创建流程。 */
     override fun cancelCreation() {
         manager.cancelPendingCreation()
+        localAccessService.discardPendingCreation()
     }
 
     /**
-     * 选择既有目录并使用密码解锁。
+     * 选择既有目录，使用 Recovery Key 建立新的本机访问入口。
      *
-     * @param password 本次密码。
+     * @param recoveryKeyText 用户离线保存的 Recovery Key。
+     * @param pin 用户为当前设备设置的可选 PIN；为空时不启用 PIN。
      * @return 用户取消时为空。
      */
-    override suspend fun unlockWithPassword(password: String): WorkspaceOpenResult? {
-        val root = chooseDirectory("选择 Tagloom 工作区") ?: return null
-        return manager.unlock(root, password).toSharedResult()
-    }
-
-    /**
-     * 选择既有目录并使用 Recovery Key 解锁。
-     *
-     * @param recoveryKeyText 恢复文本。
-     * @return 用户取消时为空。
-     */
-    override suspend fun unlockWithRecovery(recoveryKeyText: String): WorkspaceOpenResult? {
-        val root = chooseDirectory("选择要用 Recovery Key 解锁的 Tagloom 工作区") ?: return null
-        return manager.unlockWithRecovery(root, recoveryKeyText).toSharedResult()
+    override suspend fun unlockWithRecovery(
+        recoveryKeyText: String,
+        pin: String?,
+    ): WorkspaceOpenResult? {
+        val root = chooseDirectory(DesktopWorkspaceDialogText.recoverWorkspaceDirectoryTitle()) ?: return null
+        return localAccessService.establishLocalAccess(
+            root = root,
+            pin = pin,
+            authenticate = { secret -> manager.recoverAndReplacePasswordSlot(root, recoveryKeyText, secret) },
+            onRegistrationFailure = manager::lock,
+        ).toSharedWorkspaceOpenResult()
     }
 
     /**
@@ -110,43 +156,81 @@ class DesktopWorkspaceGateway(
     }
 
     /**
-     * 选择密文备份与空目录，并使用原密码打开恢复工作区。
+     * 选择密文备份与空目录，使用 Recovery Key 恢复并建立本机访问入口。
      *
-     * @param password 原工作区密码。
+     * @param recoveryKeyText 用户离线保存的 Recovery Key。
+     * @param pin 用户为恢复后工作区设置的可选 PIN；为空时不启用 PIN。
      * @return 用户取消任一步骤时为空。
      */
-    override suspend fun restoreBackup(password: String): WorkspaceOpenResult? {
+    override suspend fun restoreBackup(
+        recoveryKeyText: String,
+        pin: String?,
+    ): WorkspaceOpenResult? {
         val archive = chooseBackupArchive() ?: return null
-        val target = chooseDirectory("选择空目录恢复 Tagloom 工作区") ?: return null
-        return manager.restoreBackup(archive, target, password).toSharedResult()
+        val target = chooseDirectory(DesktopWorkspaceDialogText.restoreWorkspaceDirectoryTitle()) ?: return null
+        return localAccessService.establishLocalAccess(
+            root = target,
+            pin = pin,
+            authenticate = { secret ->
+                manager.restoreBackupWithRecovery(
+                    archive = archive,
+                    targetRoot = target,
+                    recoveryKeyText = recoveryKeyText,
+                    newPassword = secret,
+                )
+            },
+            onRegistrationFailure = manager::lock,
+        ).toSharedWorkspaceOpenResult()
     }
 
     /**
-     * 更换活动工作区密码并保持对象密文不变。
+     * 为当前 Windows 帐户保护的本机材料启用 PIN。
      *
-     * @param oldPassword 当前密码。
-     * @param newPassword 新密码。
-     * @return 刷新后的共享打开状态。
+     * @param pin 用户设置的 6 至 12 位数字 PIN。
      */
-    override suspend fun changePassword(
-        oldPassword: String,
-        newPassword: String,
-    ): WorkspaceOpenResult = manager.changeActivePassword(oldPassword, newPassword).toSharedResult()
+    override suspend fun enablePin(pin: String) {
+        localAccessService.enablePin(pin)
+    }
+
+    /**
+     * 认证当前 PIN 后用新 PIN 重新加密本机解锁材料。
+     *
+     * 工作区 manifest、对象密文和 Recovery Key 全部保持不变。
+     *
+     * @param currentPin 当前设备 PIN。
+     * @param newPin 新设备 PIN。
+     */
+    override suspend fun changePin(
+        currentPin: String,
+        newPin: String,
+    ) {
+        localAccessService.changePin(currentPin, newPin)
+    }
+
+    /**
+     * 认证当前 PIN 后停止要求 PIN，改回当前 Windows 用户自动打开模式。
+     *
+     * @param currentPin 当前设备 PIN。
+     */
+    override suspend fun disablePin(currentPin: String) {
+        localAccessService.disablePin(currentPin)
+    }
 
     /**
      * 轮换活动工作区主密钥并返回只展示一次的新 Recovery Key。
      *
-     * @param currentPassword 当前密码。
-     * @param newPassword 新主密钥密码槽使用的密码。
+     * 高熵本机解锁材料在轮换前后保持不变；它不会把用户 PIN 写入工作区 manifest，
+     * 同时避免本机登记与已经提交的新 manifest 之间出现两套不同解锁材料。
+     *
+     * @param currentPin 当前设备 PIN；未启用 PIN 时为空。
      * @return 使用新密钥重新打开的共享状态与新 Recovery Key。
      */
-    override suspend fun rotateMasterKey(
-        currentPassword: String,
-        newPassword: String,
-    ): WorkspaceMasterKeyRotationResult {
-        val result = manager.rotateActiveMasterKey(currentPassword, newPassword)
+    override suspend fun rotateMasterKey(currentPin: String?): WorkspaceMasterKeyRotationResult {
+        val result = localAccessService.withActiveWorkspaceCredential(currentPin) { _, secret ->
+            manager.rotateActiveMasterKey(secret, secret)
+        }
         return WorkspaceMasterKeyRotationResult(
-            openResult = result.openState.toSharedResult(),
+            openResult = result.openState.toSharedWorkspaceOpenResult(),
             recoveryKeyText = result.recoveryKeyText,
         )
     }
@@ -163,7 +247,7 @@ class DesktopWorkspaceGateway(
         note: Note,
     ): WorkspaceNote = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }
         .saveNote(objectId, note)
-        .toSharedNote()
+        .toSharedWorkspaceNote()
 
     /**
      * 把 Note 写为 tombstone。
@@ -264,18 +348,22 @@ class DesktopWorkspaceGateway(
      *
      * @return 用户确认的规范绝对路径；取消时为空。
      */
-    private suspend fun chooseBackupDestination(): Path? = withContext(Dispatchers.Swing) {
-        val chooser = JFileChooser().apply {
-            dialogTitle = "保存 Tagloom 密文备份"
-            fileSelectionMode = JFileChooser.FILES_ONLY
-            isAcceptAllFileFilterUsed = false
-            fileFilter = FileNameExtensionFilter("Tagloom 备份 (*.tagloom-backup.zip)", "zip")
-            selectedFile = java.io.File(DEFAULT_BACKUP_FILE_NAME)
-        }
-        if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
-            normalizeBackupFileName(chooser.selectedFile.toPath())
-        } else {
-            null
+    private suspend fun chooseBackupDestination(): Path? {
+        val title = DesktopWorkspaceDialogText.backupDestinationTitle()
+        val fileTypeDescription = DesktopWorkspaceDialogText.backupFileTypeDescription()
+        return withContext(Dispatchers.Swing) {
+            val chooser = JFileChooser().apply {
+                dialogTitle = title
+                fileSelectionMode = JFileChooser.FILES_ONLY
+                isAcceptAllFileFilterUsed = false
+                fileFilter = FileNameExtensionFilter(fileTypeDescription, "zip")
+                selectedFile = java.io.File(DEFAULT_BACKUP_FILE_NAME)
+            }
+            if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
+                normalizeBackupFileName(chooser.selectedFile.toPath())
+            } else {
+                null
+            }
         }
     }
 
@@ -284,17 +372,21 @@ class DesktopWorkspaceGateway(
      *
      * @return 用户确认的规范绝对路径；取消时为空。
      */
-    private suspend fun chooseBackupArchive(): Path? = withContext(Dispatchers.Swing) {
-        val chooser = JFileChooser().apply {
-            dialogTitle = "选择 Tagloom 密文备份"
-            fileSelectionMode = JFileChooser.FILES_ONLY
-            isAcceptAllFileFilterUsed = false
-            fileFilter = FileNameExtensionFilter("Tagloom 备份 (*.tagloom-backup.zip)", "zip")
-        }
-        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-            chooser.selectedFile.toPath().toAbsolutePath().normalize()
-        } else {
-            null
+    private suspend fun chooseBackupArchive(): Path? {
+        val title = DesktopWorkspaceDialogText.backupArchiveTitle()
+        val fileTypeDescription = DesktopWorkspaceDialogText.backupFileTypeDescription()
+        return withContext(Dispatchers.Swing) {
+            val chooser = JFileChooser().apply {
+                dialogTitle = title
+                fileSelectionMode = JFileChooser.FILES_ONLY
+                isAcceptAllFileFilterUsed = false
+                fileFilter = FileNameExtensionFilter(fileTypeDescription, "zip")
+            }
+            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                chooser.selectedFile.toPath().toAbsolutePath().normalize()
+            } else {
+                null
+            }
         }
     }
 
@@ -312,36 +404,6 @@ class DesktopWorkspaceGateway(
             normalized.resolveSibling(normalized.fileName.toString() + BACKUP_FILE_SUFFIX)
         }
     }
-
-    /**
-     * 把桌面恢复状态投影为共享 UI 模型。
-     *
-     * @return 不含本机路径或密钥的打开结果。
-     */
-    private fun DesktopWorkspaceOpenState.toSharedResult(): WorkspaceOpenResult = WorkspaceOpenResult(
-        notes = notes.map { note -> note.toSharedNote() },
-        savedQueries = savedQueries.map { saved -> WorkspaceSavedQuery(saved.id, saved.snapshot.payload) },
-        tagDefinitions = tagDefinitions.map { saved -> WorkspaceTagDefinition(saved.snapshot.payload) },
-        propertyDefinitions = propertyDefinitions.map { saved -> WorkspacePropertyDefinition(saved.snapshot.payload) },
-        readOnly = readOnly,
-        recoveryMessages = recoveryReport.entries.map { entry ->
-            "事务 ${entry.transactionId.value.take(8)}：${entry.action.name}"
-        } + integrityIssues.map { issue ->
-            "已隔离 ${issue.kind} 对象 ${issue.objectId.take(8)}：${issue.failure.name}"
-        },
-    )
-
-    /**
-     * 把已确认桌面 Note 投影为共享 UI 模型。
-     *
-     * @return 稳定 ID 与 payload。
-     */
-    private fun DesktopStoredNote.toSharedNote(): WorkspaceNote = WorkspaceNote(
-        id = id,
-        note = snapshot.payload,
-        createdAt = snapshot.header.createdAt,
-        updatedAt = snapshot.header.updatedAt,
-    )
 
     private companion object {
         /** 备份保存对话框的默认脱敏文件名。 */

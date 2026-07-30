@@ -50,6 +50,8 @@ import com.oruke.tagloom.editor.editableRichText
 import com.oruke.tagloom.editor.insertBlockAfter
 import com.oruke.tagloom.editor.numberedListOrdinal
 import com.oruke.tagloom.editor.turnBlockInto
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染一行没有卡片边框的 Block，并按需显示加号和拖动把手。
@@ -166,27 +168,27 @@ private fun BlockActionMenus(
     onCursorRequest: (EditorCursorTarget) -> Unit,
 ) {
     DropdownMenu(expanded = actionMenuOpen, onDismissRequest = { onActionMenuChange(false) }) {
-        DropdownMenuItem(text = { Text("转换块类型…") }, onClick = {
+        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_convert)) }, onClick = {
             onActionMenuChange(false)
             onTypeMenuChange(true)
         })
-        DropdownMenuItem(text = { Text("上移") }, onClick = {
+        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_move_up)) }, onClick = {
             state.moveBlock(block.id, BlockMoveDirection.UP)
             onActionMenuChange(false)
         })
-        DropdownMenuItem(text = { Text("下移") }, onClick = {
+        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_move_down)) }, onClick = {
             state.moveBlock(block.id, BlockMoveDirection.DOWN)
             onActionMenuChange(false)
         })
-        DropdownMenuItem(text = { Text("缩进") }, onClick = {
+        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_indent)) }, onClick = {
             state.indentBlock(block.id)
             onActionMenuChange(false)
         })
-        DropdownMenuItem(text = { Text("提升一级") }, onClick = {
+        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_outdent)) }, onClick = {
             state.outdentBlock(block.id)
             onActionMenuChange(false)
         })
-        DropdownMenuItem(text = { Text("删除") }, onClick = {
+        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_delete)) }, onClick = {
             state.deleteBlockAndFocus(block.id)?.let(onCursorRequest)
             onActionMenuChange(false)
         })
@@ -223,10 +225,10 @@ private fun BlockGutter(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (visible) {
-            GutterButton("+", "在下方添加 Block", onAdd)
+            GutterButton("+", stringResource(Res.string.editor_block_add_description), onAdd)
             GutterButton(
                 label = "⠿",
-                description = "拖动或打开 Block 菜单",
+                description = stringResource(Res.string.editor_block_actions_description),
                 onClick = onOpenActions,
                 modifier = Modifier.pointerInput(Unit) {
                     detectDragGesturesAfterLongPress(
@@ -349,11 +351,15 @@ private fun ReadOnlyBlockPlaceholder(block: Block) {
     ) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
             Text(
-                if (block.content is UnknownBlockContent) "当前版本无法编辑此 Block" else "该 Block 当前为只读",
+                if (block.content is UnknownBlockContent) {
+                    stringResource(Res.string.editor_block_unknown_uneditable)
+                } else {
+                    stringResource(Res.string.editor_block_read_only)
+                },
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                "类型：${block.type}。原始数据会继续保留。",
+                stringResource(Res.string.editor_block_preserved_data, block.type),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -383,14 +389,15 @@ private fun blockTextStyle(block: Block) = when (val content = block.content) {
  * @param block 当前 Block。
  * @return 只在未聚焦空 Block 中显示的提示。
  */
+@Composable
 private fun blockPlaceholder(block: Block): String = when (block.type) {
-    BlockTypes.HEADING -> "标题"
-    BlockTypes.TODO -> "待办事项"
+    BlockTypes.HEADING -> stringResource(Res.string.editor_block_placeholder_heading)
+    BlockTypes.TODO -> stringResource(Res.string.editor_block_placeholder_todo)
     BlockTypes.BULLETED_LIST,
     BlockTypes.NUMBERED_LIST,
-    -> "列表项"
-    BlockTypes.QUOTE -> "引用"
-    else -> "输入内容，按 / 选择块类型"
+    -> stringResource(Res.string.editor_block_placeholder_list)
+    BlockTypes.QUOTE -> stringResource(Res.string.editor_block_placeholder_quote)
+    else -> stringResource(Res.string.editor_block_placeholder_default)
 }
 
 /**

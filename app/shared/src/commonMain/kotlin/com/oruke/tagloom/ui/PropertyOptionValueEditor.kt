@@ -29,6 +29,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染单选或多选属性的已选 chip、搜索菜单与可选自由创建入口。
@@ -78,7 +80,11 @@ internal fun MetadataSelectProperty(
             }
             if (selectedIds.isEmpty() || multiple) {
                 MetadataInlineAction(
-                    label = if (selectedIds.isEmpty()) "选择" else "+",
+                    label = if (selectedIds.isEmpty()) {
+                        stringResource(Res.string.editor_property_select)
+                    } else {
+                        "+"
+                    },
                     enabled = editable,
                 ) { menuOpen = true }
             }
@@ -93,7 +99,7 @@ internal fun MetadataSelectProperty(
         ) {
             PopoverSearchField(
                 value = query,
-                placeholder = "搜索或输入选项",
+                placeholder = stringResource(Res.string.editor_property_search_or_enter_option),
                 requestFocus = menuOpen,
                 onValueChange = { value -> query = value },
             )
@@ -122,7 +128,7 @@ internal fun MetadataSelectProperty(
             if (canCreate) {
                 HorizontalDivider()
                 DropdownMenuItem(
-                    text = { Text("创建选项「$normalized」") },
+                    text = { Text(stringResource(Res.string.editor_property_create_option, normalized)) },
                     leadingIcon = { Text("+") },
                     onClick = {
                         menuOpen = false
@@ -136,9 +142,9 @@ internal fun MetadataSelectProperty(
                     text = {
                         Text(
                             if (definition.optionInputMode == PropertyOptionInputMode.FIXED && definition.options.isEmpty()) {
-                                "请先在属性定义中添加固定选项"
+                                stringResource(Res.string.editor_property_fixed_options_required)
                             } else {
-                                "没有匹配选项"
+                                stringResource(Res.string.editor_property_no_matching_options)
                             },
                         )
                     },

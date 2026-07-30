@@ -8,6 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.EditorDocument
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 在编辑器视口右下角渲染不可编辑的权威快照时间。
@@ -26,7 +28,15 @@ internal fun DocumentTimestamps(
         shape = MaterialTheme.shapes.extraSmall,
     ) {
         Text(
-            text = "创建 ${document.createdAt.toCompactUtcTimestamp()}  ·  更新 ${document.updatedAt.toCompactUtcTimestamp()}",
+            text = stringResource(
+                Res.string.editor_timestamp_line,
+                document.createdAt.toCompactUtcTimestamp(
+                    stringResource(Res.string.editor_timestamp_not_saved),
+                ),
+                document.updatedAt.toCompactUtcTimestamp(
+                    stringResource(Res.string.editor_timestamp_not_saved),
+                ),
+            ),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -37,12 +47,14 @@ internal fun DocumentTimestamps(
 /**
  * 把 ISO-8601 UTC 文本压缩为稳定的分钟级展示格式。
  *
- * 公共 UI 不引入平台日期依赖；无法解析的未来格式会原样保留，空值显示为尚未保存。
+ * 公共 UI 不引入平台日期依赖；无法解析的未来格式会原样保留，空值显示为调用方提供的
+ * 已本地化未保存文本。
  *
+ * @param unsavedText 当前语言中表示尚未保存的文本。
  * @return `YYYY-MM-DD HH:mm UTC` 或安全回退文本。
  */
-internal fun String.toCompactUtcTimestamp(): String {
-    if (isBlank()) return "尚未保存"
+internal fun String.toCompactUtcTimestamp(unsavedText: String): String {
+    if (isBlank()) return unsavedText
     val match = COMPACT_UTC_PATTERN.find(this) ?: return this
     return "${match.groupValues[1]} ${match.groupValues[2]} UTC"
 }

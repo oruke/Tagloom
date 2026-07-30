@@ -11,6 +11,8 @@ import com.oruke.tagloom.core.domain.property.EffectivePropertyValueSource
 import com.oruke.tagloom.core.model.PropertyValueSource
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.TagloomEditorState
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 在属性值下方展示对象类型来源、默认策略、笔记覆盖和约束状态。
@@ -31,19 +33,29 @@ internal fun PropertyProvenance(
         state.tagDefinitions.firstOrNull { definition -> definition.id == tagId }
     }
     when {
-        sourceTag != null -> parts += "来自类型 ${sourceTag.name}"
-        document.note.manualPropertyBindings.any { manual -> manual.propertyId == property.propertyId } -> parts += "仅当前笔记"
+        sourceTag != null -> parts += stringResource(Res.string.editor_property_from_type, sourceTag.name)
+        document.note.manualPropertyBindings.any { manual -> manual.propertyId == property.propertyId } -> {
+            parts += stringResource(Res.string.editor_property_current_note)
+        }
     }
     when (property.valueSource) {
         EffectivePropertyValueSource.NOTE_VALUE -> parts += storedValueSourceLabel(state, document, property)
-        EffectivePropertyValueSource.DYNAMIC_DEFAULT -> parts += "动态默认值"
-        EffectivePropertyValueSource.SNAPSHOT_PENDING -> parts += "等待写入快照"
+        EffectivePropertyValueSource.DYNAMIC_DEFAULT -> parts += stringResource(Res.string.editor_property_dynamic_default)
+        EffectivePropertyValueSource.SNAPSHOT_PENDING -> {
+            parts += stringResource(Res.string.editor_property_snapshot_pending)
+        }
         EffectivePropertyValueSource.NONE -> Unit
     }
-    if (binding?.required == true) parts += if (property.value == null) "必填未填写" else "必填"
-    if (binding?.readonly == true) parts += "只读"
-    if (binding?.inheritable == false) parts += "仅当前类型"
-    if (property.conflicted) parts += "约束冲突"
+    if (binding?.required == true) {
+        parts += if (property.value == null) {
+            stringResource(Res.string.editor_property_required_missing)
+        } else {
+            stringResource(Res.string.editor_property_required)
+        }
+    }
+    if (binding?.readonly == true) parts += stringResource(Res.string.editor_tag_readonly)
+    if (binding?.inheritable == false) parts += stringResource(Res.string.editor_property_current_type_only)
+    if (property.conflicted) parts += stringResource(Res.string.editor_property_constraints_conflict)
     if (parts.isEmpty()) return
 
     Text(
@@ -66,6 +78,7 @@ internal fun PropertyProvenance(
  * @param property 已解析属性。
  * @return 笔记覆盖、类型快照或系统值说明。
  */
+@Composable
 private fun storedValueSourceLabel(
     state: TagloomEditorState,
     document: EditorDocument,
@@ -77,9 +90,15 @@ private fun storedValueSourceLabel(
             val tagName = stored.sourceTagId?.let { tagId ->
                 state.tagDefinitions.firstOrNull { definition -> definition.id == tagId }?.name
             }
-            tagName?.let { name -> "快照自类型 $name" } ?: "类型快照"
+            tagName?.let { name ->
+                stringResource(Res.string.editor_property_snapshot_from_type, name)
+            } ?: stringResource(Res.string.editor_property_type_snapshot)
         }
-        PropertyValueSource.SYSTEM -> "系统值"
-        PropertyValueSource.USER, null -> if (stored?.overridden == true) "笔记覆盖" else "笔记值"
+        PropertyValueSource.SYSTEM -> stringResource(Res.string.editor_property_system_value)
+        PropertyValueSource.USER, null -> if (stored?.overridden == true) {
+            stringResource(Res.string.editor_property_note_override)
+        } else {
+            stringResource(Res.string.editor_property_note_value)
+        }
     }
 }

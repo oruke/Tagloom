@@ -37,6 +37,8 @@ import com.oruke.tagloom.editor.buildTagDefinitionDraft
 import com.oruke.tagloom.editor.toConfirmedBinding
 import com.oruke.tagloom.editor.toEditorDraft
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 保存对象类型对话框的定义草稿和确认后的笔记关联意图。
@@ -80,15 +82,16 @@ internal fun TagDefinitionDialog(
     }
     val boundPropertyIds = bindingDrafts.map { draft -> draft.propertyId }.toSet()
     val availableProperties = state.propertyDefinitions.filterNot { definition -> definition.id in boundPropertyIds }
+    val saveObjectTypeError = stringResource(Res.string.editor_error_save_object_type)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
                 when {
-                    readOnlyRoot -> "查看默认类型"
-                    creating -> "新建对象类型"
-                    else -> "编辑对象类型"
+                    readOnlyRoot -> stringResource(Res.string.editor_tag_view_default_type)
+                    creating -> stringResource(Res.string.editor_tag_create)
+                    else -> stringResource(Res.string.editor_tag_edit)
                 },
             )
         },
@@ -104,14 +107,14 @@ internal fun TagDefinitionDialog(
                         errorMessage = null
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("类型名称") },
+                    label = { Text(stringResource(Res.string.editor_tag_name)) },
                     singleLine = true,
                     readOnly = readOnlyRoot,
                     enabled = !readOnlyRoot,
                 )
                 if (readOnlyRoot) {
                     Text(
-                        "Note 是所有对象的只读根类型，不能重命名、删除或解除继承。",
+                        stringResource(Res.string.editor_tag_root_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -130,12 +133,12 @@ internal fun TagDefinitionDialog(
                 )
                 HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("类型属性", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(Res.string.editor_tag_properties), style = MaterialTheme.typography.titleSmall)
                     Text(
                         if (readOnlyRoot) {
-                            "所有 Note 都具备以下基础属性；这里只能查看。"
+                            stringResource(Res.string.editor_tag_root_properties_description)
                         } else {
-                            "使用这个类型的 Note 会继承以下属性；子类型可继续重载。"
+                            stringResource(Res.string.editor_tag_properties_description)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -165,7 +168,7 @@ internal fun TagDefinitionDialog(
                                 onClick = { propertyMenuOpen = true },
                                 enabled = availableProperties.isNotEmpty(),
                             ) {
-                                Text("+ 添加工作区属性")
+                                Text(stringResource(Res.string.editor_tag_add_workspace_property))
                             }
                             DropdownMenu(
                                 expanded = propertyMenuOpen,
@@ -177,7 +180,7 @@ internal fun TagDefinitionDialog(
                                             Column {
                                                 Text(definition.name)
                                                 Text(
-                                                    definition.type.displayName(),
+                                                    definition.type.localizedDisplayName(),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
@@ -203,7 +206,9 @@ internal fun TagDefinitionDialog(
         },
         confirmButton = {
             if (readOnlyRoot) {
-                TextButton(onClick = onDismiss) { Text("关闭") }
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(Res.string.editor_action_close))
+                }
             } else {
                 Button(
                     onClick = {
@@ -211,23 +216,31 @@ internal fun TagDefinitionDialog(
                             val bindings = bindingDrafts.mapIndexed { index, draft ->
                                 val definition = requireNotNull(
                                     state.propertyDefinitions.firstOrNull { property -> property.id == draft.propertyId },
-                                ) { "类型绑定的属性定义已不存在" }
+                                ) { "tag-property-definition-missing" }
                                 draft.toConfirmedBinding(definition, index)
                             }
                             state.buildTagDefinitionDraft(original, name, parentTagIds, bindings)
-                        }.onSuccess(onConfirm).onFailure { failure ->
-                            errorMessage = failure.message ?: "对象类型无法保存"
+                        }.onSuccess(onConfirm).onFailure {
+                            errorMessage = saveObjectTypeError
                         }
                     },
                     enabled = name.isNotBlank(),
                 ) {
-                    Text(if (creating) "创建类型" else "保存")
+                    Text(
+                        if (creating) {
+                            stringResource(Res.string.editor_tag_create_action)
+                        } else {
+                            stringResource(Res.string.workspace_action_save)
+                        },
+                    )
                 }
             }
         },
         dismissButton = {
             if (!readOnlyRoot) {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(Res.string.workspace_action_cancel))
+                }
             }
         },
     )
@@ -256,13 +269,21 @@ private fun TagParentEditor(
     onToggle: (TagId) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("继承自", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.editor_tag_inherits_from), style = MaterialTheme.typography.titleSmall)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (parentTagIds.isEmpty()) {
-                SchemaPill(if (editable) "Note（默认父类型）" else "根类型", emphasized = false, onClick = {})
+                SchemaPill(
+                    if (editable) {
+                        stringResource(Res.string.editor_tag_default_parent)
+                    } else {
+                        stringResource(Res.string.editor_tag_root_type)
+                    },
+                    emphasized = false,
+                    onClick = {},
+                )
             } else {
                 parentTagIds.forEach { parentId ->
                     val name = state.tagDefinitions.firstOrNull { definition -> definition.id == parentId }?.name
@@ -271,7 +292,9 @@ private fun TagParentEditor(
                 }
             }
             if (editable) Box {
-                TextButton(onClick = { onMenuOpenChange(true) }) { Text("+ 父类型") }
+                TextButton(onClick = { onMenuOpenChange(true) }) {
+                    Text(stringResource(Res.string.editor_tag_add_parent))
+                }
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
@@ -288,7 +311,11 @@ private fun TagParentEditor(
             }
         }
         Text(
-            if (editable) "支持多父继承；同层属性约束不一致时会在 Note 中显示冲突。" else "所有自定义对象类型最终继承此根类型。",
+            if (editable) {
+                stringResource(Res.string.editor_tag_inheritance_notice)
+            } else {
+                stringResource(Res.string.editor_tag_root_inheritance_notice)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -315,7 +342,8 @@ private fun ReadOnlyTypeProperties(
             ) {
                 Text(definition?.name ?: binding.propertyId.value, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    definition?.type?.displayName() ?: "缺失定义",
+                    definition?.type?.localizedDisplayName()
+                        ?: stringResource(Res.string.editor_common_missing_definition),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

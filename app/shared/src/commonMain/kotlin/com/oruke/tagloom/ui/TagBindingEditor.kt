@@ -31,6 +31,8 @@ import com.oruke.tagloom.core.model.DefaultValuePolicy
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.PropertyTypes
 import com.oruke.tagloom.editor.TagPropertyBindingDraft
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染一个标签直接属性绑定及其约束和默认策略。
@@ -58,20 +60,31 @@ internal fun TagBindingDraftEditor(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(definition?.name ?: "缺失属性 ${draft.propertyId.value}", style = MaterialTheme.typography.labelLarge)
                     Text(
-                        definition?.type?.displayName() ?: "schema 已损坏",
+                        definition?.name
+                            ?: stringResource(Res.string.editor_tag_missing_property, draft.propertyId.value),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Text(
+                        definition?.type?.localizedDisplayName()
+                            ?: stringResource(Res.string.editor_tag_schema_damaged),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (definition == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = onRemove) { Text("移除") }
+                TextButton(onClick = onRemove) { Text(stringResource(Res.string.editor_action_remove)) }
             }
             if (definition != null) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    BindingToggle("必填", draft.required) { checked -> onChange(draft.copy(required = checked)) }
-                    BindingToggle("只读", draft.readonly) { checked -> onChange(draft.copy(readonly = checked)) }
-                    BindingToggle("子标签继承", draft.inheritable) { checked -> onChange(draft.copy(inheritable = checked)) }
+                    BindingToggle(stringResource(Res.string.editor_tag_required), draft.required) { checked ->
+                        onChange(draft.copy(required = checked))
+                    }
+                    BindingToggle(stringResource(Res.string.editor_tag_readonly), draft.readonly) { checked ->
+                        onChange(draft.copy(readonly = checked))
+                    }
+                    BindingToggle(stringResource(Res.string.editor_tag_child_inherit), draft.inheritable) { checked ->
+                        onChange(draft.copy(inheritable = checked))
+                    }
                 }
                 DefaultPolicyEditor(draft, definition, onChange)
             }
@@ -96,12 +109,17 @@ private fun DefaultPolicyEditor(
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Box {
             OutlinedButton(onClick = { policyMenuOpen = true }) {
-                Text("默认值：${draft.defaultPolicy.displayName()}")
+                Text(
+                    stringResource(
+                        Res.string.editor_tag_default_value_prefix,
+                        draft.defaultPolicy.localizedDisplayName(),
+                    ),
+                )
             }
             DropdownMenu(expanded = policyMenuOpen, onDismissRequest = { policyMenuOpen = false }) {
                 DefaultValuePolicy.entries.forEach { policy ->
                     DropdownMenuItem(
-                        text = { Text(policy.displayName()) },
+                        text = { Text(policy.localizedDisplayName()) },
                         leadingIcon = { Text(if (policy == draft.defaultPolicy) "✓" else "") },
                         onClick = {
                             onChange(draft.copy(defaultPolicy = policy))
@@ -115,9 +133,9 @@ private fun DefaultPolicyEditor(
             DefaultValueInput(draft, definition, onChange)
             Text(
                 if (draft.defaultPolicy == DefaultValuePolicy.DYNAMIC) {
-                    "动态：未覆盖的笔记会实时跟随标签默认值。"
+                    stringResource(Res.string.editor_tag_default_dynamic_description)
                 } else {
-                    "快照：首次关联标签时把值和来源写入笔记，之后不随标签变化。"
+                    stringResource(Res.string.editor_tag_default_snapshot_description)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -145,7 +163,9 @@ private fun DefaultValueInput(
             var menuOpen by remember(draft.propertyId) { mutableStateOf(false) }
             val selected = definition.options.firstOrNull { option -> option.id == draft.defaultValueText }
             Box {
-                OutlinedButton(onClick = { menuOpen = true }) { Text(selected?.label ?: "选择默认选项") }
+                OutlinedButton(onClick = { menuOpen = true }) {
+                    Text(selected?.label ?: stringResource(Res.string.editor_tag_select_default_option))
+                }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     definition.options.forEach { option ->
                         DropdownMenuItem(
@@ -175,10 +195,10 @@ private fun DefaultValueInput(
         }
 
         PropertyTypes.BOOLEAN -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SchemaPill("是", emphasized = draft.defaultValueText == "true") {
+            SchemaPill(stringResource(Res.string.editor_boolean_true), emphasized = draft.defaultValueText == "true") {
                 onChange(draft.copy(defaultValueText = "true"))
             }
-            SchemaPill("否", emphasized = draft.defaultValueText == "false") {
+            SchemaPill(stringResource(Res.string.editor_boolean_false), emphasized = draft.defaultValueText == "false") {
                 onChange(draft.copy(defaultValueText = "false"))
             }
         }
@@ -187,8 +207,16 @@ private fun DefaultValueInput(
             value = draft.defaultValueText,
             onValueChange = { value -> onChange(draft.copy(defaultValueText = value)) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("默认值") },
-            placeholder = { Text(if (definition.type == PropertyTypes.DATE) "YYYY-MM-DD" else "输入默认值") },
+            label = { Text(stringResource(Res.string.editor_tag_default_value)) },
+            placeholder = {
+                Text(
+                    if (definition.type == PropertyTypes.DATE) {
+                        stringResource(Res.string.editor_property_date_placeholder)
+                    } else {
+                        stringResource(Res.string.editor_tag_input_default_value)
+                    },
+                )
+            },
             singleLine = true,
         )
     }
@@ -241,8 +269,9 @@ internal fun SchemaPill(
  *
  * @return 无默认、动态或写入快照。
  */
-private fun DefaultValuePolicy.displayName(): String = when (this) {
-    DefaultValuePolicy.NONE -> "无默认值"
-    DefaultValuePolicy.DYNAMIC -> "动态跟随"
-    DefaultValuePolicy.SNAPSHOT -> "写入快照"
+@Composable
+private fun DefaultValuePolicy.localizedDisplayName(): String = when (this) {
+    DefaultValuePolicy.NONE -> stringResource(Res.string.editor_default_policy_none)
+    DefaultValuePolicy.DYNAMIC -> stringResource(Res.string.editor_default_policy_dynamic)
+    DefaultValuePolicy.SNAPSHOT -> stringResource(Res.string.editor_default_policy_snapshot)
 }

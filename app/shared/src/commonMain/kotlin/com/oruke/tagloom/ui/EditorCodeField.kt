@@ -40,6 +40,8 @@ import com.oruke.tagloom.editor.EditorCursorTarget
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.adjacentCursor
 import com.oruke.tagloom.editor.mergeBlockWithPrevious
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染可保留换行和输入法状态的多行代码 Block。
@@ -105,7 +107,7 @@ internal fun EditorCodeField(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Tab 缩进 · Ctrl+S 保存",
+                stringResource(Res.string.editor_code_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -168,7 +170,7 @@ internal fun EditorCodeField(
                 Box(Modifier.fillMaxWidth()) {
                     if (fieldValue.text.isEmpty() && !focused) {
                         Text(
-                            "输入代码…",
+                            stringResource(Res.string.editor_code_placeholder),
                             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

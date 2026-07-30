@@ -40,6 +40,8 @@ import com.oruke.tagloom.editor.selectionHasMark
 import com.oruke.tagloom.editor.selectionMarkAttribute
 import com.oruke.tagloom.editor.setSelectionMark
 import com.oruke.tagloom.editor.toggleSelectionMark
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染文本选区出现时的浮动格式工具栏。
@@ -102,7 +104,10 @@ internal fun SelectionFormattingToolbar(state: TagloomEditorState) {
                     },
                 )
                 Text(
-                    "${state.selection.end - state.selection.start} 字",
+                    stringResource(
+                        Res.string.editor_selection_character_count,
+                        state.selection.end - state.selection.start,
+                    ),
                     modifier = Modifier.padding(horizontal = 8.dp),
                     style = MaterialTheme.typography.labelSmall,
                 )
@@ -128,7 +133,7 @@ private fun SelectionUtilityAction(
 ) {
     Box {
         Text(
-            text = mode.label,
+            text = mode.localizedLabel(),
             modifier = Modifier
                 .clickable { onExpandedChange(!expanded) }
                 .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -141,7 +146,7 @@ private fun SelectionUtilityAction(
         ) {
             Column(Modifier.width(300.dp).padding(10.dp)) {
                 Text(
-                    mode.title,
+                    mode.localizedTitle(),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -149,7 +154,7 @@ private fun SelectionUtilityAction(
                     value = mode.value(state),
                     onValueChange = { value -> mode.update(state, value) },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    placeholder = { Text(mode.placeholder) },
+                    placeholder = { Text(mode.localizedPlaceholder()) },
                     minLines = if (mode == SelectionUtilityMode.ANNOTATION) 3 else 1,
                     singleLine = mode == SelectionUtilityMode.LINK,
                 )
@@ -161,7 +166,7 @@ private fun SelectionUtilityAction(
                     enabled = mode.value(state).isNotBlank(),
                     modifier = Modifier.padding(top = 8.dp),
                 ) {
-                    Text(mode.actionLabel)
+                    Text(mode.localizedActionLabel())
                 }
             }
         }
@@ -171,22 +176,57 @@ private fun SelectionUtilityAction(
 /**
  * 区分选区工具栏中的链接与独立加注输入。
  *
- * @property label 工具栏短标签。
- * @property title 菜单标题。
- * @property placeholder 输入提示。
- * @property actionLabel 提交按钮文案。
  */
-private enum class SelectionUtilityMode(
-    val label: String,
-    val title: String,
-    val placeholder: String,
-    val actionLabel: String,
-) {
+private enum class SelectionUtilityMode {
     /** 为选区写入链接 Mark。 */
-    LINK("链接", "添加链接", "https://example.com", "应用链接"),
+    LINK,
 
     /** 为选区创建独立加注正文。 */
-    ANNOTATION("加注", "添加独立加注", "解释这个词或短语", "添加加注");
+    ANNOTATION;
+
+    /**
+     * 返回当前工具入口的短标签。
+     *
+     * @return 工具栏内的本地化动作文本。
+     */
+    @Composable
+    fun localizedLabel(): String = when (this) {
+        LINK -> stringResource(Res.string.editor_selection_link_label)
+        ANNOTATION -> stringResource(Res.string.editor_selection_annotation_label)
+    }
+
+    /**
+     * 返回当前工具浮层的标题。
+     *
+     * @return 输入浮层顶部的本地化标题。
+     */
+    @Composable
+    fun localizedTitle(): String = when (this) {
+        LINK -> stringResource(Res.string.editor_selection_link_title)
+        ANNOTATION -> stringResource(Res.string.editor_selection_annotation_title)
+    }
+
+    /**
+     * 返回当前工具的输入提示。
+     *
+     * @return 链接或加注正文的本地化 placeholder。
+     */
+    @Composable
+    fun localizedPlaceholder(): String = when (this) {
+        LINK -> stringResource(Res.string.editor_selection_link_placeholder)
+        ANNOTATION -> stringResource(Res.string.editor_selection_annotation_placeholder)
+    }
+
+    /**
+     * 返回当前工具的确认按钮文案。
+     *
+     * @return 应用链接或添加加注的本地化动作。
+     */
+    @Composable
+    fun localizedActionLabel(): String = when (this) {
+        LINK -> stringResource(Res.string.editor_selection_link_action)
+        ANNOTATION -> stringResource(Res.string.editor_selection_annotation_action)
+    }
 
     /**
      * 读取当前模式的输入草稿。
@@ -272,13 +312,13 @@ private fun InlineColorMenuAction(
             properties = PopupProperties(focusable = false),
         ) {
             Text(
-                mode.label,
+                mode.localizedLabel(),
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             DropdownMenuItem(
-                text = { Text("默认") },
+                text = { Text(stringResource(Res.string.editor_color_default)) },
                 leadingIcon = { ColorSwatch(mode, null) },
                 trailingIcon = { if (selectedToken == null) Text("✓") },
                 onClick = {
@@ -289,7 +329,7 @@ private fun InlineColorMenuAction(
             HorizontalDivider()
             InlineColorPalette.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option.label) },
+                    text = { Text(option.localizedLabel()) },
                     leadingIcon = { ColorSwatch(mode, option) },
                     trailingIcon = { if (selectedToken == option.token) Text("✓") },
                     onClick = {
@@ -343,19 +383,28 @@ private fun ColorSwatch(
  * 区分颜色选择器正在编辑文字前景还是背景高亮。
  *
  * @property markType 写入权威 RichText 的稳定 Mark 类型。
- * @property label 面板标题。
  * @property symbol 工具栏紧凑符号。
  */
 private enum class InlineColorMode(
     val markType: String,
-    val label: String,
     val symbol: String,
 ) {
     /** 文字前景色。 */
-    TEXT(InlineMarkTypes.TEXT_COLOR, "文字颜色", "A"),
+    TEXT(InlineMarkTypes.TEXT_COLOR, "A"),
 
     /** 文字背景高亮。 */
-    HIGHLIGHT(InlineMarkTypes.HIGHLIGHT, "高亮颜色", "▰"),
+    HIGHLIGHT(InlineMarkTypes.HIGHLIGHT, "▰");
+
+    /**
+     * 返回颜色菜单在当前 Locale 下的标题。
+     *
+     * @return 文字颜色或高亮颜色标题。
+     */
+    @Composable
+    fun localizedLabel(): String = when (this) {
+        TEXT -> stringResource(Res.string.editor_color_text)
+        HIGHLIGHT -> stringResource(Res.string.editor_color_highlight)
+    }
 }
 
 /**

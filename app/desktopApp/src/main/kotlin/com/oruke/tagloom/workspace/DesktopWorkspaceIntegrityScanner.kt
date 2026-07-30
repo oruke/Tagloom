@@ -32,13 +32,13 @@ class DesktopWorkspaceIntegrityScanner(
                     val file = paths.target(record.path)
                     when {
                         !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) -> DesktopObjectIntegrityIssue(
-                            record.kind.name,
+                            record.kind,
                             record.objectId,
                             DesktopIntegrityFailure.MISSING_FILE,
                         )
                         cryptoProvider.sha256(Files.readAllBytes(file)).toHex() != record.encryptedSha256 ->
                             DesktopObjectIntegrityIssue(
-                                record.kind.name,
+                                record.kind,
                                 record.objectId,
                                 DesktopIntegrityFailure.HASH_MISMATCH,
                             )

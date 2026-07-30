@@ -3,6 +3,8 @@ package com.oruke.tagloom
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
+import com.oruke.tagloom.core.model.AttachmentBlockContent
+import com.oruke.tagloom.core.model.BlobId
 import com.oruke.tagloom.core.model.CodeBlockContent
 import com.oruke.tagloom.core.model.HeadingBlockContent
 import com.oruke.tagloom.core.model.InlineMark
@@ -10,6 +12,8 @@ import com.oruke.tagloom.core.model.InlineMarkAttributes
 import com.oruke.tagloom.core.model.InlineMarkTypes
 import com.oruke.tagloom.core.model.InlineRun
 import com.oruke.tagloom.core.model.Note
+import com.oruke.tagloom.core.model.NoteReferenceBlockContent
+import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.RichText
 import com.oruke.tagloom.core.model.RichTextBlockContent
 import com.oruke.tagloom.platform.DocumentExportFormat
@@ -31,10 +35,11 @@ class DesktopDocumentRendererTest {
     @Test
     fun rendersPortableDocumentFormats() {
         val note = sampleNote()
-        val markdown = DesktopDocumentRenderer.render(note, DocumentExportFormat.MARKDOWN)
-        val html = DesktopDocumentRenderer.render(note, DocumentExportFormat.HTML)
-        val pdf = DesktopDocumentRenderer.render(note, DocumentExportFormat.PDF)
-        val word = DesktopDocumentRenderer.render(note, DocumentExportFormat.WORD)
+        val labels = englishExportLabels()
+        val markdown = DesktopDocumentRenderer.render(note, DocumentExportFormat.MARKDOWN, labels)
+        val html = DesktopDocumentRenderer.render(note, DocumentExportFormat.HTML, labels)
+        val pdf = DesktopDocumentRenderer.render(note, DocumentExportFormat.PDF, labels)
+        val word = DesktopDocumentRenderer.render(note, DocumentExportFormat.WORD, labels)
 
         assertTrue(markdown.decodeToString().contains("**权威状态**"))
         assertTrue(html.decodeToString().contains("<!doctype html>"))
@@ -48,6 +53,38 @@ class DesktopDocumentRendererTest {
         XWPFDocument(ByteArrayInputStream(word)).use { document ->
             assertTrue(document.paragraphs.joinToString("\n") { paragraph -> paragraph.text }.contains("中文导出验证"))
         }
+    }
+
+    /**
+     * 验证导出静态文本由调用方提供的本地化文案决定，不固定为任意语言。
+     */
+    @Test
+    fun rendersStaticLabelsFromProvidedLocale() {
+        val note = Note(
+            title = "",
+            directTagIds = emptyList(),
+            blocks = listOf(
+                Block(
+                    id = BlockId("attachment-export"),
+                    type = BlockTypes.FILE,
+                    orderKey = "0000000000",
+                    content = AttachmentBlockContent(BlobId("blob-export"), "example.txt"),
+                ),
+                Block(
+                    id = BlockId("reference-export"),
+                    type = BlockTypes.NOTE_REFERENCE,
+                    orderKey = "0000000001",
+                    content = NoteReferenceBlockContent(ObjectId("referenced-note")),
+                ),
+            ),
+        )
+
+        val html = DocumentHtmlRenderer.render(note, englishExportLabels()).decodeToString()
+
+        assertTrue(html.contains("<html lang=\"en\">"))
+        assertTrue(html.contains("<title>Untitled</title>"))
+        assertTrue(html.contains("Attachment: example.txt"))
+        assertTrue(html.contains("Tagloom note reference: referenced-note"))
     }
 
     /**
@@ -93,5 +130,19 @@ class DesktopDocumentRendererTest {
                 content = CodeBlockContent("kotlin", "val answer = 42"),
             ),
         ),
+    )
+
+    /**
+     * 构造不依赖 Compose 资源运行时的英文导出文案。
+     *
+     * @return 用于验证渲染器不固化任何自然语言的文案对象。
+     */
+    private fun englishExportLabels(): DocumentExportLabels = DocumentExportLabels(
+        htmlLanguageTag = "en",
+        untitled = "Untitled",
+        attachmentPrefix = "Attachment: ",
+        noteReferencePrefix = "Tagloom note reference: ",
+        unknownBlockPrefix = "Unsupported block: ",
+        annotationsTitle = "Annotations",
     )
 }

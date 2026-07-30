@@ -21,6 +21,8 @@ import com.oruke.tagloom.editor.upsertTagDefinition
 import com.oruke.tagloom.editor.validateTagDefinition
 import com.oruke.tagloom.platform.WorkspaceGateway
 import com.oruke.tagloom.platform.WorkspaceOpenResult
+import com.oruke.tagloom.platform.WorkspaceRecentWorkspace
+import com.oruke.tagloom.platform.WorkspaceRecoveryMessage
 import com.oruke.tagloom.platform.WorkspaceSavedQuery
 import com.oruke.tagloom.platform.WorkspaceSearchHit
 
@@ -28,6 +30,9 @@ import com.oruke.tagloom.platform.WorkspaceSearchHit
  * 区分共享 UI 的锁定、Recovery Key 确认、已打开和只读恢复阶段。
  */
 internal enum class WorkspaceUiPhase {
+    /** 正在读取本机最近工作区登记。 */
+    INITIALIZING,
+
     /** 尚未解锁。 */
     WELCOME,
 
@@ -52,7 +57,7 @@ internal class WorkspaceUiController(
     val editorState: TagloomEditorState,
 ) {
     /** 当前工作区 UI 阶段。 */
-    var phase: WorkspaceUiPhase by mutableStateOf(WorkspaceUiPhase.WELCOME)
+    var phase: WorkspaceUiPhase by mutableStateOf(WorkspaceUiPhase.INITIALIZING)
         private set
 
     /** 平台 I/O 或密码操作是否正在执行。 */
@@ -60,11 +65,15 @@ internal class WorkspaceUiController(
         private set
 
     /** 当前可安全展示的本地错误。 */
-    var errorMessage: String? by mutableStateOf(null)
+    var errorMessage: WorkspaceUiMessage? by mutableStateOf(null)
         private set
 
     /** 当前操作成功后的非敏感提示。 */
-    var statusMessage: String? by mutableStateOf(null)
+    var statusMessage: WorkspaceUiMessage? by mutableStateOf(null)
+        private set
+
+    /** 本机最近登记工作区的安全展示信息。 */
+    var recentWorkspace: WorkspaceRecentWorkspace? by mutableStateOf(null)
         private set
 
     /** 创建流程只展示一次的 Recovery Key。 */
@@ -75,8 +84,8 @@ internal class WorkspaceUiController(
     var rotatedRecoveryKey: String? by mutableStateOf(null)
         private set
 
-    /** prepared 事务恢复结果的脱敏说明。 */
-    var recoveryMessages: List<String> by mutableStateOf(emptyList())
+    /** prepared 事务与完整性扫描的脱敏恢复语义。 */
+    var recoveryMessages: List<WorkspaceRecoveryMessage> by mutableStateOf(emptyList())
         private set
 
     /** 当前搜索条件。 */
@@ -91,12 +100,41 @@ internal class WorkspaceUiController(
         private set
 
     /**
-     * 选择空目录并准备两阶段创建。
+     * 读取本机最近登记工作区，决定自动打开、PIN 解锁还是首次连接入口。
      *
-     * @param password 初始密码。
+     * 未启用 PIN 的 Windows 本机登记会在此处直接认证，避免每次启动反复选择目录或输入
+     * Recovery Key；本机登记不可用时不会猜测目录或自动恢复，用户必须显式选择新建或
+     * 用 Recovery Key 连接既有工作区。
      */
-    suspend fun prepareCreation(password: String) = runOperation {
-        val prepared = gateway.prepareCreation(password) ?: return@runOperation
+    suspend fun initialize() {
+        if (busy) {
+            return
+        }
+        busy = true
+        errorMessage = null
+        statusMessage = null
+        try {
+            recentWorkspace = gateway.recentWorkspaceOrNull()
+            recentWorkspace
+                ?.takeIf { workspace -> !workspace.requiresPin }
+                ?.let { open(gateway.openRecentWorkspace()) }
+        } catch (error: Throwable) {
+            errorMessage = WorkspaceUiMessage.OperationFailed
+        } finally {
+            if (phase == WorkspaceUiPhase.INITIALIZING) {
+                phase = WorkspaceUiPhase.WELCOME
+            }
+            busy = false
+        }
+    }
+
+    /**
+     * 选择空目录并按用户选择的本机保护模式准备两阶段创建。
+     *
+     * @param pin 用户为当前设备设置的可选 PIN；为空时不启用 PIN。
+     */
+    suspend fun prepareCreation(pin: String?) = runOperation {
+        val prepared = gateway.prepareCreation(pin) ?: return@runOperation
         preparedRecoveryKey = prepared.recoveryKeyText
         phase = WorkspaceUiPhase.RECOVERY_CONFIRMATION
     }
@@ -106,6 +144,7 @@ internal class WorkspaceUiController(
      */
     suspend fun confirmCreation() = runOperation {
         open(gateway.confirmCreation())
+        recentWorkspace = gateway.recentWorkspaceOrNull()
         preparedRecoveryKey = null
     }
 
@@ -120,21 +159,33 @@ internal class WorkspaceUiController(
     }
 
     /**
-     * 选择既有工作区并使用密码解锁。
-     *
-     * @param password 本次输入密码。
+     * 使用当前 Windows 帐户保护的材料重新打开最近登记工作区。
      */
-    suspend fun unlockWithPassword(password: String) = runOperation {
-        gateway.unlockWithPassword(password)?.let(::open)
+    suspend fun openRecentWorkspace() = runOperation {
+        open(gateway.openRecentWorkspace())
     }
 
     /**
-     * 选择既有工作区并使用 Recovery Key 解锁。
+     * 使用 PIN 解锁最近登记工作区。
+     *
+     * @param pin 用户输入的当前设备 PIN。
+     */
+    suspend fun unlockRecentWorkspace(pin: String) = runOperation {
+        open(gateway.unlockRecentWorkspace(pin))
+    }
+
+    /**
+     * 选择既有工作区，使用 Recovery Key 建立新的本机访问入口。
      *
      * @param recoveryKeyText 用户离线保存的恢复文本。
+     * @param pin 用户为当前设备设置的可选 PIN；为空时不启用 PIN。
      */
-    suspend fun unlockWithRecovery(recoveryKeyText: String) = runOperation {
-        gateway.unlockWithRecovery(recoveryKeyText)?.let(::open)
+    suspend fun unlockWithRecovery(
+        recoveryKeyText: String,
+        pin: String?,
+    ) = runOperation {
+        gateway.unlockWithRecovery(recoveryKeyText, pin)?.let(::open)
+        recentWorkspace = gateway.recentWorkspaceOrNull()
     }
 
     /**
@@ -142,47 +193,71 @@ internal class WorkspaceUiController(
      */
     suspend fun createBackup() = runOperation {
         if (gateway.createBackup()) {
-            statusMessage = "密文备份已创建"
+            statusMessage = WorkspaceUiMessage.BackupCreated
         }
     }
 
     /**
-     * 选择密文备份与空目录，恢复后使用原密码解锁。
+     * 选择密文备份与空目录，使用 Recovery Key 恢复后建立新的本机访问入口。
      *
-     * @param password 原工作区密码。
+     * @param recoveryKeyText 用户离线保存的恢复文本。
+     * @param pin 用户为当前设备设置的可选 PIN；为空时不启用 PIN。
      */
-    suspend fun restoreBackup(password: String) = runOperation {
-        gateway.restoreBackup(password)?.let(::open)
+    suspend fun restoreBackup(
+        recoveryKeyText: String,
+        pin: String?,
+    ) = runOperation {
+        gateway.restoreBackup(recoveryKeyText, pin)?.let(::open)
+        recentWorkspace = gateway.recentWorkspaceOrNull()
     }
 
     /**
-     * 更换当前工作区密码并保留已打开文档状态。
+     * 为当前 Windows 帐户保护的本机材料启用 PIN。
      *
-     * @param oldPassword 当前密码。
-     * @param newPassword 新密码。
+     * @param pin 用户设置的 6 至 12 位数字 PIN。
      */
-    suspend fun changePassword(
-        oldPassword: String,
-        newPassword: String,
-    ) = runOperation {
-        gateway.changePassword(oldPassword, newPassword)
-        statusMessage = "工作区密码已更换；对象正文未重新加密"
+    suspend fun enablePin(pin: String) = runOperation {
+        gateway.enablePin(pin)
+        recentWorkspace = gateway.recentWorkspaceOrNull()
+        statusMessage = WorkspaceUiMessage.PinEnabled
     }
 
     /**
-     * 重新认证当前密码并轮换主密钥、全部权威信封和 Recovery Key。
+     * 更换当前设备 PIN，不改变工作区 manifest 或已打开文档状态。
      *
-     * @param currentPassword 当前密码。
-     * @param newPassword 新主密钥密码槽使用的密码。
+     * @param currentPin 当前设备 PIN。
+     * @param newPin 新设备 PIN。
      */
-    suspend fun rotateMasterKey(
-        currentPassword: String,
-        newPassword: String,
+    suspend fun changePin(
+        currentPin: String,
+        newPin: String,
     ) = runOperation {
-        val result = gateway.rotateMasterKey(currentPassword, newPassword)
+        gateway.changePin(currentPin, newPin)
+        recentWorkspace = gateway.recentWorkspaceOrNull()
+        statusMessage = WorkspaceUiMessage.PinChanged
+    }
+
+    /**
+     * 认证当前本机访问模式并轮换主密钥、全部权威信封和 Recovery Key。
+     *
+     * @param currentPin 当前设备 PIN；未启用 PIN 时为空。
+     */
+    suspend fun rotateMasterKey(currentPin: String?) = runOperation {
+        val result = gateway.rotateMasterKey(currentPin)
         open(result.openResult)
         rotatedRecoveryKey = result.recoveryKeyText
-        statusMessage = "主密钥和全部权威密文已轮换；请立即离线保存新的 Recovery Key"
+        statusMessage = WorkspaceUiMessage.MasterKeyRotated
+    }
+
+    /**
+     * 认证当前 PIN 后停用 PIN，改回当前 Windows 用户自动打开模式。
+     *
+     * @param currentPin 当前设备 PIN。
+     */
+    suspend fun disablePin(currentPin: String) = runOperation {
+        gateway.disablePin(currentPin)
+        recentWorkspace = gateway.recentWorkspaceOrNull()
+        statusMessage = WorkspaceUiMessage.PinDisabled
     }
 
     /**
@@ -248,7 +323,7 @@ internal class WorkspaceUiController(
         savedQueries = (savedQueries + saved).sortedWith(
             compareBy({ query -> query.query.name }, { query -> query.id.value }),
         )
-        statusMessage = "查询已保存"
+        statusMessage = WorkspaceUiMessage.QuerySaved
     }
 
     /**
@@ -270,7 +345,11 @@ internal class WorkspaceUiController(
         } else {
             editorState.materializeSelectedSnapshotDefaults()
         }
-        statusMessage = if (attachToSelected) "对象类型已创建并关联" else "对象类型定义已更新"
+        statusMessage = if (attachToSelected) {
+            WorkspaceUiMessage.TagCreatedAndAttached
+        } else {
+            WorkspaceUiMessage.TagUpdated
+        }
     }
 
     /**
@@ -288,15 +367,15 @@ internal class WorkspaceUiController(
         statusMessage = when (destination) {
             PropertyDefinitionDestination.CurrentNote -> {
                 editorState.setPropertyAttached(saved.id, attached = true)
-                "属性已创建并加入当前笔记"
+                WorkspaceUiMessage.PropertyCreatedAndAttached
             }
-            PropertyDefinitionDestination.Workspace -> "属性定义已保存到工作区"
+            PropertyDefinitionDestination.Workspace -> WorkspaceUiMessage.PropertySaved
             is PropertyDefinitionDestination.Tag -> {
                 val updatedTag = editorState.bindPropertyToTag(destination.tagId, saved.id)
                 val confirmedTag = gateway.saveTagDefinition(updatedTag).definition
                 editorState.upsertTagDefinition(confirmedTag)
                 editorState.materializeSelectedSnapshotDefaults()
-                "属性已创建并绑定类型 ${confirmedTag.name}"
+                WorkspaceUiMessage.PropertyBoundToTag(confirmedTag.name)
             }
         }
     }
@@ -321,7 +400,11 @@ internal class WorkspaceUiController(
             plan.definition
         }
         editorState.applyFreePropertyOption(confirmedDefinition, plan.optionId)
-        statusMessage = if (plan.requiresPersistence) "新选项已保存并选择" else "已选择已有选项"
+        statusMessage = if (plan.requiresPersistence) {
+            WorkspaceUiMessage.OptionSavedAndSelected
+        } else {
+            WorkspaceUiMessage.ExistingOptionSelected
+        }
     }
 
     /**
@@ -345,6 +428,7 @@ internal class WorkspaceUiController(
         searchText = ""
         searchHits = emptyList()
         savedQueries = emptyList()
+        recentWorkspace = gateway.recentWorkspaceOrNull()
         statusMessage = null
         phase = WorkspaceUiPhase.WELCOME
     }
@@ -364,7 +448,7 @@ internal class WorkspaceUiController(
         }
         savedQueries = result.savedQueries
         if (result.recoveryMessages.isNotEmpty()) {
-            statusMessage = "已隔离无法验证的对象；可先创建密文备份并查看恢复提示"
+            statusMessage = WorkspaceUiMessage.IntegrityNotice
         }
         editorState.loadWorkspaceDocuments(
             result.notes.map { note ->
@@ -397,7 +481,7 @@ internal class WorkspaceUiController(
         try {
             block()
         } catch (error: Throwable) {
-            errorMessage = error.message?.takeIf(String::isNotBlank) ?: "工作区操作失败"
+            errorMessage = WorkspaceUiMessage.OperationFailed
         } finally {
             busy = false
         }

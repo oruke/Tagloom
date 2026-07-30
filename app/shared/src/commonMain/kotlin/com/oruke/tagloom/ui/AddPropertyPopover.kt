@@ -36,6 +36,8 @@ import com.oruke.tagloom.editor.PropertyDefinitionDestination
 import com.oruke.tagloom.editor.PropertyOptionDraft
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.buildPropertyDefinitionDraft
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染锚定在属性区末尾的渐进式新增属性浮层。
@@ -66,6 +68,7 @@ internal fun AddPropertyPopover(
         mutableStateOf<PropertyDefinitionDestination>(PropertyDefinitionDestination.CurrentNote)
     }
     var error by remember(document.id) { mutableStateOf<String?>(null) }
+    val createPropertyError = stringResource(Res.string.editor_error_create_property)
 
     /**
      * 清空浮层内的临时状态，使下一次打开从搜索开始。
@@ -92,7 +95,7 @@ internal fun AddPropertyPopover(
 
     Box {
         Text(
-            text = "+ 添加属性",
+            text = stringResource(Res.string.editor_property_add),
             modifier = Modifier.clickable { expanded = true }.padding(vertical = 4.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -171,7 +174,7 @@ internal fun AddPropertyPopover(
                                 onCreateProperty(definition, destination)
                             }
                         }.exceptionOrNull()
-                        if (failure == null) dismiss() else error = failure.message ?: "无法创建属性"
+                        if (failure == null) dismiss() else error = createPropertyError
                     },
                 )
             }
@@ -200,7 +203,7 @@ private fun AddPropertySearchStep(
 ) {
     PopoverSearchField(
         value = query,
-        placeholder = "搜索已有属性或输入名称",
+        placeholder = stringResource(Res.string.editor_property_input_name),
         requestFocus = true,
         onValueChange = onQueryChange,
     )
@@ -217,7 +220,7 @@ private fun AddPropertySearchStep(
                 Row(Modifier.width(320.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(definition.name, modifier = Modifier.weight(1f))
                     Text(
-                        definition.type.displayName(),
+                        definition.type.localizedDisplayName(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -229,7 +232,15 @@ private fun AddPropertySearchStep(
     }
     HorizontalDivider()
     DropdownMenuItem(
-        text = { Text(if (query.isBlank()) "新建属性" else "新建“${query.trim()}”") },
+        text = {
+            Text(
+                if (query.isBlank()) {
+                    stringResource(Res.string.editor_property_new)
+                } else {
+                    stringResource(Res.string.editor_property_create_named, query.trim())
+                },
+            )
+        },
         leadingIcon = { Text("+") },
         onClick = onCreate,
     )
@@ -282,29 +293,45 @@ private fun AddPropertyConfigureStep(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("‹", modifier = Modifier.clickable(onClick = onBack).padding(end = 8.dp), style = MaterialTheme.typography.titleMedium)
-            Text(if (existing == null) "新建属性" else "添加已有属性", style = MaterialTheme.typography.titleSmall)
+            Text(
+                if (existing == null) {
+                    stringResource(Res.string.editor_property_new)
+                } else {
+                    stringResource(Res.string.editor_property_add_existing)
+                },
+                style = MaterialTheme.typography.titleSmall,
+            )
         }
-        LabeledPopoverField("属性名称") {
-            CompactPropertyInput(name, "输入属性名称", readOnly = existing != null, onValueChange = onNameChange)
+        LabeledPopoverField(stringResource(Res.string.editor_property_name)) {
+            CompactPropertyInput(
+                name,
+                stringResource(Res.string.editor_property_input_name),
+                readOnly = existing != null,
+                onValueChange = onNameChange,
+            )
         }
-        LabeledPopoverField("属性类型") {
+        LabeledPopoverField(stringResource(Res.string.editor_property_type)) {
             if (existing == null) {
                 PropertyTypeSelector(value = type, onValueChange = onTypeChange)
             } else {
-                ReadOnlyPopoverValue(type.displayName())
+                ReadOnlyPopoverValue(type.localizedDisplayName())
             }
         }
         if (type.isOptionType() && existing == null) {
-            LabeledPopoverField("选项方式") {
+            LabeledPopoverField(stringResource(Res.string.editor_property_option_source)) {
                 OptionModeSelector(value = optionMode, onValueChange = onOptionModeChange)
             }
             if (optionMode == PropertyOptionInputMode.FIXED) {
-                LabeledPopoverField("固定选项") {
-                    CompactPropertyInput(optionText, "例如：待办，进行中，完成", onValueChange = onOptionTextChange)
+                LabeledPopoverField(stringResource(Res.string.editor_property_option_fixed)) {
+                    CompactPropertyInput(
+                        optionText,
+                        stringResource(Res.string.editor_property_option_examples),
+                        onValueChange = onOptionTextChange,
+                    )
                 }
             }
         }
-        LabeledPopoverField("添加到") {
+        LabeledPopoverField(stringResource(Res.string.editor_property_create_to)) {
             PropertyDestinationSelector(
                 state = state,
                 document = document,
@@ -314,9 +341,9 @@ private fun AddPropertyConfigureStep(
         }
         Text(
             if (destination == PropertyDefinitionDestination.CurrentNote) {
-                "仅影响当前笔记，不改变对象类型 schema。"
+                stringResource(Res.string.editor_property_current_note_hint)
             } else {
-                "将成为当前应用类型的可继承属性。"
+                stringResource(Res.string.editor_property_type_hint)
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -327,7 +354,7 @@ private fun AddPropertyConfigureStep(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.weight(1f))
             Text(
-                "取消",
+                stringResource(Res.string.workspace_action_cancel),
                 modifier = Modifier.clickable(onClick = onCancel).padding(horizontal = 12.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -339,7 +366,11 @@ private fun AddPropertyConfigureStep(
                 shape = MaterialTheme.shapes.small,
             ) {
                 Text(
-                    if (existing == null) "创建并添加" else "添加",
+                    if (existing == null) {
+                        stringResource(Res.string.editor_property_add)
+                    } else {
+                        stringResource(Res.string.editor_property_add_existing)
+                    },
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.labelLarge,
                 )

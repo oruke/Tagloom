@@ -152,7 +152,7 @@ internal class DesktopIndexProjection(
      */
     private fun com.oruke.tagloom.core.workspace.ManifestObjectRecord.toIssue(
         failure: DesktopIntegrityFailure,
-    ): DesktopObjectIntegrityIssue = DesktopObjectIntegrityIssue(kind.name, objectId, failure)
+    ): DesktopObjectIntegrityIssue = DesktopObjectIntegrityIssue(kind, objectId, failure)
 
     /**
      * 认证并读取当前磁盘 manifest 载荷。

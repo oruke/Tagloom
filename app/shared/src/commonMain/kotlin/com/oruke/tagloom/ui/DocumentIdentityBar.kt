@@ -48,6 +48,8 @@ import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.resolveEffectiveTags
 import com.oruke.tagloom.editor.setAppliedObjectType
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 渲染标题正下方的对象身份、层级路径与普通标签。
@@ -104,11 +106,16 @@ private fun HierarchyToggle(
     onClick: () -> Unit,
 ) {
     val iconColor = if (expanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val hierarchyDescription = if (expanded) {
+        stringResource(Res.string.editor_identity_collapse_hierarchy)
+    } else {
+        stringResource(Res.string.editor_identity_expand_hierarchy)
+    }
     Surface(
         modifier = Modifier
             .size(28.dp)
             .semantics {
-                contentDescription = if (expanded) "仅显示应用类型" else "展开对象类型父级路径"
+                contentDescription = hierarchyDescription
                 role = Role.Button
             }
             .clickable(onClick = onClick),
@@ -163,7 +170,10 @@ private fun ObjectTypeSelector(
         state.tagDefinitions.firstOrNull { definition -> definition.id == appliedId }
     }
     val label = when {
-        typeState.requiresResolution -> "确认类型 · ${typeState.candidateTypeIds.size}"
+        typeState.requiresResolution -> stringResource(
+            Res.string.editor_identity_resolve_type,
+            typeState.candidateTypeIds.size,
+        )
         showHierarchy && appliedType != null -> state.objectTypePath(appliedType.id)
         else -> appliedType?.name ?: rootType.name
     }
@@ -206,7 +216,7 @@ private fun ObjectTypeSelector(
         ) {
             PopoverSearchField(
                 value = query,
-                placeholder = "搜索对象类型",
+                placeholder = stringResource(Res.string.editor_identity_search_object_types),
                 requestFocus = expanded,
                 onValueChange = { value -> query = value },
             )
@@ -227,7 +237,13 @@ private fun ObjectTypeSelector(
                         ) {
                             Text(definition.name, modifier = Modifier.weight(1f))
                             Text(
-                                if (definition.id == rootType.id) "只读根类型" else if (selected) "已应用" else "",
+                                when {
+                                    definition.id == rootType.id -> {
+                                        stringResource(Res.string.editor_identity_root_type_readonly)
+                                    }
+                                    selected -> stringResource(Res.string.editor_identity_applied)
+                                    else -> ""
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -236,7 +252,11 @@ private fun ObjectTypeSelector(
                     leadingIcon = { Text(if (selected) "✓" else "◇") },
                     trailingIcon = {
                         Text(
-                            if (definition.id == rootType.id) "查看" else "编辑",
+                            if (definition.id == rootType.id) {
+                                stringResource(Res.string.editor_action_view)
+                            } else {
+                                stringResource(Res.string.editor_action_edit)
+                            },
                             modifier = Modifier.clickable {
                                 expanded = false
                                 query = ""
@@ -256,7 +276,15 @@ private fun ObjectTypeSelector(
             HorizontalDivider()
             val normalized = query.trim()
             DropdownMenuItem(
-                text = { Text(if (normalized.isEmpty()) "新建对象类型" else "新建“$normalized”") },
+                text = {
+                    Text(
+                        if (normalized.isEmpty()) {
+                            stringResource(Res.string.editor_identity_create_object_type)
+                        } else {
+                            stringResource(Res.string.editor_identity_create_named_object_type, normalized)
+                        },
+                    )
+                },
                 leadingIcon = { Text("+") },
                 onClick = {
                     expanded = false
@@ -328,7 +356,7 @@ private fun OrdinaryTagSelector(
         ) {
             PopoverSearchField(
                 value = query,
-                placeholder = "搜索或输入标签",
+                placeholder = stringResource(Res.string.editor_identity_search_or_enter_tag),
                 requestFocus = expanded,
                 onValueChange = { value -> query = value },
             )
@@ -355,7 +383,7 @@ private fun OrdinaryTagSelector(
             if (canCreate) {
                 HorizontalDivider()
                 DropdownMenuItem(
-                    text = { Text("创建标签 #$normalized") },
+                    text = { Text(stringResource(Res.string.editor_identity_create_tag, normalized)) },
                     leadingIcon = { Text("+") },
                     onClick = {
                         expanded = false
@@ -365,7 +393,11 @@ private fun OrdinaryTagSelector(
                 )
             }
             if (candidates.isEmpty() && !canCreate && query.isNotBlank()) {
-                DropdownMenuItem(text = { Text("没有匹配标签") }, enabled = false, onClick = {})
+                DropdownMenuItem(
+                    text = { Text(stringResource(Res.string.editor_identity_no_matching_tags)) },
+                    enabled = false,
+                    onClick = {},
+                )
             }
         }
     }
@@ -415,7 +447,7 @@ private fun IdentityAddButton(
         border = if (compact) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Text(
-            text = if (compact) "+" else "+ 添加标签",
+            text = if (compact) "+" else stringResource(Res.string.editor_identity_add_tag),
             modifier = Modifier.padding(horizontal = if (compact) 9.dp else 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelMedium,
         )

@@ -12,6 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.EditorBlockType
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 描述 Slash 菜单和 Block 类型菜单共享的一项命令。
@@ -19,28 +22,88 @@ import com.oruke.tagloom.editor.EditorBlockType
 internal data class EditorBlockCommand(
     /** 命令应用后的 Block 类型。 */
     val type: EditorBlockType,
-    /** 菜单主标题。 */
-    val label: String,
-    /** 一句话用途说明。 */
-    val description: String,
-    /** 中文、英文和 Markdown 检索别名。 */
-    val keywords: Set<String>,
+    /** 菜单主标题对应的资源。 */
+    val labelResource: StringResource,
+    /** 一句话用途说明对应的资源。 */
+    val descriptionResource: StringResource,
+    /** 当前 Locale 下检索别名对应的逗号分隔资源。 */
+    val keywordsResource: StringResource,
     /** 菜单左侧使用的紧凑符号。 */
     val symbol: String,
 )
 
 /** 编辑器 v0.2 支持的 Block 创建与转换命令。 */
 internal val EditorBlockCommands: List<EditorBlockCommand> = listOf(
-    EditorBlockCommand(EditorBlockType.TEXT, "正文", "普通连续文本", setOf("text", "paragraph", "正文", "段落"), "T"),
-    EditorBlockCommand(EditorBlockType.HEADING_ONE, "一级标题", "页面主要章节标题", setOf("h1", "heading1", "标题", "一级"), "H1"),
-    EditorBlockCommand(EditorBlockType.HEADING_TWO, "二级标题", "页面次级章节标题", setOf("h2", "heading2", "标题", "二级"), "H2"),
-    EditorBlockCommand(EditorBlockType.HEADING_THREE, "三级标题", "页面小节标题", setOf("h3", "heading3", "标题", "三级"), "H3"),
-    EditorBlockCommand(EditorBlockType.BULLETED_LIST, "无序列表", "使用项目符号组织条目", setOf("bullet", "list", "列表", "无序"), "•"),
-    EditorBlockCommand(EditorBlockType.NUMBERED_LIST, "有序列表", "使用连续序号组织步骤", setOf("number", "list", "列表", "有序"), "1."),
-    EditorBlockCommand(EditorBlockType.TODO, "待办", "可以勾选完成的条目", setOf("todo", "checkbox", "待办", "清单"), "☐"),
-    EditorBlockCommand(EditorBlockType.QUOTE, "引用", "突出显示一段引用文字", setOf("quote", "引用"), "“"),
-    EditorBlockCommand(EditorBlockType.CODE, "代码块", "保留换行和等宽排版", setOf("code", "代码"), "</>"),
-    EditorBlockCommand(EditorBlockType.DIVIDER, "分隔线", "分隔两个内容区域", setOf("divider", "line", "分隔线"), "—"),
+    EditorBlockCommand(
+        EditorBlockType.TEXT,
+        Res.string.editor_block_command_text_label,
+        Res.string.editor_block_command_text_description,
+        Res.string.editor_block_command_text_keywords,
+        "T",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.HEADING_ONE,
+        Res.string.editor_block_command_heading_one_label,
+        Res.string.editor_block_command_heading_one_description,
+        Res.string.editor_block_command_heading_one_keywords,
+        "H1",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.HEADING_TWO,
+        Res.string.editor_block_command_heading_two_label,
+        Res.string.editor_block_command_heading_two_description,
+        Res.string.editor_block_command_heading_two_keywords,
+        "H2",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.HEADING_THREE,
+        Res.string.editor_block_command_heading_three_label,
+        Res.string.editor_block_command_heading_three_description,
+        Res.string.editor_block_command_heading_three_keywords,
+        "H3",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.BULLETED_LIST,
+        Res.string.editor_block_command_bulleted_list_label,
+        Res.string.editor_block_command_bulleted_list_description,
+        Res.string.editor_block_command_bulleted_list_keywords,
+        "•",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.NUMBERED_LIST,
+        Res.string.editor_block_command_numbered_list_label,
+        Res.string.editor_block_command_numbered_list_description,
+        Res.string.editor_block_command_numbered_list_keywords,
+        "1.",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.TODO,
+        Res.string.editor_block_command_todo_label,
+        Res.string.editor_block_command_todo_description,
+        Res.string.editor_block_command_todo_keywords,
+        "☐",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.QUOTE,
+        Res.string.editor_block_command_quote_label,
+        Res.string.editor_block_command_quote_description,
+        Res.string.editor_block_command_quote_keywords,
+        "“",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.CODE,
+        Res.string.editor_block_command_code_label,
+        Res.string.editor_block_command_code_description,
+        Res.string.editor_block_command_code_keywords,
+        "</>",
+    ),
+    EditorBlockCommand(
+        EditorBlockType.DIVIDER,
+        Res.string.editor_block_command_divider_label,
+        Res.string.editor_block_command_divider_description,
+        Res.string.editor_block_command_divider_keywords,
+        "—",
+    ),
 )
 
 /**
@@ -49,16 +112,46 @@ internal val EditorBlockCommands: List<EditorBlockCommand> = listOf(
  * @param query 去除 `/` 后的检索文本。
  * @return 保持产品定义顺序的匹配命令。
  */
+@Composable
 internal fun filterEditorBlockCommands(query: String): List<EditorBlockCommand> {
     val normalized = query.trim().lowercase()
     if (normalized.isEmpty()) {
         return EditorBlockCommands
     }
     return EditorBlockCommands.filter { command ->
-        command.label.lowercase().contains(normalized) ||
-            command.keywords.any { keyword -> keyword.lowercase().contains(normalized) }
+        command.localizedLabel().lowercase().contains(normalized) ||
+            command.localizedKeywords().any { keyword -> keyword.lowercase().contains(normalized) }
     }
 }
+
+/**
+ * 返回 Block 命令在当前 Locale 下的主标题。
+ *
+ * @return Slash 菜单和类型菜单使用的标题。
+ */
+@Composable
+private fun EditorBlockCommand.localizedLabel(): String = stringResource(labelResource)
+
+/**
+ * 返回 Block 命令在当前 Locale 下的一句话说明。
+ *
+ * @return 标题下方的用途说明。
+ */
+@Composable
+private fun EditorBlockCommand.localizedDescription(): String = stringResource(descriptionResource)
+
+/**
+ * 返回当前 Locale 可识别的命令检索别名。
+ *
+ * @return 去除空白后的不重复小写别名集合。
+ */
+@Composable
+private fun EditorBlockCommand.localizedKeywords(): Set<String> =
+    stringResource(keywordsResource)
+        .split(',')
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .toSet()
 
 /**
  * 渲染一个包含类型符号、名称和说明的标准 Block 菜单项。
@@ -79,9 +172,9 @@ internal fun EditorBlockCommandItem(
         ),
         text = {
             Column(Modifier.fillMaxWidth()) {
-                Text(command.label, fontWeight = FontWeight.Medium)
+                Text(command.localizedLabel(), fontWeight = FontWeight.Medium)
                 Text(
-                    command.description,
+                    command.localizedDescription(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

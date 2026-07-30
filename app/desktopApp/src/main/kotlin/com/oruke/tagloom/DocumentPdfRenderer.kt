@@ -31,17 +31,21 @@ internal object DocumentPdfRenderer {
      * 把 Note 渲染为分页、可选择文字的 PDF。
      *
      * @param note 待导出的权威 Note payload。
+     * @param labels 导出内容使用的当前语言静态文本。
      * @return 以 `%PDF` 开头的完整 PDF 文件字节。
      */
-    fun render(note: Note): ByteArray {
+    fun render(
+        note: Note,
+        labels: DocumentExportLabels,
+    ): ByteArray {
         val output = ByteArrayOutputStream()
         PDDocument().use { document ->
             loadExportFont(document).use { loadedFont ->
                 val writer = PdfPageWriter(document, loadedFont.font)
 
                 // 标题与正文分阶段写入，保证分页发生时每个 Block 仍保持稳定间距。
-                writer.writeParagraph(note.title.ifBlank { "无标题" }, TITLE_FONT_SIZE, 0f, TITLE_SPACING)
-                note.blocks.filterNot(Block::deleted).forEach(writer::writeBlock)
+                writer.writeParagraph(note.title.ifBlank { labels.untitled }, TITLE_FONT_SIZE, 0f, TITLE_SPACING)
+                note.blocks.filterNot(Block::deleted).forEach { block -> writer.writeBlock(block, labels) }
                 document.save(output)
             }
         }
@@ -151,8 +155,12 @@ private class PdfPageWriter(
      * 按类型写入一个活动 Block。
      *
      * @param block 待输出的 Block。
+     * @param labels 导出内容使用的当前语言静态文本。
      */
-    fun writeBlock(block: Block) {
+    fun writeBlock(
+        block: Block,
+        labels: DocumentExportLabels,
+    ) {
         when (val content = block.content) {
             is HeadingBlockContent -> writeParagraph(
                 content.richText.plainText,
@@ -181,21 +189,21 @@ private class PdfPageWriter(
             is CodeBlockContent -> writeParagraph(content.text, CODE_FONT_SIZE, CODE_INDENT, BLOCK_SPACING)
             DividerBlockContent -> writeParagraph("────────────────────────────────────────", BODY_FONT_SIZE, 0f, BLOCK_SPACING)
             is AttachmentBlockContent -> writeParagraph(
-                "附件：${content.caption.plainText.ifBlank { content.fileName }}",
+                labels.attachmentPrefix + content.caption.plainText.ifBlank { content.fileName },
                 BODY_FONT_SIZE,
                 0f,
                 SMALL_SPACING,
             )
 
             is NoteReferenceBlockContent -> writeParagraph(
-                "Tagloom 笔记引用：${content.noteId.value}",
+                labels.noteReferencePrefix + content.noteId.value,
                 BODY_FONT_SIZE,
                 0f,
                 SMALL_SPACING,
             )
 
             is UnknownBlockContent -> writeParagraph(
-                "未支持的 Block：${block.type}",
+                labels.unknownBlockPrefix + block.type,
                 BODY_FONT_SIZE,
                 0f,
                 SMALL_SPACING,

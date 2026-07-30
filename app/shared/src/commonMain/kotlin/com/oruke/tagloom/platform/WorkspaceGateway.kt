@@ -5,6 +5,8 @@ import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.SavedQuery
 import com.oruke.tagloom.core.model.TagDefinition
+import com.oruke.tagloom.core.transaction.TransactionRecoveryAction
+import com.oruke.tagloom.core.workspace.ManifestObjectKind
 
 /**
  * 表示共享 UI 可加载或保存的一篇工作区 Note。
@@ -21,6 +23,50 @@ data class WorkspaceNote(
 )
 
 /**
+ * 描述恢复页面可展示的脱敏状态，而不在平台层拼接自然语言。
+ *
+ * 共享 UI 根据当前 Locale 渲染文本，平台层只传递事务、对象类别和失败原因等稳定语义，
+ * 从而避免中文或英文文案被固化到桌面文件系统实现中。
+ */
+sealed interface WorkspaceRecoveryMessage {
+    /**
+     * 描述启动时处理的一条 prepared 事务。
+     */
+    data class RecoveredTransaction(
+        /** 仅用于用户核对的事务 ID 前缀，不暴露完整恢复记录。 */
+        val transactionIdPrefix: String,
+        /** 该事务最终采取的恢复动作。 */
+        val action: TransactionRecoveryAction,
+    ) : WorkspaceRecoveryMessage
+
+    /**
+     * 描述已从读取与索引中逻辑隔离的权威对象。
+     */
+    data class IsolatedObject(
+        /** 被隔离对象在 manifest 中的协议类别。 */
+        val kind: ManifestObjectKind,
+        /** 仅用于用户核对的不透明对象 ID 前缀。 */
+        val objectIdPrefix: String,
+        /** 导致对象被隔离的脱敏完整性失败分类。 */
+        val failure: WorkspaceIntegrityFailure,
+    ) : WorkspaceRecoveryMessage
+}
+
+/**
+ * 区分共享恢复界面可本地化展示的对象完整性失败。
+ */
+enum class WorkspaceIntegrityFailure {
+    /** manifest 引用的密文文件不存在或不是普通文件。 */
+    MISSING_FILE,
+
+    /** 密文文件摘要与已认证 manifest 记录不一致。 */
+    HASH_MISMATCH,
+
+    /** 密文信封、AEAD 或快照 schema 无法通过认证。 */
+    AUTHENTICATION_FAILED,
+}
+
+/**
  * 返回工作区打开后的活动 Note 与恢复状态。
  */
 data class WorkspaceOpenResult(
@@ -34,8 +80,8 @@ data class WorkspaceOpenResult(
     val propertyDefinitions: List<WorkspacePropertyDefinition> = emptyList(),
     /** 无法自动证明新旧状态完整时为真。 */
     val readOnly: Boolean,
-    /** 面向恢复界面的非敏感说明。 */
-    val recoveryMessages: List<String> = emptyList(),
+    /** 面向恢复界面的脱敏语义说明。 */
+    val recoveryMessages: List<WorkspaceRecoveryMessage> = emptyList(),
 )
 
 /**
@@ -70,6 +116,19 @@ data class WorkspacePropertyDefinition(
 data class WorkspacePreparedCreation(
     /** 带版本和校验码的 Recovery Key 文本。 */
     val recoveryKeyText: String,
+)
+
+/**
+ * 描述本机最近登记工作区的安全展示信息。
+ *
+ * 该模型故意不携带绝对路径、Recovery Key、PIN 或工作区主密钥，避免共享 UI 把本机访问
+ * 配置当成工作区权威数据。
+ */
+data class WorkspaceRecentWorkspace(
+    /** 用户可见的工作区目录名称。 */
+    val displayName: String,
+    /** 当前设备是否已启用 PIN 保护。 */
+    val requiresPin: Boolean,
 )
 
 /**
@@ -116,12 +175,40 @@ interface WorkspaceGateway {
     fun currentUtcTimestamp(): String
 
     /**
+     * 读取本机最近登记的默认工作区。
+     *
+     * @return 尚未在本机登记工作区时为空；结果不包含绝对路径或任何解锁材料。
+     */
+    suspend fun recentWorkspaceOrNull(): WorkspaceRecentWorkspace?
+
+    /**
+     * 使用当前 Windows 帐户保护的本机材料打开最近登记工作区。
+     *
+     * 该入口只适用于未启用 PIN 的本机登记；平台必须拒绝把它用于 PIN 模式，避免 UI
+     * 误把“自动打开”降级为绕过本机访问保护。
+     *
+     * @return 已认证的工作区打开结果。
+     */
+    suspend fun openRecentWorkspace(): WorkspaceOpenResult
+
+    /**
+     * 使用 PIN 解锁本机最近登记工作区。
+     *
+     * @param pin 用户输入的本机 PIN；平台负责解开本机高熵材料后认证工作区。
+     * @return 已认证的工作区打开结果。
+     */
+    suspend fun unlockRecentWorkspace(pin: String): WorkspaceOpenResult
+
+    /**
      * 选择空目录并准备新工作区，确认前不得写入文件。
      *
-     * @param password 用户初始密码。
+     * 平台会生成不会展示给用户的高熵解锁材料；用户可选择用 PIN 或当前 Windows 帐户
+     * 保护其本机副本。
+     *
+     * @param pin 用户为本机访问记录设置的可选 PIN；为空时不启用 PIN。
      * @return 用户取消目录选择时为空，否则返回一次性 Recovery Key。
      */
-    suspend fun prepareCreation(password: String): WorkspacePreparedCreation?
+    suspend fun prepareCreation(pin: String?): WorkspacePreparedCreation?
 
     /**
      * 在用户确认已离线保存 Recovery Key 后落盘并打开工作区。
@@ -134,20 +221,16 @@ interface WorkspaceGateway {
     fun cancelCreation()
 
     /**
-     * 选择已有工作区并使用密码解锁。
+     * 选择已有工作区，用 Recovery Key 认证并为当前设备建立新的本机解锁入口。
      *
-     * @param password 本次输入密码。
+     * @param recoveryKeyText 带版本和校验码的 Recovery Key。
+     * @param pin 用户为当前设备设置的可选 PIN；为空时不启用 PIN。
      * @return 用户取消目录选择时为空。
      */
-    suspend fun unlockWithPassword(password: String): WorkspaceOpenResult?
-
-    /**
-     * 选择已有工作区并使用 Recovery Key 解锁。
-     *
-     * @param recoveryKeyText 带版本和校验码的恢复文本。
-     * @return 用户取消目录选择时为空。
-     */
-    suspend fun unlockWithRecovery(recoveryKeyText: String): WorkspaceOpenResult?
+    suspend fun unlockWithRecovery(
+        recoveryKeyText: String,
+        pin: String?,
+    ): WorkspaceOpenResult?
 
     /**
      * 选择备份文件目标并导出当前确认点的权威密文。
@@ -157,36 +240,51 @@ interface WorkspaceGateway {
     suspend fun createBackup(): Boolean
 
     /**
-     * 选择密文备份和空恢复目录，并使用原密码认证恢复结果。
+     * 选择密文备份和空恢复目录，用 Recovery Key 认证并建立当前设备的本机入口。
      *
-     * @param password 原工作区密码。
+     * @param recoveryKeyText 带版本和校验码的 Recovery Key。
+     * @param pin 用户为恢复后本机入口设置的可选 PIN；为空时不启用 PIN。
      * @return 用户取消任一步骤时为空，否则返回已打开工作区。
      */
-    suspend fun restoreBackup(password: String): WorkspaceOpenResult?
+    suspend fun restoreBackup(
+        recoveryKeyText: String,
+        pin: String?,
+    ): WorkspaceOpenResult?
 
     /**
-     * 更换当前工作区密码，只重包 Workspace Master Key。
+     * 为当前 Windows 帐户保护的本机解锁材料启用 PIN。
      *
-     * @param oldPassword 当前密码。
-     * @param newPassword 新密码。
-     * @return 更新凭据后的当前打开状态。
+     * @param pin 用户设置的 6 至 12 位数字 PIN。
      */
-    suspend fun changePassword(
-        oldPassword: String,
-        newPassword: String,
-    ): WorkspaceOpenResult
+    suspend fun enablePin(pin: String)
+
+    /**
+     * 更换当前设备 PIN，不修改工作区 manifest、对象信封或 Recovery Key。
+     *
+     * @param currentPin 当前本机 PIN。
+     * @param newPin 新本机 PIN。
+     */
+    suspend fun changePin(
+        currentPin: String,
+        newPin: String,
+    )
+
+    /**
+     * 认证当前 PIN 后停用 PIN，改回当前 Windows 帐户保护的自动打开模式。
+     *
+     * @param currentPin 当前本机 PIN。
+     */
+    suspend fun disablePin(currentPin: String)
 
     /**
      * 轮换 Workspace Master Key 并重写全部权威信封。
      *
-     * @param currentPassword 当前密码，用于显式重新认证。
-     * @param newPassword 新主密钥密码槽使用的密码。
+     * 平台使用当前本机访问模式重新取得高熵材料；PIN 本身不进入工作区 manifest。
+     *
+     * @param currentPin 当前本机 PIN；未启用 PIN 时为空。
      * @return 新会话和只展示一次的新 Recovery Key。
      */
-    suspend fun rotateMasterKey(
-        currentPassword: String,
-        newPassword: String,
-    ): WorkspaceMasterKeyRotationResult
+    suspend fun rotateMasterKey(currentPin: String?): WorkspaceMasterKeyRotationResult
 
     /**
      * 通过统一事务入口创建或更新 Note。
