@@ -20,6 +20,8 @@ data class EditorDocument(
     val persisted: Boolean = true,
     /** 当前内存内容是否晚于最后确认快照。 */
     val dirty: Boolean = false,
+    /** 当前解锁会话内递增的草稿版本，仅用于区分连续编辑，不进入权威快照。 */
+    val draftVersion: Long = 0L,
 )
 
 /**

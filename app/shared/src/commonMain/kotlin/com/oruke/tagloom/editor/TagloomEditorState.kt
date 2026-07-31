@@ -418,6 +418,7 @@ class TagloomEditorState(
                     note = updated,
                     updatedAt = timestampProvider(),
                     dirty = true,
+                    draftVersion = current.draftVersion + 1L,
                 )
             }
         }

@@ -3,6 +3,7 @@ package com.oruke.tagloom.editor
 import com.oruke.tagloom.core.model.BlockTypes
 import com.oruke.tagloom.core.model.HeadingBlockContent
 import com.oruke.tagloom.core.model.InlineMarkTypes
+import com.oruke.tagloom.core.model.NoteValidator
 import com.oruke.tagloom.core.model.TodoBlockContent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,6 +66,23 @@ class BlockDocumentEditingTest {
         val beta = richText.runs.first { run -> run.text == "beta" }
         assertTrue(beta.marks.any { mark -> mark.type == InlineMarkTypes.CODE })
         assertEquals(1, beta.annotationIds.size)
+    }
+
+    /**
+     * 验证合并留下 tombstone 后再次拆分仍可生成可保存的活动 Block 顺序。
+     */
+    @Test
+    fun splitsAgainAfterMergeWithoutInvalidatingNote() {
+        val state = testState()
+        state.createDocument()
+        val firstId = state.selectedDocument!!.note.blocks.single().id
+        state.updateBlockText(firstId, "前后")
+        val second = assertNotNull(state.splitBlock(firstId, 1, 1))
+        assertNotNull(state.mergeBlockWithPrevious(second.blockId))
+
+        assertNotNull(state.splitBlock(firstId, 1, 1))
+
+        assertTrue(NoteValidator.validate(state.selectedDocument!!.note).isEmpty())
     }
 
     /**

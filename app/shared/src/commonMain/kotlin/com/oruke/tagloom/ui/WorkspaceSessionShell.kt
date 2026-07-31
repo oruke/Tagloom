@@ -78,10 +78,12 @@ internal fun WorkspaceSessionShell(
     var searchPaletteOpen by remember { mutableStateOf(false) }
     val selectedDocument = controller.editorState.selectedDocument
 
-    LaunchedEffect(selectedDocument?.id, selectedDocument?.note, selectedDocument?.dirty, controller.busy) {
+    LaunchedEffect(selectedDocument?.id, selectedDocument?.draftVersion, selectedDocument?.dirty, controller.busy) {
         if (selectedDocument?.dirty == true && !controller.busy) {
             delay(AUTO_SAVE_DELAY_MILLIS)
-            onSave()
+            if (controller.canAutoSaveSelected()) {
+                onSave()
+            }
         }
     }
 

@@ -12,7 +12,7 @@ object NoteValidationCodes {
     /** Block 直接或间接把自己作为祖先。 */
     const val PARENT_CYCLE: String = "parent_cycle"
 
-    /** 同一父节点下存在重复排序键。 */
+    /** 同一父节点下的活动 Block 存在重复排序键。 */
     const val DUPLICATE_SIBLING_ORDER: String = "duplicate_sibling_order"
 
     /** InlineRun 引用了笔记中不存在的加注。 */
@@ -123,13 +123,17 @@ object NoteValidator {
     }
 
     /**
-     * 检测同一父节点下会导致非确定性显示顺序的重复 orderKey。
+     * 检测同一父节点下会导致非确定性显示顺序的活动 Block 重复 orderKey。
+     *
+     * tombstone 保留删除前的排序键用于历史解释，但不会参与活动树渲染；后续活动 Block
+     * 可以复用该位置，因此不能把 tombstone 与活动 Block 的键相同判定为结构损坏。
      *
      * @param blocks 待检查的全部 Block。
      * @return 对每个重复排序键中的 Block 生成的问题列表。
      */
     private fun findDuplicateSiblingOrders(blocks: List<Block>): List<NoteValidationIssue> =
         blocks
+            .filterNot(Block::deleted)
             .groupBy { block -> block.parentId to block.orderKey }
             .values
             .filter { siblings -> siblings.size > 1 }

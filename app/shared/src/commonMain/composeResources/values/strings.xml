@@ -62,6 +62,7 @@
     <string name="workspace_status_option_saved_and_selected">New option saved and selected</string>
     <string name="workspace_status_option_selected">Existing option selected</string>
     <string name="workspace_status_integrity_notice">Some unverifiable objects were isolated. Create an encrypted backup and review the recovery details.</string>
+    <string name="workspace_error_note_save_failed">The current note could not be saved. Keep editing to retry automatically, or use Save now.</string>
     <string name="workspace_error_operation_failed">The workspace operation could not be completed. Verify your local access or Recovery Key and try again.</string>
     <string name="workspace_search_save_title">Save current search</string>
     <string name="workspace_search_name_label">Query name</string>

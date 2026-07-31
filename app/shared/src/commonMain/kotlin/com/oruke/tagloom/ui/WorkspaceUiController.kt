@@ -99,6 +99,9 @@ internal class WorkspaceUiController(
     var savedQueries: List<WorkspaceSavedQuery> by mutableStateOf(emptyList())
         private set
 
+    /** 统一编排 Note 保存与自动保存版本去重。 */
+    private val noteSaveDelegate = WorkspaceNoteSaveDelegate(gateway, editorState)
+
     /**
      * 读取本机最近登记工作区，决定自动打开、PIN 解锁还是首次连接入口。
      *
@@ -270,29 +273,18 @@ internal class WorkspaceUiController(
     /**
      * 保存当前文档；保存期间继续发生的内存编辑不会被旧返回值覆盖。
      */
-    suspend fun saveSelected() = runOperation {
-        editorState.materializeSelectedSnapshotDefaults()
-        val submitted = editorState.selectedDocument ?: return@runOperation
-        val saved = gateway.saveNote(
-            objectId = submitted.id.takeIf { submitted.persisted },
-            note = submitted.note,
-        )
-        val current = editorState.documents.firstOrNull { document -> document.id == submitted.id }
-        val hasConcurrentChanges = current?.note?.let { note -> note != submitted.note } == true
-        val visibleNote = current?.note?.takeIf { hasConcurrentChanges } ?: saved.note
-        editorState.acceptPersistedDocument(
-            previousId = submitted.id,
-            persistedDocument = EditorDocument(
-                id = saved.id,
-                note = visibleNote,
-                createdAt = current?.createdAt?.takeIf { hasConcurrentChanges } ?: saved.createdAt,
-                updatedAt = current?.updatedAt?.takeIf { hasConcurrentChanges } ?: saved.updatedAt,
-                persisted = true,
-                dirty = hasConcurrentChanges,
-            ),
-        )
-        searchHits = emptyList()
+    suspend fun saveSelected() = runOperation(failureMessage = WorkspaceUiMessage.NoteSaveFailed) {
+        if (noteSaveDelegate.saveSelected()) {
+            searchHits = emptyList()
+        }
     }
+
+    /**
+     * 判断当前草稿是否比最近一次保存尝试更新。
+     *
+     * @return 工作区空闲且当前草稿版本尚未提交过时为 true。
+     */
+    fun canAutoSaveSelected(): Boolean = noteSaveDelegate.canAutoSave(busy)
 
     /**
      * 删除当前文档；已确认文档先写 tombstone，草稿只从内存移除。
@@ -422,6 +414,7 @@ internal class WorkspaceUiController(
     suspend fun lock() = runOperation {
         gateway.lock()
         editorState.clearWorkspace()
+        noteSaveDelegate.resetAutoSaveAttempt()
         preparedRecoveryKey = null
         rotatedRecoveryKey = null
         recoveryMessages = emptyList()
@@ -439,6 +432,7 @@ internal class WorkspaceUiController(
      * @param result 平台打开结果。
      */
     private fun open(result: WorkspaceOpenResult) {
+        noteSaveDelegate.resetAutoSaveAttempt()
         recoveryMessages = result.recoveryMessages
         if (result.readOnly) {
             editorState.clearWorkspace()
@@ -469,9 +463,13 @@ internal class WorkspaceUiController(
     /**
      * 统一 busy 状态与安全错误展示，避免异常让按钮永久失效。
      *
+     * @param failureMessage 本次操作失败后可安全展示的本地化语义。
      * @param block 单次平台工作区操作。
      */
-    private suspend fun runOperation(block: suspend () -> Unit) {
+    private suspend fun runOperation(
+        failureMessage: WorkspaceUiMessage = WorkspaceUiMessage.OperationFailed,
+        block: suspend () -> Unit,
+    ) {
         if (busy) {
             return
         }
@@ -481,7 +479,7 @@ internal class WorkspaceUiController(
         try {
             block()
         } catch (error: Throwable) {
-            errorMessage = WorkspaceUiMessage.OperationFailed
+            errorMessage = failureMessage
         } finally {
             busy = false
         }

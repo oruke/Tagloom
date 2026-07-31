@@ -60,6 +60,9 @@ internal sealed interface WorkspaceUiMessage {
     /** 打开会话时隔离了无法认证的对象。 */
     data object IntegrityNotice : WorkspaceUiMessage
 
+    /** 当前 Note 保存失败但编辑器草稿仍可继续修改。 */
+    data object NoteSaveFailed : WorkspaceUiMessage
+
     /** 平台或密码学操作失败时使用的脱敏错误。 */
     data object OperationFailed : WorkspaceUiMessage
 }
@@ -94,6 +97,7 @@ internal fun WorkspaceUiMessage.localizedText(): String = when (this) {
         Res.string.workspace_status_option_selected,
     )
     WorkspaceUiMessage.IntegrityNotice -> stringResource(Res.string.workspace_status_integrity_notice)
+    WorkspaceUiMessage.NoteSaveFailed -> stringResource(Res.string.workspace_error_note_save_failed)
     WorkspaceUiMessage.OperationFailed -> stringResource(Res.string.workspace_error_operation_failed)
 }
 

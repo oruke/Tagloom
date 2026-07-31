@@ -97,6 +97,29 @@ class NoteValidationTest {
     }
 
     /**
+     * 验证 tombstone 可保留删除前排序键，不与复用该位置的活动 Block 冲突。
+     */
+    @Test
+    fun validateAllowsTombstoneToRetainActiveSiblingOrder() {
+        val deleted = block(
+            type = "paragraph",
+            orderKey = "same",
+            content = RichTextBlockContent(RichText()),
+            id = BlockId("deleted"),
+        ).copy(deleted = true)
+        val active = block(
+            type = "paragraph",
+            orderKey = "same",
+            content = RichTextBlockContent(RichText()),
+            id = BlockId("active"),
+        )
+
+        val issues = NoteValidator.validate(noteOf(listOf(deleted, active)))
+
+        assertTrue(issues.none { it.code == NoteValidationCodes.DUPLICATE_SIBLING_ORDER })
+    }
+
+    /**
      * 验证缺失加注与孤立状态不一致均会被拒绝。
      */
     @Test
