@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Light Porcelain Background Gradient -->
+    <linearGradient id="bg-light-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F1F5F9" />
+    </linearGradient>
+
+    <!-- Horizontal Ribbon Gradient (Cyan -> Indigo -> Purple) -->
+    <linearGradient id="t-light-horizontal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="50%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+
+    <!-- Vertical Ribbon Gradient (Dark Sky -> Cyan -> Emerald) -->
+    <linearGradient id="t-light-vertical" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#0369A1" />
+      <stop offset="50%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+
+  <!-- Layer 1: App Icon Background (Light Porcelain Squircle) -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg-light-grad)" />
+
+  <!-- Layer 2: Monogram T Icon Geometry (v3 Final Scale-Optimized) -->
+  <g>
+    <!-- Vertical Ribbon Stem of "T" (Tag Needle / Loom Warp Thread) -->
+    <path d="M 512 768 L 512 256 C 512 208, 464 176, 416 176 C 368 176, 320 208, 320 256" fill="none" stroke="url(#t-light-vertical)" stroke-width="136" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Horizontal Ribbon Bar of "T" (Weft Thread) -->
+    <path d="M 192 384 L 832 384 C 864 384, 888 408, 888 440" fill="none" stroke="url(#t-light-horizontal)" stroke-width="136" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Overlap Joint: Vertical Stem weaving OVER the Horizontal Bar -->
+    <path d="M 512 270 L 512 470" fill="none" stroke="url(#t-light-vertical)" stroke-width="136" stroke-linecap="round" />
+
+    <!-- Enlarged Tag Hole Circle at Top-Left Loop (16px Visible Ring & Knockout Center) -->
+    <circle cx="416" cy="256" r="64" fill="#FFFFFF" stroke="#059669" stroke-width="20" />
+
+    <!-- Enlarged Tag Pin Anchor Circle at Stem Bottom (16px Visible Anchor Node) -->
+    <circle cx="512" cy="768" r="52" fill="#0369A1" stroke="#FFFFFF" stroke-width="12" />
+  </g>
+</svg>

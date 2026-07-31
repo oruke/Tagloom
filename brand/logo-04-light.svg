@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Light Background Gradient -->
+    <linearGradient id="bg-light-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F1F5F9" />
+    </linearGradient>
+
+    <!-- Monogram Gradients (High contrast for light background) -->
+    <linearGradient id="t-light-horizontal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="50%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+
+    <linearGradient id="t-light-vertical" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#0369A1" />
+      <stop offset="50%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+
+  <!-- App Icon Background (Light Mode Squircle) -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg-light-grad)" />
+  <rect x="12" y="12" width="1000" height="1000" rx="212" fill="none" stroke="#CBD5E1" stroke-width="6" />
+
+  <!-- Monogram T Icon Geometry -->
+  <g>
+    <!-- Vertical Ribbon Stem of "T" (Tag Needle / Loom Warp Thread) -->
+    <path d="M 512 800
+             L 512 256
+             C 512 212, 476 176, 432 176
+             C 388 176, 352 212, 352 256"
+          fill="none" stroke="url(#t-light-vertical)" stroke-width="84" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Horizontal Ribbon Bar of "T" (Weft Thread) -->
+    <path d="M 216 344
+             L 808 344
+             C 852 344, 888 380, 888 424"
+          fill="none" stroke="url(#t-light-horizontal)" stroke-width="84" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Overlap Joint: Vertical Stem weaving OVER the Horizontal Bar -->
+    <path d="M 512 280 L 512 408" fill="none" stroke="url(#t-light-vertical)" stroke-width="84" stroke-linecap="round" />
+
+    <!-- Tag Tag-Hole Dot at Top Left Loop -->
+    <circle cx="432" cy="256" r="20" fill="#FFFFFF" stroke="#059669" stroke-width="8" />
+
+    <!-- Tag Pin Anchor Point at Bottom -->
+    <circle cx="512" cy="800" r="18" fill="#0284C7" />
+  </g>
+</svg>

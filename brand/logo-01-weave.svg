@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad-01" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B" />
+      <stop offset="50%" stop-color="#1C2541" />
+      <stop offset="100%" stop-color="#0B132B" />
+    </linearGradient>
+
+    <!-- Ribbon Gradients -->
+    <linearGradient id="cyan-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+
+    <linearGradient id="indigo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+
+    <linearGradient id="teal-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#0D9488" />
+    </linearGradient>
+
+    <!-- Shadow filter for weaving depth -->
+    <filter id="shadow-01" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.55" />
+    </filter>
+
+    <filter id="glow-01" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Background -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg-grad-01)" />
+  <rect x="12" y="12" width="1000" height="1000" rx="212" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="6" />
+
+  <!-- Subtle Weave Loom Matrix Lines in Background -->
+  <g opacity="0.08" stroke="#38BDF8" stroke-width="3" stroke-dasharray="12 12">
+    <line x1="352" y1="120" x2="352" y2="904" />
+    <line x1="512" y1="120" x2="512" y2="904" />
+    <line x1="672" y1="120" x2="672" y2="904" />
+    <line x1="120" y1="352" x2="904" y2="352" />
+    <line x1="120" y1="512" x2="904" y2="512" />
+    <line x1="120" y1="672" x2="904" y2="672" />
+  </g>
+
+  <!-- Main Weave Motif: Interweaving Warp & Weft Bands -->
+  <g filter="url(#shadow-01)">
+    <!-- Vertical Strand 1 (Left Warp) -->
+    <path d="M 360 216
+             L 360 808"
+          fill="none" stroke="url(#cyan-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Vertical Strand 2 (Right Warp) -->
+    <path d="M 664 216
+             L 664 808"
+          fill="none" stroke="url(#cyan-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Horizontal Strand 1 (Top Weft) -->
+    <path d="M 216 360
+             L 808 360"
+          fill="none" stroke="url(#indigo-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Horizontal Strand 2 (Bottom Weft) -->
+    <path d="M 216 664
+             L 808 664"
+          fill="none" stroke="url(#indigo-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Overlapping Weave Joints (Creating 3D Over/Under Interlock) -->
+    <!-- Top-Left Joint: Vertical over Horizontal -->
+    <path d="M 360 300 L 360 420" fill="none" stroke="url(#cyan-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Bottom-Left Joint: Horizontal over Vertical -->
+    <path d="M 300 664 L 420 664" fill="none" stroke="url(#indigo-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Top-Right Joint: Horizontal over Vertical -->
+    <path d="M 604 360 L 724 360" fill="none" stroke="url(#indigo-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Bottom-Right Joint: Vertical over Horizontal -->
+    <path d="M 664 604 L 664 724" fill="none" stroke="url(#cyan-grad)" stroke-width="72" stroke-linecap="round" />
+
+    <!-- Center Connecting Core Knot (Diagonal Cross Threads forming encrypted nexus) -->
+    <path d="M 360 360 Q 512 512 664 664" fill="none" stroke="url(#teal-grad)" stroke-width="36" stroke-linecap="round" opacity="0.9" />
+    <path d="M 664 360 Q 512 512 360 664" fill="none" stroke="url(#teal-grad)" stroke-width="36" stroke-linecap="round" opacity="0.9" />
+
+    <!-- Central Security Keyhole / Node -->
+    <circle cx="512" cy="512" r="44" fill="#0B132B" stroke="#38BDF8" stroke-width="12" />
+    <circle cx="512" cy="512" r="16" fill="#38BDF8" />
+  </g>
+</svg>

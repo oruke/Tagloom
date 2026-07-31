@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background Gradient: Clean High-Contrast Porcelain Light Squircle -->
+    <linearGradient id="bg-compact-v2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#E2E8F0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Layer 1: High-Contrast Light Squircle Background (16px to 1024px All-Scale Ready) -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg-compact-v2)" />
+
+  <!-- Layer 2: T Monogram Ribbon Symbol (v2 Optimized Architecture) -->
+  <g>
+    <!-- Horizontal Ribbon Bar of "T" (Electric Sky Blue) -->
+    <path d="M 192 384 L 832 384" fill="none" stroke="#0284C7" stroke-width="144" stroke-linecap="round" />
+
+    <!-- Vertical Ribbon Stem of "T" (Deep Royal Navy Blue) -->
+    <path d="M 512 768 L 512 256 C 512 208, 464 176, 416 176 C 368 176, 320 208, 320 256" fill="none" stroke="#1E3A8A" stroke-width="144" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Overlap Joint: Vertical Stem weaving OVER the Horizontal Bar -->
+    <path d="M 512 270 L 512 470" fill="none" stroke="#1E3A8A" stroke-width="144" stroke-linecap="round" />
+  </g>
+</svg>

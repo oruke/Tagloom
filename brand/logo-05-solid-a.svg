@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Royal Blue Background Gradient -->
+    <linearGradient id="bg-solid-a" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+  </defs>
+
+  <!-- Layer 1: Solid Royal Blue Squircle Base -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg-solid-a)" />
+
+  <!-- Layer 2: Solid White T Monogram Silhouette (Fill Geometry, No Stroke) -->
+  <g fill="#FFFFFF">
+    <!-- Horizontal Ribbon Bar -->
+    <rect x="160" y="320" width="704" height="160" rx="80" />
+
+    <!-- Vertical Ribbon Stem -->
+    <rect x="432" y="192" width="160" height="640" rx="80" />
+
+    <!-- Woven Interlock Cutout (Vertical Stem Weaving OVER Horizontal Bar) -->
+    <rect x="432" y="320" width="160" height="24" fill="url(#bg-solid-a)" />
+  </g>
+</svg>
