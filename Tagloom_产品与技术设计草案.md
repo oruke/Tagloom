@@ -407,6 +407,83 @@ link
 
 不为 InlineRun 分配长期稳定 ID。同步和历史的最小权威单元仍是 Block；并发修改同一 Block 时，对其规范化富文本执行三方合并。
 
+## 7.3 BaseTable 正文表格 Block（规划，后续实现）
+
+BaseTable 是 Note 内的叶子 Block，用于在单篇 Note 正文中维护结构化行列，属于 Block / RichText 编辑体系的一部分。它不是数据库，也不是第 14 节 Database 的 Table View 展示：行、列、单元格均不代表 Note 或 PropertyDefinition。本节全部内容为规划，后续实现；不改变“当前 v0.2 功能已实现”的事实。
+
+规划结构沿用统一 `id / type / parentId / orderKey / content / attributes` 外壳（示例 ID 仅用于讲解，不代表生产 ID 形态）：
+
+```json
+{
+  "id": "block-9",
+  "type": "base-table",
+  "parentId": null,
+  "orderKey": "a9",
+  "content": {
+    "title": {
+      "richText": { "runs": [] }
+    },
+    "columns": [
+      { "columnId": "col-1", "orderKey": "a1", "type": "text", "options": [] }
+    ],
+    "rows": [
+      {
+        "rowId": "row-1",
+        "orderKey": "a1",
+        "cells": {
+          "col-1": { "richText": { "runs": [] } }
+        }
+      }
+    ]
+  },
+  "attributes": {}
+}
+```
+
+约束：
+
+- `type` 为 `base-table`，是叶子 Block，没有子 Block；`rows`、`columns`、`cells` 全部在 `content` 内权威保存，属于 Note 快照内容树的一部分，绝不是 `Note.blocks` 的子 Block，也绝不镜像到 `Note.propertyValues` 或 PropertyDefinition，避免产生第二份权威数据。
+- 行与列使用稳定、不透明、内容无关的 RowId / ColumnId（不由标题、序号或单元格文本派生）；表内 `orderKey` 只负责行 / 列排序，与 Block 外层 `orderKey` 分离，不承载业务语义。
+- 文本单元格使用规范化 `RichText.runs`，遵守第 7.2 节的 Run 合并与 Mark 排序规则；空单元格可省略，保证序列化结果稳定。
+- 首版单元格类型为 `text`、`number`（按规范十进制文本保存）、`boolean`、`date`、`datetime`；列类型与列级选项是局部配置，只存在于本表格 `content`，不得成为工作区属性，也不进入属性索引。
+- BaseTable 可位于 Note 顶层，也可作为 `tab` 的子 Block（见第 7.4 节）；行、列、单元格不是 `tab` 的子 Block。
+- 不支持单元格内嵌 Block、跨行 / 跨列合并、跨 Note 关系与自动同步。公式形式的 `=` 文本按普通文本处理，不执行求值；公式能力后续如需引入，必须单独 ADR 评估，不得以字符串求值方式进入 MVP。
+
+编辑与一致性（规划）：
+
+- 所有编辑（增删行 / 列、改单元格、改列类型）都经 Note 应用服务，携带 `expectedRevision` 并通过 TransactionCoordinator 提交，产生新的 Note 快照事务；不存在绕过 Note 的“表格行写入”。
+- 同一 Note 内移动 BaseTable（含跨 tab 移动）保留 Block ID、RowId、ColumnId；跨 Note 首版只复制内容并重写 Block / Row / Column / 局部选项 ID，不保留任何引用关系。
+- CSV / TSV / GFM 按“有损内容导入导出”处理：导入前必须提供类型推断预览，并提示 RichText 样式、稳定 ID、本地列类型与列选项、引用关系会在往返中丢失；导出同样提示有损。
+- “从 Database 固化为正文表格”仅是一次性、显式的静态复制：结果为当前投影的快照副本，不保留与 Database / View / 属性的任何连接，后续变化不影响该表格。
+- “从正文表格创建数据集”必须先显示预览：会为每一行创建一个新的 Note 并创建所需属性；原表格保持独立，不会与数据集自动同步。
+
+删除、合并与前向兼容（规划）：
+
+- 删除 BaseTable 即删除外层 Block，先生成 Block tombstone；行、列采用内部 tombstone 语义，删除列时保留其单元格数据用于恢复与冲突解释，达到保留期且同步确认后才能物理清理。
+- 上线前必须实现按 RowId / ColumnId / Cell 粒度的 `BaseTableMergeStrategy` 三方合并；同一文本单元格复用 RichText 三方合并（见第 16 节），`number` / `boolean` / `date` / `datetime` 标量单元格使用确定性 LWW。
+- 未知 BaseTable schema 或未知列类型必须原样保留并以只读网格展示，旧客户端不得因无法解析而丢失内容。以上能力均为规划，不暗示现有实现已具备。
+
+## 7.4 Tabs 容器 Block（规划，后续实现）
+
+Tab 是 Note 内的结构化 Block，不是独立的 workspace/tab 实体。规划结构：
+
+```text
+tabs          容器 Block，直接活动子节点仅可为 tab
+└── tab       页签 Block，parent 必为 tabs，标题使用 RichText
+    ├── paragraph
+    ├── base-table
+    └── ...    普通 Block 均为 tab 的子节点
+```
+
+约束：
+
+- `tabs` 容器 Block 的直接活动子节点仅可为 `tab`；`tab` 的 `parentId` 必须指向 `tabs`。
+- 普通 Block（包括 BaseTable，见第 7.3 节）是 `tab` 的子节点；BaseTable 的行、列、单元格不是 `tab` 的子 Block。跨 Tab 移动只更新 `parentId` 与 `orderKey`，不改变稳定 Block ID，也不复制内容。
+- `tab` 标题使用规范化 `RichText`，遵守第 7.2 节的 Run 合并与 Mark 排序规则。
+- 当前活动 Tab 是 UI 会话状态，不持久化；只有用户显式设置的 `defaultTabId` 可以持久化到 Note。
+- 删除 `tab` 时默认执行“解包保留内容”：只移除 `tab` 块本身，其子 Block 提升为 `tabs` 所在层级（通常为 Note 顶层）并重新生成 `orderKey`；若 `tabs` 已无 `tab` 子节点，则 `tabs` 容器一并删除。只有用户明确选择“连同内容删除”时才级联生成子 Block 的 tombstone。
+- 首版“添加到 Tab”只支持在同一 Note 内移动 Block；跨 Note 的复用后续通过 note-reference / view-reference 引用实现（view-reference 指 Database View，见第 14.2 节），移动 / 复用不得隐式复制内容，也不允许一个 Block 拥有多个 parent。用户显式把表格复制为副本时允许复制，但必须重新生成 Block / Row / Column / 局部选项 ID，不能与源表格共享身份。
+
 ---
 
 # 8. 对象类型（超级标签）与普通标签
@@ -795,38 +872,131 @@ linkType
 
 ---
 
-# 14. 查询系统
+# 14. 数据库、视图与查询（规划，后续实现）
 
-支持：
+查询能力覆盖标签、属性、全文、双链、语义与混合查询；规划中查询与数据库视图的筛选、排序统一由第 14.4 节的 QuerySpec 表达。
 
-```text
-标签查询
-属性查询
-全文查询
-双链查询
-语义查询
-混合查询
+> 本节描述的 Database/View 配置对象、QuerySpec 与三种受限展示视图（Table / Kanban / Gallery）属于规划中的后续切片，尚未实现；BaseTable 正文表格是 Note 内容 Block，定义见第 7.3 节，不属于本节 Database/View 体系。本节不改变“当前 v0.2 功能已实现”的事实，不得把预留协议表述为终端用户可用功能。
+
+## 14.1 DatasetProjection：Database Table View 的派生展示
+
+Database Table View 是 `ViewDefinition.presentation.kind = table` 时对多个 Note 的派生展示（DatasetProjection），不是新的权威对象类型，也不是物理表：
+
+- 行 = Note 对象。
+- 列 = FieldRef（系统字段 / 对象类型）/ PropertyDefinition。
+- 单元格 = Note 字段或 `Note.propertyValues` 中对应属性的值。
+
+约束：
+
+- 投影结果、分组、统计和展示索引均可从已确认快照重建；删除投影索引不影响任何权威数据。
+- 写单元格没有独立数据路径：必须经过 Note 应用服务，并以当前 revision 校验后产生新的 Note 快照事务；不存在绕过 Note 的“数据库行写入”。
+- Database Table View 不是 BaseTable（第 7.3 节）：不能引用 BaseTableColumnId，不复用 BaseTable 的 `content`、局部列类型 / 局部选项或编辑命令；Table / Kanban / Gallery 只属于 Database View，不适用于 BaseTable。
+- 不引入“BaseTable/Collection/Set”等同义实体；一个 Note 只因属性值出现在投影中，不因出现在投影中而改变身份。
+
+## 14.2 权威配置对象：DatabaseDefinition 与 ViewDefinition
+
+规划新增两类权威配置对象，均使用第 26 节的版本化快照头。
+
+`DatabaseDefinition`（数据集）只保存稳定数据集身份与来源约束，示例字段（示例 ID 仅用于讲解，不代表生产 ID 形态）：
+
+```json
+{
+  "id": "01JDB01",
+  "name": "项目库",
+  "sourceTypeId": "project",
+  "includeDescendants": true,
+  "creationTypeId": "project",
+  "defaultViewId": "01JVIEW1"
+}
 ```
 
-示例：
+- `sourceTypeId`：单一来源对象类型；`includeDescendants` 表示是否包含其全部后代类型。
+- `creationTypeId`：在该数据集中新建对象时使用的对象类型（通常等于当前类型）。
+- `defaultViewId`：打开数据集时默认展示的 View。
 
-```text
-tag:Project
-tag:Project status:active
-tag:Book rating>=4
-linkedTo:"Tagloom"
-"增量同步" semantic:true
+`ViewDefinition`（视图）独立存在，不内嵌于 Database，示例字段：
+
+```json
+{
+  "id": "01JVIEW1",
+  "databaseId": "01JDB01",
+  "name": "进行中",
+  "orderKey": "a1",
+  "query": {},
+  "presentation": { "kind": "table", "fields": [] }
+}
 ```
 
-查询结果可以保存为视图：
+- View 单向指向 Database（`databaseId`）；Database 不保存 `viewIds` 反向列表，避免双向引用产生不一致。
+- `query` 是 QuerySpec；`presentation` 只描述展示方式（Table / Kanban / Gallery 与列配置），不承载查询语义。
+- Database/View 不保存 Note、属性 schema、查询结果或权限；这些仍由对应权威对象与统一权限层提供。
+- “创建 Database + 首个 View”“删除默认 View 后调整 `defaultViewId`”等跨对象操作必须在一个 TransactionCoordinator 事务内确认，不能出现 Database 已确认而 View 缺失的中间状态。
+- 新增对象类型之前，必须先具备 manifest / `objectType` 未知值安全拒绝与只读兼容策略；不能假定旧客户端可以解析新对象类型。
+
+## 14.3 SavedQuery 与 QuerySpec 的复用边界
+
+- SavedQuery 只保存可复用的 QuerySpec，不携带布局或展示信息。
+- View 与 SavedQuery 共用 QuerySpec 值对象；MVP 中 View 不直接引用 SavedQuery，创建 View 时复制 QuerySpec，避免视图与保存查询之间的隐式耦合与删除联动。
+- 后续若需“从 SavedQuery 派生视图”，应在 QuerySpec 与视图语义稳定后单独评估显式引用，不得借此引入新的同义实体。
+
+## 14.4 QuerySpec：版本化、类型化 AST
+
+QuerySpec 是版本化、类型化的查询 AST，使用稳定 ID 而非显示名引用字段：
 
 ```text
-列表
-表格
-看板
-日历
-图谱
+QuerySpec
+├── FilterExpr
+│   ├── True / All / Any / Not
+│   ├── FullText
+│   └── Predicate
+├── FieldRef（系统字段 / 对象类型 / 属性）
+└── SortSpec
 ```
+
+MVP 谓词集合：
+
+```text
+eq / ne / isEmpty / isNotEmpty
+文本：contains
+数字 / 日期：gt / gte / lt / lte
+单选：in / notIn
+多选：containsAny / containsAll
+类型：isExact / isDescendantOf
+```
+
+约束：
+
+- 用户界面只能显示当前对象类型的有效属性；`dynamic` / `snapshot` 默认值、属性继承与同级冲突必须采用与 EffectivePropertyResolver 一致的语义，不得在 UI 与领域层出现两套解释。
+- 类型或属性定义变动时，允许先把对应结构索引整体标记为落后并重建；索引只能消费已确认快照，落后期间 UI 必须提示查询结果可能不完整。
+
+## 14.5 多视图交互（规划）
+
+UI 术语与入口边界（规划）：
+
+- “正文表格”指 BaseTable Block（第 7.3 节），只从 Note 编辑器的“插入 Block”菜单进入；其工具栏使用行 / 列 / 单元格语义（添加行、添加列、调整等），不得出现“新建数据集 / 添加视图 / 转为看板 / 按类型建表”等数据库入口。
+- “数据集视图”指 Database View，由侧边栏或“新建数据集”流程进入；“表格视图”仅指 Database 的 Table View。Table View 工具栏显示来源类型、视图切换、筛选、排序与属性列配置。
+- 界面必须可读地提示边界：正文表格标注“只属于当前 Note，不会创建属性，也不会生成新的 Note”；数据集视图标注“编辑单元格会更新对应 Note 的属性”。
+- 删除正文表格中的一行只删除文档内容，不删除 Note；Database 不提供“删除行”，只能通过调整筛选、更改对象类型或删除 Note 表达。
+- 筛选只属于 Database View，不适用于 BaseTable；BaseTable 可提供表格内的局部派生排序 / 过滤（只影响当前展示），不复用 QuerySpec，也不持久化结果。
+
+交互规则：
+
+- 顶部按“类型”选择数据集（默认 `Note`），并在 Table / Kanban / Gallery 之间切换；筛选、排序、分组、属性列与搜索都作用于当前投影。
+- 新建操作始终自动携带当前数据集的 `creationTypeId`（通常等于当前类型）。
+- 当前属性筛选值默认不回写；只有用户显式选择“应用当前筛选值”时，才把筛选值写入新建对象的对应属性。
+- Table：标题列固定；其余列按 View 的排序与列配置展示。
+- Kanban：仅支持按可写单选属性分组；跨列拖动等于更新该 Note 的对应属性值，列内顺序按 View 排序，MVP 不提供手动卡片排序。
+- Gallery：仅提供有限封面与字段展示，不做自由画布。
+- 切换类型时，不适用于新类型的筛选必须保留并给出“修复 / 移除”选择，不可静默丢失。
+- UI 降级必须明确：工作区锁定（读取与写入立即失效）、索引落后（提示可能不完整并可重建）、空结果、删除 / 冲突（tombstone 与冲突提示）、不可写来源（继承或只读属性值等）分别给出对应状态，不得伪装成正常结果。
+- 首版不复制 Notion/Anytype 的 UI，也不支持公式 / Rollup、无限嵌套筛选、自由画布和复杂自动化。
+
+## 14.6 删除边界与权限说明
+
+- 删除 View 不影响任何 Note。
+- 删除 Database 在同一事务中 tombstone 其全部 View；不影响 Note、对象类型或属性定义。
+- 不提供模糊的“从 Database 删除行”操作：用户应明确为“更改对象类型”或“删除 Note”。
+- 过滤器不是权限边界：投影结果 = 授权可读的 Note ∩ 来源类型集合 ∩ 筛选条件。当前单用户 MVP 下该约束不产生实际差异，但必须在外部入口（CLI / MCP / Agent）开放前落实，避免把视图筛选当作访问控制。
 
 ---
 
@@ -1377,6 +1547,40 @@ Direct Provider
 - 混合搜索。
 - RAG 上下文构建。
 
+## 阶段七：BaseTable、数据库视图与 Tabs（规划，后续实现）
+
+BaseTable、数据库视图与 Tabs 均属于受架构前提约束的后续切片，不属于阶段一与阶段二构成的首个对外 MVP，当前均未实现；本节不改变“当前 v0.2 功能已实现”的事实。三者是相互独立的路线，可以按各自前提并行推进：
+
+BaseTable 独立路线（不依赖 Database）：
+
+```text
+1. BaseTable 内容模型：rows / columns / cells 的 schema 与确定性规范化。
+2. 校验与局部列类型规则（text / number / boolean / date / datetime）。
+3. BaseTableMergeStrategy：按 RowId / ColumnId / Cell 三方合并，文本单元格复用 RichText 合并。
+4. BaseTable 应用服务：编辑命令、expectedRevision 与 TransactionCoordinator 提交。
+5. 最小网格 UI：插入菜单、行 / 列 / 单元格编辑、CSV / TSV / GFM 有损导入导出预览。
+```
+
+Database 路线（不依赖 BaseTable）：
+
+```text
+1. 协议兼容：manifest / objectType 未知值安全拒绝与只读兼容策略。
+2. QuerySpec：版本化类型化 AST、FilterExpr / FieldRef / SortSpec 与 MVP 谓词。
+3. 有效类型 / 属性索引：消费已确认快照，结构变动时标记落后并重建。
+4. Database / View 快照：DatabaseDefinition / ViewDefinition 与跨对象事务。
+5. Table 视图（DatasetProjection）。
+6. Kanban / Gallery 受限视图。
+```
+
+Tabs 独立路线（不依赖 Database 与 BaseTable）：
+
+```text
+1. tabs 容器 Block 与 tab 子 Block 的结构校验、规范化与删除语义。
+2. 同 Note 内 Block 移动、默认 Tab 与最小页签编辑界面。
+```
+
+每个阶段都必须维持“对象快照是唯一权威来源、索引可重建、写入经 TransactionCoordinator”的既有约束；BaseTable 细节见第 7.3 节，数据库视图交互见第 14 节。
+
 ---
 
 # 22. 推荐模块划分
@@ -1497,7 +1701,7 @@ Domain 层不能直接依赖 Compose、SQLite、Ktor 或具体 AI SDK。
 - 不提供自部署 Sync Server、WebDAV 自动同步和跨设备自动合并；只要求模型为后续同步保留稳定 ID、revision 和 Change Log。
 - 不提供远程 AI Gateway、自动 RAG、向量搜索和模型供应商账户托管。
 - 不提供写入型 MCP、批量 Agent 自动修改和无人确认的后台整理。
-- 不实现公式属性、Rollup、复杂数据库视图、插件市场和完整自动化平台。
+- 不实现公式属性、Rollup、复杂数据库视图（不限嵌套筛选、自由布局、自动化等）、插件市场和完整自动化平台；Database 公式 / Rollup、BaseTable 单元格公式（`=` 文本不求值，见第 7.3 节）、三种受限展示视图（Table / Kanban / Gallery）、Tabs 与 BaseTable 正文表格均属于受架构前提约束的后续切片，不属于已交付 MVP。
 - 不追求所有 Block、属性和加注都能与标准 Markdown 无损往返。
 - 不以文件夹作为主要组织模型，也不把每篇笔记暴露为可直接编辑的明文 Markdown 文件。
 
@@ -1538,7 +1742,7 @@ flowchart LR
 
 ## 26.2 通用对象快照
 
-Note、Tag、PropertyDef、SavedQuery 等对象采用共同信封内的逻辑头：
+Note、Tag、PropertyDef、SavedQuery 等对象采用共同信封内的逻辑头（规划中的 DatabaseDefinition、ViewDefinition 同样遵守，见第 14.2 节）：
 
 ```json
 {
@@ -1711,6 +1915,67 @@ Note、Tag、PropertyDef、SavedQuery 等对象采用共同信封内的逻辑头
 - 一篇 Note 同时应用多个超级标签：组合灵活，但模板、必填约束和同级属性来源难以在主编辑流程中预测；改由单一应用类型加多父继承表达结构组合。
 - Note 直接保存自由标签文本：实现快，但重命名、去重、颜色和跨笔记搜索缺少稳定身份。
 - 创建时间和更新时间建模为普通属性：可复用属性 UI，但会与快照头形成两套可能不一致的事实。
+
+## ADR-009：BaseTable Block 与 Database Table View 严格分离（规划）
+
+**状态**：Proposed（规划中，尚未实现）
+
+**背景**：产品规划需要两类外观都可能是网格的能力：Note 正文中的表格内容，以及按对象类型与属性聚合 Note 的集合式展示。若把 BaseTable 当作数据库、物理表或 Database Table View 的另一种表达，会产生第二权威数据、第二套写入路径和错误的用户心智，破坏“加密对象快照是唯一权威来源、索引可重建”的既有承诺；同时旧客户端无法解析新对象类型时可能造成数据损坏。
+
+**决定**：
+
+- BaseTable 是 Note 内的叶子 Block（第 7.3 节），其权威数据是 Note Block 的 `content`：`rows` / `columns` / `cells` 全部保存在 Block 快照中，行、列、单元格不是子 Block，也绝不镜像到 `Note.propertyValues` 或 PropertyDefinition。编辑经 Note 应用服务与 TransactionCoordinator 提交；删除走外层 Block tombstone，行列采用内部 tombstone；上线前实现按 RowId / ColumnId / Cell 粒度的 `BaseTableMergeStrategy`，同文本单元格复用 RichText 三方合并。
+- Database Table View 是 `ViewDefinition.presentation.kind = table` 的派生展示（DatasetProjection，第 14.1 节）：行 = Note、列 = FieldRef / PropertyDefinition、单元格 = Note 字段或 propertyValues，结果从已确认快照重建。其权威配置是 `DatabaseDefinition` 与 `ViewDefinition`，结果为 `DatasetProjection`；不引用 BaseTableColumnId，不复用 BaseTable 的 `content`、局部列类型 / 选项或编辑命令。
+- 规划新增两类权威配置对象：`DatabaseDefinition`（稳定数据集身份、单一 `sourceTypeId`、`includeDescendants`、`creationTypeId`、`defaultViewId`）与独立 `ViewDefinition`（`databaseId`、name、orderKey、QuerySpec、presentation）；View 单向指向 Database，不保存反向 `viewIds`。
+- Database/View 不保存 Note、属性 schema、结果或权限；创建 Database + 首个 View、删除默认 View 调整等跨对象操作必须在同一 TransactionCoordinator 事务内确认。
+- 新增对象类型前必须先具备 manifest / `objectType` 未知值安全拒绝与只读兼容策略，不能假定旧客户端可解析。
+- SavedQuery 只保存可复用 QuerySpec 且不携带布局，MVP 中 View 复制 QuerySpec 而不直接引用 SavedQuery。
+- 删除 View 不动 Note；删除 Database 同事务 tombstone 其 View、不动 Note / 类型 / 属性；不提供模糊的“从 Database 删除行”，行级动作只能是调整筛选、更改对象类型或删除 Note。过滤器不是权限边界，投影结果 = 授权 Note ∩ 来源 ∩ 筛选，必须在外部入口开放前落实。
+
+**权衡**：BaseTable 与 Database Table View 各自独立演进，避免文档表格被过度设计成迷你数据库，也避免数据库视图伪装成文档内容；代价是两个能力需要分别实现内容模型、编辑命令与测试，不能共享一套“表格内核”的权威语义。
+
+**未采用方案**：
+
+- 把 BaseTable 建模为独立权威对象或物理表：与 Note Block content 形成双重真相源。
+- 把表格值镜像到 `Note.propertyValues` 或 PropertyDefinition：产生第二份权威数据，破坏快照一致性。
+- Database Table View 复用 BaseTable 协议（content、局部列类型 / 选项、编辑命令）：视图会错误获得文档表格语义，BaseTable 也无法表达 Note 集合查询。
+- Database 保存 `viewIds` 双向引用：跨对象一致性难以维护。
+- View 直接引用 SavedQuery 并携带布局：删除或修改保存查询会隐式影响视图。
+- 引入 Collection / Set 等同义实体：扩大概念面而不增加能力。
+
+## ADR-010：QuerySpec 与有效类型属性索引（规划）
+
+**状态**：Proposed（规划中，尚未实现）
+
+**背景**：SavedQuery、Database View 和工作区级 Note 查询需要可序列化、可同步、可版本化的查询表达；显示名查询不稳定，也无法表达类型继承与属性缺失语义。类型或属性定义变动时，实时迁移全部查询成本过高。
+
+**决定**：QuerySpec 是版本化、类型化的查询 AST，使用稳定 ID 而非显示名引用字段：`FilterExpr`（True/All/Any/Not/FullText/Predicate）、`FieldRef`（系统字段 / 对象类型 / 属性）、`SortSpec`。MVP 谓词为 `eq/ne/isEmpty/isNotEmpty`、文本 `contains`、数字 / 日期 `gt/gte/lt/lte`、单选 `in/notIn`、多选 `containsAny/containsAll`、类型 `isExact/isDescendantOf`。QuerySpec 与“有效类型 / 属性索引”只服务 SavedQuery、Database View 和工作区 Note 查询。用户界面只能显示当前对象类型的有效属性，`dynamic` / `snapshot`、继承与冲突语义与 EffectivePropertyResolver 保持一致。类型或属性定义变动时，允许先整体标记结构索引落后并重建；索引只能消费已确认快照，落后期间 UI 必须提示。
+
+BaseTable 边界（规划）：BaseTable 的局部过滤 / 排序与局部 RowId / ColumnId 不进入 QuerySpec，也不进入有效类型 / 属性索引；其单元格文本最多进入可重建的 Note / Block 全文索引，用于工作区搜索，不产生任何记录级查询语义。
+
+**权衡**：类型化 AST 比字符串查询更难书写和调试，但跨平台序列化、同步和版本迁移更可靠；结构索引整体落后并重建比实时迁移更简单，代价是短暂的不完整查询结果必须有 UI 提示。
+
+**未采用方案**：
+
+- 以显示名作为查询字段标识：重命名后历史查询静默失效。
+- 把属性 schema 快照进 Database / View：与 PropertyDefinition 形成两套事实。
+- 结构变动时实时增量迁移全部查询：成本高、收益低，首版允许整体落后并重建。
+- 把 BaseTable 的局部列类型、局部过滤 / 排序提升为 QuerySpec 或有效属性索引的输入：会让文档内表格污染工作区属性与查询语义。
+
+## ADR-011：Tabs Block 结构与删除语义（规划）
+
+**状态**：Proposed（规划中，尚未实现）
+
+**背景**：多页签编辑是常见需求，但把 Tab 建模为独立 workspace/tab 实体将引入新的对象类型、身份与同步边界，并可能与 Block 树产生多 parent 冲突。
+
+**决定**：Tab 是 Note 内的结构化 Block：`tabs` 容器 Block 的直接活动子节点仅可为 `tab`；`tab` 的 parent 必为 `tabs`；普通 Block（含 BaseTable，见第 7.3 节）是 `tab` 的子节点，BaseTable 的行、列、单元格不是子 Block。跨 Tab 移动只更新 `parentId` / `orderKey`，不改变稳定 Block ID。`tab` 标题使用规范化 `RichText`。当前活动 Tab 是 UI 会话状态，仅用户显式设置的 `defaultTabId` 可持久化。删除 `tab` 默认“解包保留内容”（只移除 `tab` 块本身，子 Block 提升到 `tabs` 所在层级并重新生成 `orderKey`，`tabs` 无剩余 `tab` 子节点时一并删除）；“连同内容删除”才级联 tombstone 子 Block。首版“添加到 Tab”仅支持同一 Note 内移动 Block；跨 Note 复用后续通过 note-reference / view-reference 引用实现（view-reference 指 Database View，见第 14.2 节），移动 / 复用不得隐式复制内容，也不允许一个 Block 拥有多个 parent；用户显式把表格复制为副本时允许复制，但必须重新生成 Block / Row / Column / 局部选项 ID。
+
+**权衡**：Tab 完全复用既有 Block 同步、历史与合并机制，删除语义明确可测试；代价是跨 Note 的 Tab 内容复用需要等引用机制成熟，首版只能在同一 Note 内移动 Block，跨 Note 的表格副本是独立身份的一次性复制。
+
+**未采用方案**：
+
+- 独立 workspace/tab 对象：引入新身份与同步边界，且与 Block 树关系复杂。
+- Tab 内容跨 Note 隐式复制或共享原 Block 身份：会产生难以解释的重复内容或多 parent 冲突。
 
 ---
 
