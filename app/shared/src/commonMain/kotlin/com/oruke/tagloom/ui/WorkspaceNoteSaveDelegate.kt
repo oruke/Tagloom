@@ -45,6 +45,7 @@ internal class WorkspaceNoteSaveDelegate(
         val saved = gateway.saveNote(
             objectId = submitted.id.takeIf { submitted.persisted },
             note = submitted.note,
+            expectedRevision = submitted.revision,
         )
         val current = editorState.documents.firstOrNull { document -> document.id == submitted.id }
         val hasConcurrentChanges = current?.note?.let { note -> note != submitted.note } == true
@@ -54,6 +55,7 @@ internal class WorkspaceNoteSaveDelegate(
             persistedDocument = EditorDocument(
                 id = saved.id,
                 note = visibleNote,
+                revision = saved.revision,
                 createdAt = current?.createdAt?.takeIf { hasConcurrentChanges } ?: saved.createdAt,
                 updatedAt = current?.updatedAt?.takeIf { hasConcurrentChanges } ?: saved.updatedAt,
                 persisted = true,

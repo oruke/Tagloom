@@ -1,5 +1,6 @@
 package com.oruke.tagloom
 
+import com.oruke.tagloom.platform.WorkspaceDatabaseDefinition
 import com.oruke.tagloom.platform.WorkspaceIntegrityFailure
 import com.oruke.tagloom.platform.WorkspaceNote
 import com.oruke.tagloom.platform.WorkspaceOpenResult
@@ -7,6 +8,7 @@ import com.oruke.tagloom.platform.WorkspacePropertyDefinition
 import com.oruke.tagloom.platform.WorkspaceRecoveryMessage
 import com.oruke.tagloom.platform.WorkspaceSavedQuery
 import com.oruke.tagloom.platform.WorkspaceTagDefinition
+import com.oruke.tagloom.platform.WorkspaceViewDefinition
 import com.oruke.tagloom.workspace.DesktopIntegrityFailure
 import com.oruke.tagloom.workspace.DesktopStoredNote
 import com.oruke.tagloom.workspace.DesktopWorkspaceOpenState
@@ -24,6 +26,8 @@ internal fun DesktopWorkspaceOpenState.toSharedWorkspaceOpenResult(): WorkspaceO
     savedQueries = savedQueries.map { saved -> WorkspaceSavedQuery(saved.id, saved.snapshot.payload) },
     tagDefinitions = tagDefinitions.map { saved -> WorkspaceTagDefinition(saved.snapshot.payload) },
     propertyDefinitions = propertyDefinitions.map { saved -> WorkspacePropertyDefinition(saved.snapshot.payload) },
+    databaseDefinitions = databaseDefinitions.map { saved -> WorkspaceDatabaseDefinition(saved.snapshot.payload) },
+    viewDefinitions = viewDefinitions.map { saved -> WorkspaceViewDefinition(saved.snapshot.payload) },
     readOnly = readOnly,
     recoveryMessages = recoveryReport.entries.map { entry ->
         WorkspaceRecoveryMessage.RecoveredTransaction(
@@ -47,6 +51,7 @@ internal fun DesktopWorkspaceOpenState.toSharedWorkspaceOpenResult(): WorkspaceO
 internal fun DesktopStoredNote.toSharedWorkspaceNote(): WorkspaceNote = WorkspaceNote(
     id = id,
     note = snapshot.payload,
+    revision = snapshot.header.revision,
     createdAt = snapshot.header.createdAt,
     updatedAt = snapshot.header.updatedAt,
 )

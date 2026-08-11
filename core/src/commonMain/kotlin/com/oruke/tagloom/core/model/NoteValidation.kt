@@ -15,6 +15,18 @@ object NoteValidationCodes {
     /** 同一父节点下的活动 Block 存在重复排序键。 */
     const val DUPLICATE_SIBLING_ORDER: String = "duplicate_sibling_order"
 
+    /** Tabs 容器包含了非 tab 直接子节点。 */
+    const val INVALID_TABS_CHILD: String = "invalid_tabs_child"
+
+    /** tab Block 没有位于 tabs 容器下。 */
+    const val INVALID_TAB_PARENT: String = "invalid_tab_parent"
+
+    /** 叶子 Block 错误拥有活动子节点。 */
+    const val LEAF_BLOCK_HAS_CHILDREN: String = "leaf_block_has_children"
+
+    /** Note 默认页签不存在或已经删除。 */
+    const val INVALID_DEFAULT_TAB: String = "invalid_default_tab"
+
     /** InlineRun 引用了笔记中不存在的加注。 */
     const val MISSING_ANNOTATION: String = "missing_annotation"
 
@@ -76,7 +88,80 @@ object NoteValidator {
 
         issues += findParentCycles(note.blocks, blocksById)
         issues += findDuplicateSiblingOrders(note.blocks)
+        issues += validateStructuredBlocks(note, blocksById)
         issues += validateAnnotations(note)
+        return issues
+    }
+
+    /**
+     * 校验 Tabs/Tab 父子边界、BaseTable 叶子约束和局部表格内容。
+     *
+     * @param note 待检查 Note。
+     * @param blocksById Block ID 映射。
+     * @return 结构化 Block 问题。
+     */
+    private fun validateStructuredBlocks(
+        note: Note,
+        blocksById: Map<BlockId, Block>,
+    ): List<NoteValidationIssue> {
+        val issues = mutableListOf<NoteValidationIssue>()
+        val activeChildren = note.blocks
+            .filterNot(Block::deleted)
+            .groupBy(Block::parentId)
+
+        note.blocks.filterNot(Block::deleted).forEach { block ->
+            val parent = block.parentId?.let(blocksById::get)
+            if (parent?.type == BlockTypes.TABS && block.type != BlockTypes.TAB) {
+                issues += NoteValidationIssue(
+                    NoteValidationCodes.INVALID_TABS_CHILD,
+                    block.id,
+                    message = "Tabs 容器的直接活动子节点只能是 tab",
+                )
+            }
+            if (block.type == BlockTypes.TAB && (parent?.type != BlockTypes.TABS || parent.deleted)) {
+                issues += NoteValidationIssue(
+                    NoteValidationCodes.INVALID_TAB_PARENT,
+                    block.id,
+                    message = "tab 必须位于活动 tabs 容器下",
+                )
+            }
+            if (block.type == BlockTypes.BASE_TABLE && activeChildren[block.id].orEmpty().isNotEmpty()) {
+                issues += NoteValidationIssue(
+                    NoteValidationCodes.LEAF_BLOCK_HAS_CHILDREN,
+                    block.id,
+                    message = "BaseTable 是叶子 Block，不能拥有子 Block",
+                )
+            }
+            if (block.type == BlockTypes.DATABASE && activeChildren[block.id].orEmpty().isNotEmpty()) {
+                issues += NoteValidationIssue(
+                    NoteValidationCodes.LEAF_BLOCK_HAS_CHILDREN,
+                    block.id,
+                    message = "Database 是叶子 Block，不能拥有子 Block",
+                )
+            }
+            val table = block.content as? BaseTableBlockContent
+            if (table != null) {
+                issues += BaseTableValidator.validate(table).map { tableIssue ->
+                    NoteValidationIssue(
+                        code = "base_table_${tableIssue.code}",
+                        blockId = block.id,
+                        message = tableIssue.message,
+                    )
+                }
+            }
+        }
+
+        val defaultTabId = note.defaultTabId
+        if (defaultTabId != null) {
+            val defaultTab = blocksById[defaultTabId]
+            if (defaultTab == null || defaultTab.deleted || defaultTab.type != BlockTypes.TAB) {
+                issues += NoteValidationIssue(
+                    NoteValidationCodes.INVALID_DEFAULT_TAB,
+                    defaultTabId,
+                    message = "默认页签必须指向活动 tab Block",
+                )
+            }
+        }
         return issues
     }
 
@@ -198,20 +283,31 @@ object NoteValidator {
      */
     private fun collectAnnotationReferences(blocks: List<Block>): List<AnnotationReference> =
         blocks.flatMap { block ->
-            val richText = when (val content = block.content) {
-                is RichTextBlockContent -> content.richText
-                is HeadingBlockContent -> content.richText
-                is TodoBlockContent -> content.richText
-                is AttachmentBlockContent -> content.caption
+            val richTexts = when (val content = block.content) {
+                is RichTextBlockContent -> listOf(content.richText)
+                is HeadingBlockContent -> listOf(content.richText)
+                is TodoBlockContent -> listOf(content.richText)
+                is AttachmentBlockContent -> listOf(content.caption)
+                is TabBlockContent -> listOf(content.title)
+                is BaseTableBlockContent -> buildList {
+                    add(content.title)
+                    addAll(content.columns.map(BaseTableColumn::name))
+                    addAll(
+                        content.rows.flatMap { row ->
+                            row.cells.values.mapNotNull { cell -> (cell as? BaseTableTextCell)?.richText }
+                        },
+                    )
+                }
                 is CodeBlockContent,
+                is DatabaseBlockContent,
                 DividerBlockContent,
                 is NoteReferenceBlockContent,
+                TabsBlockContent,
                 is UnknownBlockContent,
-                -> null
+                -> emptyList()
             }
-            richText
-                ?.runs
-                .orEmpty()
+            richTexts
+                .flatMap(RichText::runs)
                 .flatMap { run -> run.annotationIds }
                 .distinct()
                 .map { annotationId -> AnnotationReference(block.id, annotationId) }

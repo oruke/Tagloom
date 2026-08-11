@@ -1,6 +1,7 @@
 package com.oruke.tagloom.core.sync
 
 import com.oruke.tagloom.core.model.AttachmentBlockContent
+import com.oruke.tagloom.core.model.BaseTableBlockContent
 import com.oruke.tagloom.core.model.BlobId
 import com.oruke.tagloom.core.model.BlockContent
 import com.oruke.tagloom.core.model.CodeBlockContent
@@ -57,6 +58,9 @@ internal object BlockContentThreeWayMerge {
 
             base is CodeBlockContent && local is CodeBlockContent && remote is CodeBlockContent ->
                 mergeCode(base, local, remote)
+
+            base is BaseTableBlockContent && local is BaseTableBlockContent && remote is BaseTableBlockContent ->
+                BaseTableThreeWayMerge.merge(base, local, remote)
 
             else -> BlockContentMerge(simple.value, conflicted = true)
         }

@@ -1,8 +1,8 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.crypto.Argon2idParameters
-import com.oruke.tagloom.core.index.SearchIndexQuery
 import com.oruke.tagloom.core.index.PropertyIndexFilter
+import com.oruke.tagloom.core.index.SearchIndexQuery
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
@@ -10,11 +10,11 @@ import com.oruke.tagloom.core.model.DefaultValuePolicy
 import com.oruke.tagloom.core.model.InlineRun
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.NotePropertyValue
-import com.oruke.tagloom.core.model.PropertyValueSource
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.PropertyId
 import com.oruke.tagloom.core.model.PropertyOption
 import com.oruke.tagloom.core.model.PropertyTypes
+import com.oruke.tagloom.core.model.PropertyValueSource
 import com.oruke.tagloom.core.model.RichText
 import com.oruke.tagloom.core.model.RichTextBlockContent
 import com.oruke.tagloom.core.model.SavedQuery
@@ -22,9 +22,10 @@ import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.core.model.TagId
 import com.oruke.tagloom.core.model.TagPropertyBinding
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.Comparator
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
 import kotlin.test.Test
@@ -32,8 +33,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * 使用真实密码学、文件事务和加密 SQLite 验证桌面工作区重启垂直切片。
@@ -549,6 +548,8 @@ class DesktopWorkspaceManagerIntegrationTest {
             "blobs",
             "changes",
             "queries",
+            "databases",
+            "views",
             "history",
         )
 

@@ -4,6 +4,7 @@ import org.jetbrains.compose.resources.getString
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.desktop_export_annotations_title
 import tagloom.app.shared.generated.resources.desktop_export_attachment_prefix
+import tagloom.app.shared.generated.resources.desktop_export_database_reference_prefix
 import tagloom.app.shared.generated.resources.desktop_export_html_language_tag
 import tagloom.app.shared.generated.resources.desktop_export_note_reference_prefix
 import tagloom.app.shared.generated.resources.desktop_export_unknown_block_prefix
@@ -24,6 +25,8 @@ internal data class DocumentExportLabels(
     val attachmentPrefix: String,
     /** Note 引用 ID 前的本地化前缀，已包含适合当前语言的分隔符。 */
     val noteReferencePrefix: String,
+    /** Database 引用 ID 前的本地化前缀，说明动态投影不会复制进静态导出。 */
+    val databaseReferencePrefix: String,
     /** 未支持 Block 类型前的本地化前缀，已包含适合当前语言的分隔符。 */
     val unknownBlockPrefix: String,
     /** 独立加注列表的本地化标题。 */
@@ -44,6 +47,7 @@ internal object DesktopDocumentExportLabels {
         untitled = getString(Res.string.desktop_export_untitled),
         attachmentPrefix = getString(Res.string.desktop_export_attachment_prefix),
         noteReferencePrefix = getString(Res.string.desktop_export_note_reference_prefix),
+        databaseReferencePrefix = getString(Res.string.desktop_export_database_reference_prefix),
         unknownBlockPrefix = getString(Res.string.desktop_export_unknown_block_prefix),
         annotationsTitle = getString(Res.string.desktop_export_annotations_title),
     )

@@ -1,13 +1,17 @@
 package com.oruke.tagloom.editor
 
 import com.oruke.tagloom.core.model.AttachmentBlockContent
+import com.oruke.tagloom.core.model.BaseTableBlockContent
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.CodeBlockContent
+import com.oruke.tagloom.core.model.DatabaseBlockContent
 import com.oruke.tagloom.core.model.DividerBlockContent
 import com.oruke.tagloom.core.model.HeadingBlockContent
 import com.oruke.tagloom.core.model.NoteReferenceBlockContent
 import com.oruke.tagloom.core.model.RichText
 import com.oruke.tagloom.core.model.RichTextBlockContent
+import com.oruke.tagloom.core.model.TabBlockContent
+import com.oruke.tagloom.core.model.TabsBlockContent
 import com.oruke.tagloom.core.model.TodoBlockContent
 import com.oruke.tagloom.core.model.UnknownBlockContent
 
@@ -21,9 +25,13 @@ fun Block.editableRichText(): RichText? = when (val current = content) {
     is HeadingBlockContent -> current.richText
     is TodoBlockContent -> current.richText
     is AttachmentBlockContent -> current.caption
+    is BaseTableBlockContent,
     is CodeBlockContent,
+    is DatabaseBlockContent,
     DividerBlockContent,
     is NoteReferenceBlockContent,
+    is TabBlockContent,
+    TabsBlockContent,
     is UnknownBlockContent,
     -> null
 }
@@ -40,9 +48,13 @@ fun Block.withEditableRichText(richText: RichText): Block = copy(
         is HeadingBlockContent -> current.copy(richText = richText)
         is TodoBlockContent -> current.copy(richText = richText)
         is AttachmentBlockContent -> current.copy(caption = richText)
+        is BaseTableBlockContent,
         is CodeBlockContent,
+        is DatabaseBlockContent,
         DividerBlockContent,
         is NoteReferenceBlockContent,
+        is TabBlockContent,
+        TabsBlockContent,
         is UnknownBlockContent,
         -> current
     },

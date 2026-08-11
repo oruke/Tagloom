@@ -1,5 +1,8 @@
 package com.oruke.tagloom.editor
 
+import com.oruke.tagloom.core.model.BaseTableColumnId
+import com.oruke.tagloom.core.model.BaseTableEditor
+import com.oruke.tagloom.core.model.BaseTableRowId
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
@@ -8,6 +11,8 @@ import com.oruke.tagloom.core.model.DividerBlockContent
 import com.oruke.tagloom.core.model.HeadingBlockContent
 import com.oruke.tagloom.core.model.RichText
 import com.oruke.tagloom.core.model.RichTextBlockContent
+import com.oruke.tagloom.core.model.TabBlockContent
+import com.oruke.tagloom.core.model.TabsBlockContent
 import com.oruke.tagloom.core.model.TodoBlockContent
 
 /**
@@ -160,6 +165,17 @@ internal object BlockDocumentReducer {
         if (editableText(target) == null && target.content != DividerBlockContent) {
             return null
         }
+        if (type == EditorBlockType.BASE_TABLE) {
+            val content = BaseTableEditor.createDefault(
+                rowIdFactory = { BaseTableRowId(idFactory("table-row")) },
+                columnIdFactory = { BaseTableColumnId(idFactory("table-column")) },
+            )
+            val converted = target.copy(type = BlockTypes.BASE_TABLE, content = content)
+            return BlockDocumentEdit(replace(blocks, converted), EditorCursorTarget(converted.id, 0))
+        }
+        if (type == EditorBlockType.TABS) {
+            return createTabs(blocks, target, idFactory)
+        }
         val converted = convert(target, type)
         val replaced = replace(blocks, converted)
         if (type != EditorBlockType.DIVIDER) {
@@ -170,6 +186,61 @@ internal object BlockDocumentReducer {
         return BlockDocumentEdit(
             blocks = insertSiblingAfter(replaced, converted, continuation),
             cursor = EditorCursorTarget(continuation.id, 0),
+        )
+    }
+
+    /**
+     * 将当前 Block 包装进新 Tabs 的首个页签，并创建第二个空页签。
+     *
+     * 原 Block 保留稳定 ID 和可表示正文，只更新 parentId/orderKey；Tabs 与 tab 使用新的稳定 ID。
+     *
+     * @param blocks 当前全部 Block。
+     * @param target 被包装的当前 Block。
+     * @param idFactory 稳定 ID 工厂。
+     * @return 结构化 Tabs 编辑结果。
+     */
+    private fun createTabs(
+        blocks: List<Block>,
+        target: Block,
+        idFactory: (String) -> String,
+    ): BlockDocumentEdit {
+        val tabsId = BlockId(idFactory("block"))
+        val firstTabId = BlockId(idFactory("block"))
+        val secondTabId = BlockId(idFactory("block"))
+        val secondParagraphId = BlockId(idFactory("block"))
+        val tabs = Block(
+            id = tabsId,
+            type = BlockTypes.TABS,
+            parentId = target.parentId,
+            orderKey = target.orderKey,
+            content = TabsBlockContent,
+        )
+        val firstTab = Block(
+            id = firstTabId,
+            type = BlockTypes.TAB,
+            parentId = tabsId,
+            orderKey = EditorBlockFactory.orderKey(0),
+            content = TabBlockContent(RichTextDocumentReducer.fromPlainText("页签 1")),
+        )
+        val secondTab = Block(
+            id = secondTabId,
+            type = BlockTypes.TAB,
+            parentId = tabsId,
+            orderKey = EditorBlockFactory.orderKey(1),
+            content = TabBlockContent(RichTextDocumentReducer.fromPlainText("页签 2")),
+        )
+        val firstContent = target.copy(parentId = firstTabId, orderKey = EditorBlockFactory.orderKey(0))
+        val secondContent = Block(
+            id = secondParagraphId,
+            type = BlockTypes.PARAGRAPH,
+            parentId = secondTabId,
+            orderKey = EditorBlockFactory.orderKey(0),
+            content = RichTextBlockContent(RichText()),
+        )
+        return BlockDocumentEdit(
+            blocks = blocks.filterNot { block -> block.id == target.id } +
+                listOf(tabs, firstTab, firstContent, secondTab, secondContent),
+            cursor = EditorCursorTarget(firstContent.id, editableText(firstContent).orEmpty().length),
         )
     }
 
@@ -282,6 +353,10 @@ internal object BlockDocumentReducer {
             )
             EditorBlockType.CODE -> CodeBlockContent(language = null, text = text)
             EditorBlockType.DIVIDER -> DividerBlockContent
+            EditorBlockType.BASE_TABLE,
+            EditorBlockType.DATABASE,
+            EditorBlockType.TABS,
+            -> error("结构化 Block 必须走专用创建流程")
         }
         return block.copy(type = type.protocolType, content = content)
     }

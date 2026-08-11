@@ -1,10 +1,10 @@
 package com.oruke.tagloom
 
+import com.oruke.tagloom.core.model.AttachmentBlockContent
+import com.oruke.tagloom.core.model.BlobId
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
-import com.oruke.tagloom.core.model.AttachmentBlockContent
-import com.oruke.tagloom.core.model.BlobId
 import com.oruke.tagloom.core.model.CodeBlockContent
 import com.oruke.tagloom.core.model.HeadingBlockContent
 import com.oruke.tagloom.core.model.InlineMark
@@ -17,13 +17,13 @@ import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.RichText
 import com.oruke.tagloom.core.model.RichTextBlockContent
 import com.oruke.tagloom.platform.DocumentExportFormat
+import org.apache.pdfbox.Loader
+import org.apache.pdfbox.text.PDFTextStripper
+import org.apache.poi.xwpf.usermodel.XWPFDocument
 import java.io.ByteArrayInputStream
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue
-import org.apache.pdfbox.Loader
-import org.apache.pdfbox.text.PDFTextStripper
-import org.apache.poi.xwpf.usermodel.XWPFDocument
 
 /**
  * 验证桌面导出生成真实 Markdown、HTML、PDF 和 DOCX 文件结构。
@@ -142,6 +142,7 @@ class DesktopDocumentRendererTest {
         untitled = "Untitled",
         attachmentPrefix = "Attachment: ",
         noteReferencePrefix = "Tagloom note reference: ",
+        databaseReferencePrefix = "Tagloom database reference: ",
         unknownBlockPrefix = "Unsupported block: ",
         annotationsTitle = "Annotations",
     )

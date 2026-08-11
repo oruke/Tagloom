@@ -31,23 +31,25 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.window.PopupProperties
 import com.oruke.tagloom.core.model.Block
+import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
 import com.oruke.tagloom.core.model.InlineMarkTypes
 import com.oruke.tagloom.editor.BlockMoveDirection
 import com.oruke.tagloom.editor.EditorCursorTarget
 import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.editor.TextEditDelta
 import com.oruke.tagloom.editor.adjacentCursor
-import com.oruke.tagloom.editor.applyMarkdownShortcut
 import com.oruke.tagloom.editor.applyInlineMarkdownShortcut
+import com.oruke.tagloom.editor.applyMarkdownShortcut
 import com.oruke.tagloom.editor.editableRichText
 import com.oruke.tagloom.editor.mergeBlockWithPrevious
 import com.oruke.tagloom.editor.pasteMarkdownAtBlock
 import com.oruke.tagloom.editor.splitBlock
-import com.oruke.tagloom.editor.turnBlockInto
 import com.oruke.tagloom.editor.toggleSelectionMark
-import com.oruke.tagloom.editor.TextEditDelta
+import com.oruke.tagloom.editor.turnBlockInto
 import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.*
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.editor_block_no_matching_commands
 
 /**
  * 渲染一个保持输入法组合、结构化样式、跨块键盘行为和 Slash 菜单的 RichText Block。
@@ -61,6 +63,8 @@ import tagloom.app.shared.generated.resources.*
  * @param onCursorRequest 请求另一个 Block 获得焦点。
  * @param onCursorConsumed 当前 Block 已消费焦点请求。
  * @param onCommandMenuDismiss 关闭外部强制菜单。
+ * @param databaseCreationAvailable 当前平台是否装配 Database 写入入口。
+ * @param onCreateDatabaseBlock 请求异步创建并绑定 Database Block。
  * @param onSaveRequest 保存快捷键动作。
  * @param modifier 外部布局修饰符。
  */
@@ -75,6 +79,8 @@ internal fun EditorRichTextField(
     onCursorRequest: (EditorCursorTarget) -> Unit,
     onCursorConsumed: () -> Unit,
     onCommandMenuDismiss: () -> Unit,
+    databaseCreationAvailable: Boolean,
+    onCreateDatabaseBlock: (BlockId) -> Unit,
     onSaveRequest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -97,7 +103,10 @@ internal fun EditorRichTextField(
     var dismissedSlashText by remember(block.id) { mutableStateOf<String?>(null) }
     var selectedCommandIndex by remember(block.id) { mutableIntStateOf(0) }
     val slashTrigger = findSlashCommandTrigger(fieldValue)
-    val commands = filterEditorBlockCommands(slashTrigger?.query.orEmpty())
+    val commands = filterEditorBlockCommands(
+        query = slashTrigger?.query.orEmpty(),
+        databaseAvailable = databaseCreationAvailable,
+    )
     val showCommandMenu = commandMenuRequested || (
         slashTrigger != null && dismissedSlashText != fieldValue.text && focused
         )
@@ -213,6 +222,7 @@ internal fun EditorRichTextField(
                                 command = commands[selectedCommandIndex],
                                 slashTrigger = slashTrigger,
                                 onCursorRequest = onCursorRequest,
+                                onCreateDatabaseBlock = onCreateDatabaseBlock,
                             )
                             onCommandMenuDismiss()
                             true
@@ -290,6 +300,7 @@ internal fun EditorRichTextField(
                             command = command,
                             slashTrigger = slashTrigger,
                             onCursorRequest = onCursorRequest,
+                            onCreateDatabaseBlock = onCreateDatabaseBlock,
                         )
                         onCommandMenuDismiss()
                     }
@@ -325,6 +336,7 @@ private fun toggleMark(
  * @param command 目标类型命令。
  * @param slashTrigger 当前输入触发范围；由加号打开时为空。
  * @param onCursorRequest 转换后的焦点请求。
+ * @param onCreateDatabaseBlock 请求异步创建并绑定 Database Block。
  */
 private fun applyCommand(
     state: TagloomEditorState,
@@ -332,6 +344,7 @@ private fun applyCommand(
     command: EditorBlockCommand,
     slashTrigger: SlashCommandTrigger?,
     onCursorRequest: (EditorCursorTarget) -> Unit,
+    onCreateDatabaseBlock: (BlockId) -> Unit,
 ) {
     if (slashTrigger != null) {
         val currentText = block.editableRichText()?.plainText.orEmpty()
@@ -339,6 +352,10 @@ private fun applyCommand(
             block.id,
             currentText.removeRange(slashTrigger.start, slashTrigger.endExclusive),
         )
+    }
+    if (command.type == com.oruke.tagloom.editor.EditorBlockType.DATABASE) {
+        onCreateDatabaseBlock(block.id)
+        return
     }
     state.turnBlockInto(block.id, command.type)?.let(onCursorRequest)
 }

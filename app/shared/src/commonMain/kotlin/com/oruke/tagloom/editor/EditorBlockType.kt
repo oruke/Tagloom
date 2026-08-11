@@ -42,6 +42,15 @@ enum class EditorBlockType(
 
     /** 分隔线。 */
     DIVIDER(BlockTypes.DIVIDER),
+
+    /** Note 正文局部表格。 */
+    BASE_TABLE(BlockTypes.BASE_TABLE),
+
+    /** 引用独立 Database/View 权威对象的正文数据集。 */
+    DATABASE(BlockTypes.DATABASE),
+
+    /** 包含多个页签及其正文的结构容器。 */
+    TABS(BlockTypes.TABS),
 }
 
 /**

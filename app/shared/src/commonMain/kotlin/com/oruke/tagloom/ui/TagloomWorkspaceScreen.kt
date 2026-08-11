@@ -30,20 +30,33 @@ import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.PropertyId
 import com.oruke.tagloom.core.model.TagDefinition
-import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.editor.PropertyDefinitionDestination
-import com.oruke.tagloom.editor.bindPropertyToTag
+import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.applyFreePropertyOption
+import com.oruke.tagloom.editor.bindPropertyToTag
 import com.oruke.tagloom.editor.planFreePropertyOption
-import com.oruke.tagloom.editor.setPropertyAttached
 import com.oruke.tagloom.editor.setAppliedObjectType
+import com.oruke.tagloom.editor.setPropertyAttached
 import com.oruke.tagloom.editor.upsertPropertyDefinition
 import com.oruke.tagloom.editor.upsertTagDefinition
 import com.oruke.tagloom.platform.DocumentExportRequest
 import com.oruke.tagloom.platform.DocumentFileGateway
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.*
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.database_default_name
+import tagloom.app.shared.generated.resources.database_operation_failed
+import tagloom.app.shared.generated.resources.editor_action_new_note
+import tagloom.app.shared.generated.resources.editor_empty_description
+import tagloom.app.shared.generated.resources.editor_empty_title
+import tagloom.app.shared.generated.resources.editor_export_failed
+import tagloom.app.shared.generated.resources.editor_export_html_name
+import tagloom.app.shared.generated.resources.editor_export_markdown_name
+import tagloom.app.shared.generated.resources.editor_export_pdf_name
+import tagloom.app.shared.generated.resources.editor_export_success
+import tagloom.app.shared.generated.resources.editor_export_unavailable
+import tagloom.app.shared.generated.resources.editor_export_word_name
 
 /**
  * 渲染左侧导航与中央页面组成的 Tagloom 工作区。
@@ -51,6 +64,7 @@ import tagloom.app.shared.generated.resources.*
  * 标签和属性属于当前文档内容，固定显示在标题下方，不再占用常驻右侧栏。
  *
  * @param state 编辑器状态。
+ * @param databaseController Database Block 使用的目录与写入控制器。
  * @param documentFileGateway 平台文件选择与文档编码能力。
  * @param onSaveRequest 可选立即保存动作；内存演示环境为空操作。
  * @param onSearchRequest 可选已确认内容搜索入口。
@@ -62,8 +76,9 @@ import tagloom.app.shared.generated.resources.*
  * @param modifier 外部布局修饰符。
  */
 @Composable
-fun TagloomWorkspaceScreen(
+internal fun TagloomWorkspaceScreen(
     state: TagloomEditorState,
+    databaseController: WorkspaceDatabaseController? = null,
     documentFileGateway: DocumentFileGateway? = null,
     onSaveRequest: () -> Unit = {},
     onSearchRequest: (() -> Unit)? = null,
@@ -83,6 +98,8 @@ fun TagloomWorkspaceScreen(
     val htmlName = stringResource(Res.string.editor_export_html_name)
     val pdfName = stringResource(Res.string.editor_export_pdf_name)
     val wordName = stringResource(Res.string.editor_export_word_name)
+    val defaultDatabaseName = stringResource(Res.string.database_default_name)
+    val databaseOperationFailed = stringResource(Res.string.database_operation_failed)
     val exportSuccessMessages = mapOf(
         com.oruke.tagloom.platform.DocumentExportFormat.MARKDOWN to stringResource(
             Res.string.editor_export_success,
@@ -120,7 +137,7 @@ fun TagloomWorkspaceScreen(
         val plan = state.planFreePropertyOption(propertyId, label)
         state.applyFreePropertyOption(plan.definition, plan.optionId)
     }
-    val createDocument = { state.createDocument() }
+    val createDocument = state::createDocument
 
     Box(
         modifier
@@ -163,6 +180,22 @@ fun TagloomWorkspaceScreen(
                     EditorPane(
                         state = state,
                         document = document,
+                        databaseController = databaseController,
+                        onCreateDatabaseBlock = createDatabase@{ blockId ->
+                            val documentId = state.selectedDocumentId ?: return@createDatabase
+                            val controller = databaseController ?: return@createDatabase
+                            coroutineScope.launch {
+                                controller.createDatabaseBlock(
+                                    documentId = documentId,
+                                    blockId = blockId,
+                                    name = defaultDatabaseName,
+                                    sourceTypeId = WorkspaceDefaults.DEFAULT_NOTE_TAG_ID,
+                                )
+                                if (controller.operationFailed) {
+                                    snackbarHostState.showSnackbar(databaseOperationFailed)
+                                }
+                            }
+                        },
                         onExport = { format ->
                             val gateway = documentFileGateway
                             if (gateway == null) {

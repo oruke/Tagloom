@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -18,6 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.oruke.tagloom.core.model.BlockId
+import com.oruke.tagloom.core.model.CodeBlockContent
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.PropertyId
 import com.oruke.tagloom.core.model.TagDefinition
@@ -25,6 +27,9 @@ import com.oruke.tagloom.editor.EditorCursorTarget
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.PropertyDefinitionDestination
 import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.editor.editableRichText
+import com.oruke.tagloom.editor.visibleBlockDepth
+import com.oruke.tagloom.editor.visibleEditorBlocks
 import com.oruke.tagloom.platform.DocumentExportFormat
 
 /**
@@ -32,6 +37,8 @@ import com.oruke.tagloom.platform.DocumentExportFormat
  *
  * @param state 编辑器状态。
  * @param document 当前选中文档。
+ * @param databaseController Database Block 使用的目录和写入控制器。
+ * @param onCreateDatabaseBlock 通过指定文本 Block 创建并绑定 Database 的动作。
  * @param onExport 请求按目标格式导出当前页面。
  * @param onSaveRequest 请求立即保存当前页面。
  * @param onSearchRequest 可选工作区搜索入口。
@@ -43,9 +50,11 @@ import com.oruke.tagloom.platform.DocumentExportFormat
  * @param modifier 外部布局修饰符。
  */
 @Composable
-fun EditorPane(
+internal fun EditorPane(
     state: TagloomEditorState,
     document: EditorDocument,
+    databaseController: WorkspaceDatabaseController? = null,
+    onCreateDatabaseBlock: (BlockId) -> Unit = {},
     onExport: (DocumentExportFormat) -> Unit,
     onSaveRequest: () -> Unit,
     onSearchRequest: (() -> Unit)? = null,
@@ -60,8 +69,10 @@ fun EditorPane(
     var commandMenuBlockId by remember(document.id) {
         mutableStateOf<com.oruke.tagloom.core.model.BlockId?>(null)
     }
-    val activeBlocks = state.orderedActiveBlocks(document.note)
-    val firstBlock = activeBlocks.firstOrNull()
+    val activeBlocks = state.visibleEditorBlocks(document.note)
+    val firstBlock = activeBlocks.firstOrNull { block ->
+        block.editableRichText() != null || block.content is CodeBlockContent
+    }
 
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Box(Modifier.fillMaxSize()) {
@@ -94,14 +105,17 @@ fun EditorPane(
                     CenteredEditorContent {
                         EditorBlockRow(
                             state = state,
+                            databaseController = databaseController,
                             block = block,
-                            depth = state.blockDepth(block, document.note),
+                            depth = state.visibleBlockDepth(block, document.note),
                             cursorRequest = cursorRequest,
                             commandMenuRequested = commandMenuBlockId == block.id,
                             onCursorRequest = { target -> cursorRequest = target },
                             onCursorConsumed = { cursorRequest = null },
                             onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
                             onCommandMenuDismiss = { commandMenuBlockId = null },
+                            onCreateDatabaseBlock = onCreateDatabaseBlock,
+                            onOpenNote = state::selectDocument,
                             onSaveRequest = onSaveRequest,
                         )
                     }

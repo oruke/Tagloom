@@ -1,8 +1,8 @@
 package com.oruke.tagloom.core.transaction
 
 import com.oruke.tagloom.core.model.TransactionId
-import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 /**
  * 表示工作区根目录下不含敏感名称的规范化相对路径。
@@ -37,6 +37,8 @@ value class WorkspaceRelativePath(
             "blobs",
             "changes",
             "queries",
+            "databases",
+            "views",
             "history",
         )
     }

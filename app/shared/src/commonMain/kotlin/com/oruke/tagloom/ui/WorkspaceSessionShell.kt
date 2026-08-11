@@ -31,7 +31,32 @@ import com.oruke.tagloom.platform.DocumentFileGateway
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.*
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.workspace_action_cancel
+import tagloom.app.shared.generated.resources.workspace_action_done
+import tagloom.app.shared.generated.resources.workspace_action_save
+import tagloom.app.shared.generated.resources.workspace_master_rotation_confirm
+import tagloom.app.shared.generated.resources.workspace_master_rotation_description
+import tagloom.app.shared.generated.resources.workspace_master_rotation_title
+import tagloom.app.shared.generated.resources.workspace_master_rotation_windows_account_note
+import tagloom.app.shared.generated.resources.workspace_note_delete_confirm
+import tagloom.app.shared.generated.resources.workspace_note_delete_description
+import tagloom.app.shared.generated.resources.workspace_note_delete_title
+import tagloom.app.shared.generated.resources.workspace_pin_change_confirm
+import tagloom.app.shared.generated.resources.workspace_pin_change_description
+import tagloom.app.shared.generated.resources.workspace_pin_change_title
+import tagloom.app.shared.generated.resources.workspace_pin_confirm_label
+import tagloom.app.shared.generated.resources.workspace_pin_current_label
+import tagloom.app.shared.generated.resources.workspace_pin_disable_confirm
+import tagloom.app.shared.generated.resources.workspace_pin_enable_confirm
+import tagloom.app.shared.generated.resources.workspace_pin_enable_description
+import tagloom.app.shared.generated.resources.workspace_pin_enable_title
+import tagloom.app.shared.generated.resources.workspace_pin_new_label
+import tagloom.app.shared.generated.resources.workspace_recovery_rotated_confirm_saved
+import tagloom.app.shared.generated.resources.workspace_recovery_rotated_description
+import tagloom.app.shared.generated.resources.workspace_recovery_rotated_title
+import tagloom.app.shared.generated.resources.workspace_search_name_label
+import tagloom.app.shared.generated.resources.workspace_search_save_title
 
 /**
  * 在解锁会话中复用编辑器页头承载搜索与工作区维护入口。
@@ -90,6 +115,7 @@ internal fun WorkspaceSessionShell(
     Box(Modifier.fillMaxSize()) {
         TagloomWorkspaceScreen(
             state = controller.editorState,
+            databaseController = controller.databaseController,
             documentFileGateway = documentFileGateway,
             onSaveRequest = onSave,
             onSearchRequest = {

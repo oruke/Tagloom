@@ -6,7 +6,41 @@ import com.oruke.tagloom.core.workspace.ManifestObjectKind
 import com.oruke.tagloom.platform.WorkspaceIntegrityFailure
 import com.oruke.tagloom.platform.WorkspaceRecoveryMessage
 import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.*
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.workspace_error_note_save_failed
+import tagloom.app.shared.generated.resources.workspace_error_operation_failed
+import tagloom.app.shared.generated.resources.workspace_recovery_action_completed
+import tagloom.app.shared.generated.resources.workspace_recovery_action_confirmed_and_cleaned
+import tagloom.app.shared.generated.resources.workspace_recovery_action_quarantined
+import tagloom.app.shared.generated.resources.workspace_recovery_action_rolled_back
+import tagloom.app.shared.generated.resources.workspace_recovery_failure_authentication_failed
+import tagloom.app.shared.generated.resources.workspace_recovery_failure_hash_mismatch
+import tagloom.app.shared.generated.resources.workspace_recovery_failure_missing_file
+import tagloom.app.shared.generated.resources.workspace_recovery_isolated_object
+import tagloom.app.shared.generated.resources.workspace_recovery_object_blob
+import tagloom.app.shared.generated.resources.workspace_recovery_object_change
+import tagloom.app.shared.generated.resources.workspace_recovery_object_database
+import tagloom.app.shared.generated.resources.workspace_recovery_object_history
+import tagloom.app.shared.generated.resources.workspace_recovery_object_note
+import tagloom.app.shared.generated.resources.workspace_recovery_object_property
+import tagloom.app.shared.generated.resources.workspace_recovery_object_saved_query
+import tagloom.app.shared.generated.resources.workspace_recovery_object_tag
+import tagloom.app.shared.generated.resources.workspace_recovery_object_view
+import tagloom.app.shared.generated.resources.workspace_recovery_transaction_entry
+import tagloom.app.shared.generated.resources.workspace_status_backup_created
+import tagloom.app.shared.generated.resources.workspace_status_integrity_notice
+import tagloom.app.shared.generated.resources.workspace_status_master_key_rotated
+import tagloom.app.shared.generated.resources.workspace_status_option_saved_and_selected
+import tagloom.app.shared.generated.resources.workspace_status_option_selected
+import tagloom.app.shared.generated.resources.workspace_status_pin_changed
+import tagloom.app.shared.generated.resources.workspace_status_pin_disabled
+import tagloom.app.shared.generated.resources.workspace_status_pin_enabled
+import tagloom.app.shared.generated.resources.workspace_status_property_bound_to_tag
+import tagloom.app.shared.generated.resources.workspace_status_property_created_and_attached
+import tagloom.app.shared.generated.resources.workspace_status_property_saved
+import tagloom.app.shared.generated.resources.workspace_status_query_saved
+import tagloom.app.shared.generated.resources.workspace_status_tag_created_and_attached
+import tagloom.app.shared.generated.resources.workspace_status_tag_updated
 
 /**
  * 表示工作区生命周期与维护流程中可本地化的非敏感反馈。
@@ -151,6 +185,8 @@ private fun ManifestObjectKind.localizedText(): String = when (this) {
     ManifestObjectKind.BLOB -> stringResource(Res.string.workspace_recovery_object_blob)
     ManifestObjectKind.CHANGE -> stringResource(Res.string.workspace_recovery_object_change)
     ManifestObjectKind.SAVED_QUERY -> stringResource(Res.string.workspace_recovery_object_saved_query)
+    ManifestObjectKind.DATABASE -> stringResource(Res.string.workspace_recovery_object_database)
+    ManifestObjectKind.VIEW -> stringResource(Res.string.workspace_recovery_object_view)
     ManifestObjectKind.HISTORY -> stringResource(Res.string.workspace_recovery_object_history)
 }
 

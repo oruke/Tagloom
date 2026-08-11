@@ -1,42 +1,43 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.index.BacklinkIndexHit
+import com.oruke.tagloom.core.index.PropertyIndexFilter
 import com.oruke.tagloom.core.index.SearchIndexHit
 import com.oruke.tagloom.core.index.SearchIndexQuery
-import com.oruke.tagloom.core.index.PropertyIndexFilter
 import com.oruke.tagloom.core.model.ActorId
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.ObjectId
+import com.oruke.tagloom.core.model.ObjectRevision
+import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.SavedQuery
 import com.oruke.tagloom.core.model.TagDefinition
-import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.TransactionId
 import com.oruke.tagloom.core.sync.HybridLogicalTime
+import com.oruke.tagloom.core.transaction.ChangeLogCompactionPolicy
+import com.oruke.tagloom.core.transaction.ChangeLogCompactionResult
 import com.oruke.tagloom.core.transaction.NoteSnapshotTransactionRequest
 import com.oruke.tagloom.core.transaction.NoteSnapshotTransactionService
 import com.oruke.tagloom.core.transaction.SavedQuerySnapshotTransactionRequest
 import com.oruke.tagloom.core.transaction.SavedQuerySnapshotTransactionService
-import com.oruke.tagloom.core.transaction.WorkspaceSchemaWriteContext
 import com.oruke.tagloom.core.transaction.TransactionCoordinator
 import com.oruke.tagloom.core.transaction.TransactionRecoveryReport
-import com.oruke.tagloom.core.transaction.ChangeLogCompactionPolicy
-import com.oruke.tagloom.core.transaction.ChangeLogCompactionResult
-import com.oruke.tagloom.core.workspace.UnlockedWorkspaceManifest
+import com.oruke.tagloom.core.transaction.WorkspaceSchemaWriteContext
 import com.oruke.tagloom.core.workspace.ManifestObjectKind
+import com.oruke.tagloom.core.workspace.UnlockedWorkspaceManifest
 import com.oruke.tagloom.core.workspace.WorkspaceBootstrapTransactionService
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.core.workspace.WorkspaceManifestCodec
 import com.oruke.tagloom.core.workspace.WorkspaceManifestService
 import com.oruke.tagloom.filestore.jvm.JvmEncryptedWorkspaceBackupService
-import com.oruke.tagloom.filestore.jvm.WorkspaceBackupReport
 import com.oruke.tagloom.filestore.jvm.JvmWorkspacePaths
-import java.nio.file.Files
-import java.nio.file.Path
+import com.oruke.tagloom.filestore.jvm.WorkspaceBackupReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * 持有一个桌面端已解锁工作区的主密钥、事务协调器和加密索引生命周期。
@@ -52,6 +53,7 @@ import kotlinx.coroutines.withContext
  * @param savedQueryLoader 从权威密文加载保存查询。
  * @param savedQueryTransactionService 保存查询统一事务入口。
  * @param schemaStore Tag 与 PropertyDefinition 权威密文读写入口。
+ * @param databaseStore Database 与 View 权威密文读写入口。
  * @param integrityScanner 扫描全部 manifest 密文对象。
  * @param compactionService 验证并提交 Change checkpoint 的桌面维护服务。
  * @param actorId 当前桌面会话随机 Actor ID。
@@ -62,7 +64,7 @@ import kotlinx.coroutines.withContext
 class DesktopWorkspaceSession internal constructor(
     private val paths: JvmWorkspacePaths,
     private val manifestService: WorkspaceManifestService,
-    private var unlocked: UnlockedWorkspaceManifest,
+    internal var unlocked: UnlockedWorkspaceManifest,
     private val projection: DesktopIndexProjection,
     private val transactionCoordinator: TransactionCoordinator,
     private val noteTransactionService: NoteSnapshotTransactionService,
@@ -71,18 +73,19 @@ class DesktopWorkspaceSession internal constructor(
     private val savedQueryLoader: DesktopSavedQueryLoader,
     private val savedQueryTransactionService: SavedQuerySnapshotTransactionService,
     private val schemaStore: DesktopWorkspaceSchemaStore,
+    internal val databaseStore: DesktopWorkspaceDatabaseStore,
     private val integrityScanner: DesktopWorkspaceIntegrityScanner,
     private val compactionService: DesktopChangeLogCompactionService,
-    private val actorId: ActorId,
-    private val idFactory: () -> String,
-    private val currentTimeMillis: () -> Long,
-    private val timestampProvider: () -> String,
+    internal val actorId: ActorId,
+    internal val idFactory: () -> String,
+    internal val currentTimeMillis: () -> Long,
+    internal val timestampProvider: () -> String,
 ) {
     /** 串行化会话状态刷新、锁定和业务调用。 */
-    private val sessionMutex: Mutex = Mutex()
+    internal val sessionMutex: Mutex = Mutex()
 
     /** 当前 Actor 下一个对象 revision 序号。 */
-    private var nextActorSequence: Long = 1L
+    internal var nextActorSequence: Long = 1L
 
     /** 锁定后立即拒绝全部读取和写入。 */
     private var closed: Boolean = false
@@ -127,18 +130,9 @@ class DesktopWorkspaceSession internal constructor(
             refreshManifest(bootstrap.encryptedManifest)
         }
         integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
-            savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues).distinct()
+            savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
+            databaseStore.inspect(unlocked).issues).distinct()
         openState()
-    }
-
-    /**
-     * 重新读取当前全部未删除 Note。
-     *
-     * @return 按 Note ID 稳定排序的文档。
-     */
-    suspend fun loadNotes(): List<DesktopStoredNote> = sessionMutex.withLock {
-        requireOpen()
-        loadActiveNotes()
     }
 
     /**
@@ -146,15 +140,20 @@ class DesktopWorkspaceSession internal constructor(
      *
      * @param objectId 更新目标；为空时生成新 Note ID。
      * @param note 待规范化与保存的完整 Note。
+     * @param expectedRevision 调用方读取时的 revision；新建时为空。
      * @return 新确认的 Note。
      */
     suspend fun saveNote(
         objectId: ObjectId?,
         note: Note,
+        expectedRevision: ObjectRevision? = null,
     ): DesktopStoredNote = sessionMutex.withLock {
         requireWritable()
         val targetId = objectId ?: ObjectId(idFactory())
         val previous = projection.loadSnapshots().singleOrNull { snapshot -> snapshot.header.objectId == targetId }
+        if (expectedRevision != null) {
+            require(previous?.header?.revision == expectedRevision) { "Note revision 已落后，拒绝覆盖更新" }
+        }
         val noteWithDefaultTag = if (previous == null && WorkspaceDefaults.DEFAULT_NOTE_TAG_ID !in note.directTagIds) {
             note.copy(directTagIds = note.directTagIds + WorkspaceDefaults.DEFAULT_NOTE_TAG_ID)
         } else {
@@ -270,7 +269,8 @@ class DesktopWorkspaceSession internal constructor(
             }
             refreshManifest(result.encryptedManifest)
             integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
-                savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues).distinct()
+                savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
+                databaseStore.inspect(unlocked).issues).distinct()
             result
         }
 
@@ -371,7 +371,8 @@ class DesktopWorkspaceSession internal constructor(
         requireOpen()
         refreshManifest()
         integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
-            savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues).distinct()
+            savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
+            databaseStore.inspect(unlocked).issues).distinct()
         openState()
     }
 
@@ -430,11 +431,14 @@ class DesktopWorkspaceSession internal constructor(
      */
     private suspend fun openState(): DesktopWorkspaceOpenState {
         val schemas = schemaStore.load(unlocked)
+        val databases = databaseStore.load(unlocked)
         return DesktopWorkspaceOpenState(
             notes = loadActiveNotes(),
             savedQueries = savedQueryLoader.load(unlocked).map(::DesktopStoredSavedQuery),
             tagDefinitions = schemas.tags.map(::DesktopStoredTagDefinition),
             propertyDefinitions = schemas.properties.map(::DesktopStoredPropertyDefinition),
+            databaseDefinitions = databases.databases.map(::DesktopStoredDatabaseDefinition),
+            viewDefinitions = databases.views.map(::DesktopStoredViewDefinition),
             integrityIssues = integrityIssues,
             recoveryReport = recoveryReport,
             readOnly = readOnly,
@@ -461,7 +465,7 @@ class DesktopWorkspaceSession internal constructor(
      *
      * @return 当前活动 Note。
      */
-    private suspend fun loadActiveNotes(): List<DesktopStoredNote> = projection.loadSnapshots()
+    internal suspend fun loadActiveNotes(): List<DesktopStoredNote> = projection.loadSnapshots()
         .filterNot { snapshot -> snapshot.header.deleted }
         .map(::DesktopStoredNote)
 
@@ -470,7 +474,7 @@ class DesktopWorkspaceSession internal constructor(
      *
      * @param encryptedBytes 已知的新 manifest；为空时从磁盘读取。
      */
-    private suspend fun refreshManifest(encryptedBytes: ByteArray? = null) {
+    internal suspend fun refreshManifest(encryptedBytes: ByteArray? = null) {
         val bytes = encryptedBytes ?: withContext(Dispatchers.IO) { Files.readAllBytes(paths.manifest) }
         val payload = manifestService.inspectWithMasterKey(bytes, unlocked.workspaceMasterKey)
         unlocked = UnlockedWorkspaceManifest(
@@ -481,12 +485,12 @@ class DesktopWorkspaceSession internal constructor(
     }
 
     /** 拒绝锁定后的全部操作。 */
-    private fun requireOpen() {
+    internal fun requireOpen() {
         check(!closed) { "工作区已经锁定" }
     }
 
     /** 拒绝锁定或只读安全模式下的写入。 */
-    private fun requireWritable() {
+    internal fun requireWritable() {
         requireOpen()
         check(!readOnly) { "工作区处于只读恢复模式" }
     }

@@ -3,6 +3,8 @@ package com.oruke.tagloom.workspace
 import com.oruke.tagloom.core.crypto.CryptoProvider
 import com.oruke.tagloom.core.crypto.EnvelopeCryptoService
 import com.oruke.tagloom.core.model.ActorId
+import com.oruke.tagloom.core.transaction.DatabaseCatalogSnapshotEnvelopeService
+import com.oruke.tagloom.core.transaction.DatabaseCatalogSnapshotTransactionService
 import com.oruke.tagloom.core.transaction.NoteSnapshotEnvelopeService
 import com.oruke.tagloom.core.transaction.NoteSnapshotTransactionService
 import com.oruke.tagloom.core.transaction.SavedQuerySnapshotEnvelopeService
@@ -17,9 +19,9 @@ import com.oruke.tagloom.filestore.jvm.JvmEncryptedWorkspaceBackupService
 import com.oruke.tagloom.filestore.jvm.JvmTransactionStorage
 import com.oruke.tagloom.filestore.jvm.JvmWorkspaceContentVerifier
 import com.oruke.tagloom.filestore.jvm.JvmWorkspacePaths
-import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.nio.file.Path
 
 /**
  * 组装桌面会话所需的文件事务、内容验证、加密索引和应用服务。
@@ -52,6 +54,7 @@ object DesktopWorkspaceSessionFactory {
         val envelopeService = EnvelopeCryptoService(cryptoProvider)
         val savedQueryEnvelopeService = SavedQuerySnapshotEnvelopeService(envelopeService)
         val workspaceSchemaEnvelopeService = WorkspaceSchemaSnapshotEnvelopeService(envelopeService)
+        val databaseEnvelopeService = DatabaseCatalogSnapshotEnvelopeService(envelopeService)
         val index = DesktopIndexFactory.open(paths, cryptoProvider, unlocked)
         val projection = DesktopIndexProjection(
             paths = paths,
@@ -103,6 +106,17 @@ object DesktopWorkspaceSessionFactory {
                 cryptoProvider = cryptoProvider,
                 envelopeService = workspaceSchemaEnvelopeService,
                 transactionService = WorkspaceSchemaSnapshotTransactionService(
+                    cryptoProvider,
+                    envelopeService,
+                    manifestService,
+                    coordinator,
+                ),
+            ),
+            databaseStore = DesktopWorkspaceDatabaseStore(
+                paths = paths,
+                cryptoProvider = cryptoProvider,
+                envelopeService = databaseEnvelopeService,
+                transactionService = DatabaseCatalogSnapshotTransactionService(
                     cryptoProvider,
                     envelopeService,
                     manifestService,

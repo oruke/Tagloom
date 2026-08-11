@@ -26,13 +26,13 @@ import com.oruke.tagloom.core.workspace.ManifestObjectRecord
 import com.oruke.tagloom.core.workspace.UnlockedWorkspaceManifest
 import com.oruke.tagloom.core.workspace.WorkspaceManifestCodec
 import com.oruke.tagloom.core.workspace.WorkspaceManifestService
-import com.oruke.tagloom.filestore.jvm.JvmTransactionStorage
 import com.oruke.tagloom.filestore.jvm.JvmAtomicFileOperations
 import com.oruke.tagloom.filestore.jvm.JvmAtomicFilePort
 import com.oruke.tagloom.filestore.jvm.JvmPreparedContentVerifier
-import com.oruke.tagloom.filestore.jvm.ManifestTransactionState
+import com.oruke.tagloom.filestore.jvm.JvmTransactionStorage
 import com.oruke.tagloom.filestore.jvm.JvmWorkspaceContentVerifier
 import com.oruke.tagloom.filestore.jvm.JvmWorkspacePaths
+import com.oruke.tagloom.filestore.jvm.ManifestTransactionState
 import java.nio.file.Files
 import java.nio.file.LinkOption
 
@@ -297,6 +297,8 @@ private data class RotationArtifactRole(
             ManifestObjectKind.TAG -> RotationArtifactRole("tag-snapshot", WrappingKeyPurpose.SNAPSHOT)
             ManifestObjectKind.PROPERTY -> RotationArtifactRole("property-snapshot", WrappingKeyPurpose.SNAPSHOT)
             ManifestObjectKind.SAVED_QUERY -> RotationArtifactRole("saved-query-snapshot", WrappingKeyPurpose.SNAPSHOT)
+            ManifestObjectKind.DATABASE -> RotationArtifactRole("database-snapshot", WrappingKeyPurpose.SNAPSHOT)
+            ManifestObjectKind.VIEW -> RotationArtifactRole("view-snapshot", WrappingKeyPurpose.SNAPSHOT)
             ManifestObjectKind.BLOB -> RotationArtifactRole("blob", WrappingKeyPurpose.BLOB)
             ManifestObjectKind.CHANGE -> RotationArtifactRole("object-change", WrappingKeyPurpose.CHANGE)
             ManifestObjectKind.HISTORY -> if (record.path.value.startsWith("history/checkpoints/")) {

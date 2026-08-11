@@ -2,7 +2,7 @@
 
 Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加密对象快照保存权威状态，用 Change DAG 承载恢复、历史和多设备同步，并通过对象类型（超级标签）、普通标签、属性继承、稳定 Block、双向链接与受控 Agent 接口组织知识。
 
-> 当前状态：v0.2 Windows MVP 已接通桌面工作区创建/解锁、加密快照、事务恢复、加密索引、Block/RichText 编辑、Markdown、备份恢复与密钥维护，并通过桌面集成测试。Windows 分发包已构建并完成真实 EXE 启动和锁定欢迎页渲染检查。签名盲同步、CLI/MCP、AI 与向量能力目前停留在服务、适配器或共享契约层，没有在桌面 UI 中伪装成可用功能。
+> 当前状态：v0.2 Windows MVP 已接通桌面工作区创建/解锁、加密快照、事务恢复、加密索引、Block/RichText 编辑、Markdown、备份恢复与密钥维护，并通过桌面集成测试。其后的首版增量已加入 Tabs、Note 内 BaseTable，以及通过 `/database` 原位创建的 Database Block、独立 Database / View 加密快照、Table / Kanban / Gallery 受限展示与 Note revision 写回。Windows 分发包已构建并完成真实 EXE 启动和锁定欢迎页渲染检查。签名盲同步、CLI/MCP、AI 与向量能力目前停留在服务、适配器或共享契约层，没有在桌面 UI 中伪装成可用功能。
 
 完整产品与技术基线见 [Tagloom 产品与技术设计草案](./Tagloom_产品与技术设计草案.md)，参与开发前请先阅读 [AGENTS.md](./AGENTS.md)。
 
@@ -21,6 +21,7 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 - 工作区采用“左侧笔记导航 + 中央页面编辑器”：新建、过滤与切换始终可见；对象类型、描述、普通标签、属性和只读快照时间紧跟标题显示，不占用常驻右侧栏。
 - 正文采用连续页面排版，不再把每个 Block 渲染成独立表单卡片；悬停或聚焦时才显示新增与拖动把手。
 - 支持正文、三级标题、无序/有序列表、待办、引用、代码块与分割线，并可通过不抢占输入焦点的 `/` 菜单、左侧加号或 Markdown 行首快捷方式转换。
+- Database 与其他结构化内容使用同一套 Block 创建心智：输入 `/database` 或从 Block 加号菜单选择“数据集”后在当前位置创建，不在侧栏提供独立创建页面；Block 内可直接修改名称、来源类型、视图、筛选和字段。
 - `Enter` 拆分并延续 Block，`Backspace` 在行首合并或提升层级，`Tab` / `Shift+Tab` 调整嵌套，方向键可跨 Block 移动，`Ctrl/Cmd+S` 保存。
 - 文本输入保留 Compose `TextFieldValue` 的光标、选区和 IME 组合态；闭合的粗体、斜体、删除线、行内 `code` Markdown 会转成结构化 Mark，多行 Markdown 可直接粘贴成 Block。
 - 选区浮动工具栏支持粗体、斜体、删除线、行内 `code`、链接、文字颜色、高亮颜色与独立加注；颜色保存语义 token，不把平台色值写进权威快照。
@@ -218,7 +219,7 @@ Compose Desktop 当前只向 Windows UI Automation 暴露绘制节点，因此�
 5. 编辑器内 Markdown 直接粘贴、Markdown/HTML/PDF/Word 导出、密文备份恢复、密码变更、主密钥轮换和 Change Log 安全压缩已完成。
 6. 自动化故障恢复、明文泄漏扫描、索引规模基准、Windows 分发包构建和真实启动渲染检查已通过。
 
-同步桌面入口、Android/iOS 功能对等、AI Provider、可执行 MCP 写入、向量数据库和完整样式系统不属于首个 MVP。当前编辑器也尚未包含 Notion/Anytype 的列布局、多 Block 框选、拖动嵌套预览、数据库视图与实时协作；这里的“连续 Block 编辑器”指核心写作交互已经可用，不宣称完整产品对等。iOS 的 `core` KLIB 已在 Windows 交叉编译；共享 iOS 宿主仍需在 macOS/Xcode 环境完成最终编译和运行验证。
+同步桌面入口、Android/iOS 功能对等、AI Provider、可执行 MCP 写入、向量数据库和完整样式系统不属于首个 MVP。当前编辑器已包含 Tabs、Note 内 BaseTable 和受限数据库视图，但仍未具备 Notion/Anytype 的列布局、多 Block 框选、拖动嵌套预览、复杂数据库能力与实时协作；这里的“连续 Block 编辑器”和“首版数据库视图”都不宣称完整产品对等。iOS 的 `core` KLIB 已在 Windows 交叉编译；共享 iOS 宿主仍需在 macOS/Xcode 环境完成最终编译和运行验证。
 
 ## 开发原则
 

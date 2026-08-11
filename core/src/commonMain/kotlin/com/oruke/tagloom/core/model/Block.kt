@@ -1,7 +1,7 @@
 package com.oruke.tagloom.core.model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -52,6 +52,18 @@ object BlockTypes {
 
     /** 指向笔记或 Block 的引用。 */
     const val NOTE_REFERENCE: String = "note-reference"
+
+    /** 包含一个或多个页签的结构容器。 */
+    const val TABS: String = "tabs"
+
+    /** Tabs 容器下的单个页签。 */
+    const val TAB: String = "tab"
+
+    /** Note 正文内的局部结构化表格。 */
+    const val BASE_TABLE: String = "base-table"
+
+    /** 在 Note 正文中嵌入一个独立 Database 对象。 */
+    const val DATABASE: String = "database"
 }
 
 /**
@@ -152,6 +164,37 @@ data class NoteReferenceBlockContent(
 ) : BlockContent
 
 /**
+ * 表示只承担 Block 树结构的 Tabs 容器内容。
+ *
+ * 当前活动页签属于 UI 会话状态，容器 payload 不保存它。
+ */
+@Serializable
+@SerialName("tabs")
+data object TabsBlockContent : BlockContent
+
+/**
+ * 表示 Tabs 容器中的一个页签标题。
+ */
+@Serializable
+@SerialName("tab")
+data class TabBlockContent(
+    /** 页签的规范化富文本标题。 */
+    val title: RichText,
+) : BlockContent
+
+/**
+ * 表示 Note 正文中对独立 Database 权威对象的稳定引用。
+ *
+ * DatabaseDefinition 与 ViewDefinition 继续独立加密和版本化，Block 不复制投影行或视图配置。
+ */
+@Serializable
+@SerialName("database")
+data class DatabaseBlockContent(
+    /** 被嵌入正文的 Database 稳定标识。 */
+    val databaseId: DatabaseId,
+) : BlockContent
+
+/**
  * 保存当前客户端尚未理解的 Block payload。
  */
 @Serializable
@@ -221,6 +264,26 @@ object BlockContentSerializer : KSerializer<BlockContent> {
                 payload = json.encodeToJsonElement(NoteReferenceBlockContent.serializer(), value).jsonObject,
             )
 
+            TabsBlockContent -> typedJson(
+                type = "tabs",
+                payload = buildJsonObject { },
+            )
+
+            is TabBlockContent -> typedJson(
+                type = "tab",
+                payload = json.encodeToJsonElement(TabBlockContent.serializer(), value).jsonObject,
+            )
+
+            is BaseTableBlockContent -> typedJson(
+                type = "base-table",
+                payload = json.encodeToJsonElement(BaseTableBlockContent.serializer(), value).jsonObject,
+            )
+
+            is DatabaseBlockContent -> typedJson(
+                type = "database",
+                payload = json.encodeToJsonElement(DatabaseBlockContent.serializer(), value).jsonObject,
+            )
+
             is UnknownBlockContent -> value.raw
         }
 
@@ -250,6 +313,10 @@ object BlockContentSerializer : KSerializer<BlockContent> {
             "divider" -> DividerBlockContent
             "attachment" -> json.decodeFromJsonElement(AttachmentBlockContent.serializer(), payload)
             "note-reference" -> json.decodeFromJsonElement(NoteReferenceBlockContent.serializer(), payload)
+            "tabs" -> TabsBlockContent
+            "tab" -> json.decodeFromJsonElement(TabBlockContent.serializer(), payload)
+            "base-table" -> json.decodeFromJsonElement(BaseTableBlockContent.serializer(), payload)
+            "database" -> json.decodeFromJsonElement(DatabaseBlockContent.serializer(), payload)
             else -> UnknownBlockContent(raw = raw)
         }
     }
@@ -341,6 +408,10 @@ object BlockValidator {
             -> block.content is AttachmentBlockContent
 
             BlockTypes.NOTE_REFERENCE -> block.content is NoteReferenceBlockContent
+            BlockTypes.TABS -> block.content is TabsBlockContent
+            BlockTypes.TAB -> block.content is TabBlockContent
+            BlockTypes.BASE_TABLE -> block.content is BaseTableBlockContent
+            BlockTypes.DATABASE -> block.content is DatabaseBlockContent
             else -> block.content is UnknownBlockContent
         }
 

@@ -1,15 +1,17 @@
 package com.oruke.tagloom.workspace
 
+import com.oruke.tagloom.core.crypto.Argon2idParameters
+import com.oruke.tagloom.core.model.DatabaseDefinition
+import com.oruke.tagloom.core.model.KeyId
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.ObjectSnapshot
+import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.SavedQuery
 import com.oruke.tagloom.core.model.TagDefinition
-import com.oruke.tagloom.core.model.PropertyDefinition
-import com.oruke.tagloom.core.model.WorkspaceId
-import com.oruke.tagloom.core.model.KeyId
 import com.oruke.tagloom.core.model.TransactionId
-import com.oruke.tagloom.core.crypto.Argon2idParameters
+import com.oruke.tagloom.core.model.ViewDefinition
+import com.oruke.tagloom.core.model.WorkspaceId
 import com.oruke.tagloom.core.transaction.TransactionRecoveryReport
 import com.oruke.tagloom.core.workspace.ManifestObjectKind
 
@@ -70,6 +72,22 @@ data class DesktopStoredPropertyDefinition(
     val id: ObjectId
         get() = snapshot.header.objectId
 }
+
+/**
+ * 表示桌面工作区当前活动的已确认 DatabaseDefinition。
+ */
+data class DesktopStoredDatabaseDefinition(
+    /** 权威 DatabaseDefinition 快照。 */
+    val snapshot: ObjectSnapshot<DatabaseDefinition>,
+)
+
+/**
+ * 表示桌面工作区当前活动的已确认 ViewDefinition。
+ */
+data class DesktopStoredViewDefinition(
+    /** 权威 ViewDefinition 快照。 */
+    val snapshot: ObjectSnapshot<ViewDefinition>,
+)
 
 /**
  * 区分权威对象被逻辑隔离的脱敏原因。
@@ -137,6 +155,10 @@ data class DesktopWorkspaceOpenState(
     val tagDefinitions: List<DesktopStoredTagDefinition>,
     /** 当前已确认且未删除的属性定义。 */
     val propertyDefinitions: List<DesktopStoredPropertyDefinition>,
+    /** 当前已确认且未删除的 Database 定义。 */
+    val databaseDefinitions: List<DesktopStoredDatabaseDefinition> = emptyList(),
+    /** 当前已确认且未删除的 View 定义。 */
+    val viewDefinitions: List<DesktopStoredViewDefinition> = emptyList(),
     /** 已从读取和索引中隔离的损坏对象。 */
     val integrityIssues: List<DesktopObjectIntegrityIssue>,
     /** 启动时处理 prepared 事务的恢复报告。 */

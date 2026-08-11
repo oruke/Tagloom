@@ -1,31 +1,41 @@
 package com.oruke.tagloom
 
 import com.oruke.tagloom.core.index.SearchIndexQuery
+import com.oruke.tagloom.core.model.DatabaseDefinition
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.ObjectId
+import com.oruke.tagloom.core.model.ObjectRevision
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.SavedQuery
 import com.oruke.tagloom.core.model.TagDefinition
+import com.oruke.tagloom.core.model.ViewDefinition
+import com.oruke.tagloom.platform.WorkspaceDatabaseCatalog
+import com.oruke.tagloom.platform.WorkspaceDatabaseDefinition
 import com.oruke.tagloom.platform.WorkspaceGateway
+import com.oruke.tagloom.platform.WorkspaceMasterKeyRotationResult
 import com.oruke.tagloom.platform.WorkspaceNote
 import com.oruke.tagloom.platform.WorkspaceOpenResult
-import com.oruke.tagloom.platform.WorkspaceMasterKeyRotationResult
 import com.oruke.tagloom.platform.WorkspacePreparedCreation
-import com.oruke.tagloom.platform.WorkspaceSearchHit
-import com.oruke.tagloom.platform.WorkspaceSavedQuery
-import com.oruke.tagloom.platform.WorkspaceTagDefinition
 import com.oruke.tagloom.platform.WorkspacePropertyDefinition
 import com.oruke.tagloom.platform.WorkspaceRecentWorkspace
-import com.oruke.tagloom.workspace.DesktopWorkspaceManager
+import com.oruke.tagloom.platform.WorkspaceSavedQuery
+import com.oruke.tagloom.platform.WorkspaceSearchHit
+import com.oruke.tagloom.platform.WorkspaceTagDefinition
+import com.oruke.tagloom.platform.WorkspaceViewDefinition
 import com.oruke.tagloom.workspace.DesktopWorkspaceLocalAccessService
-import java.nio.file.Path
-import java.time.Instant
-import java.util.UUID
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
+import com.oruke.tagloom.workspace.DesktopWorkspaceManager
+import com.oruke.tagloom.workspace.createDatabaseCatalog
+import com.oruke.tagloom.workspace.createViewDefinition
+import com.oruke.tagloom.workspace.saveDatabaseDefinition
+import com.oruke.tagloom.workspace.saveViewDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
+import java.nio.file.Path
+import java.time.Instant
+import java.util.*
+import javax.swing.JFileChooser
+import javax.swing.filechooser.FileNameExtensionFilter
 
 /**
  * 使用 Swing 目录选择器和真实桌面工作区 Manager 实现共享 UI Gateway。
@@ -240,13 +250,15 @@ class DesktopWorkspaceGateway(
      *
      * @param objectId 已持久化 ID；新草稿为空。
      * @param note 完整 Note payload。
+     * @param expectedRevision 调用方读取时的权威 revision。
      * @return 新确认 Note。
      */
     override suspend fun saveNote(
         objectId: ObjectId?,
         note: Note,
+        expectedRevision: ObjectRevision?,
     ): WorkspaceNote = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }
-        .saveNote(objectId, note)
+        .saveNote(objectId, note, expectedRevision)
         .toSharedWorkspaceNote()
 
     /**
@@ -305,6 +317,61 @@ class DesktopWorkspaceGateway(
     override suspend fun savePropertyDefinition(definition: PropertyDefinition): WorkspacePropertyDefinition {
         val saved = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }.savePropertyDefinition(definition)
         return WorkspacePropertyDefinition(saved.snapshot.payload)
+    }
+
+    /**
+     * 通过活动会话原子创建 Database 与首个 View。
+     *
+     * @param database Database 完整定义。
+     * @param initialView 首个 View。
+     * @return 两个已确认目录对象。
+     */
+    override suspend fun createDatabase(
+        database: DatabaseDefinition,
+        initialView: ViewDefinition,
+    ): WorkspaceDatabaseCatalog {
+        val (savedDatabase, savedView) = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }
+            .createDatabaseCatalog(database, initialView)
+        return WorkspaceDatabaseCatalog(
+            WorkspaceDatabaseDefinition(savedDatabase.snapshot.payload),
+            WorkspaceViewDefinition(savedView.snapshot.payload),
+        )
+    }
+
+    /**
+     * 通过活动会话更新 DatabaseDefinition。
+     *
+     * @param definition 新完整定义。
+     * @return 新确认 Database。
+     */
+    override suspend fun saveDatabaseDefinition(definition: DatabaseDefinition): WorkspaceDatabaseDefinition {
+        val saved = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }
+            .saveDatabaseDefinition(definition)
+        return WorkspaceDatabaseDefinition(saved.snapshot.payload)
+    }
+
+    /**
+     * 通过活动会话为 Database 创建一个新 ViewDefinition。
+     *
+     * @param definition 新视图完整定义。
+     * @return 新确认 View。
+     */
+    override suspend fun createViewDefinition(definition: ViewDefinition): WorkspaceViewDefinition {
+        val saved = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }
+            .createViewDefinition(definition)
+        return WorkspaceViewDefinition(saved.snapshot.payload)
+    }
+
+    /**
+     * 通过活动会话更新 ViewDefinition。
+     *
+     * @param definition 新完整定义。
+     * @return 新确认 View。
+     */
+    override suspend fun saveViewDefinition(definition: ViewDefinition): WorkspaceViewDefinition {
+        val saved = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }
+            .saveViewDefinition(definition)
+        return WorkspaceViewDefinition(saved.snapshot.payload)
     }
 
     /**

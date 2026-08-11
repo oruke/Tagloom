@@ -25,7 +25,7 @@ fun App(
     TagloomTheme {
         if (workspaceGateway == null) {
             val editorState = remember { TagloomEditorState.demo() }
-            TagloomWorkspaceScreen(editorState, documentFileGateway)
+            TagloomWorkspaceScreen(state = editorState, documentFileGateway = documentFileGateway)
         } else {
             WorkspaceLifecycleScreen(workspaceGateway, documentFileGateway)
         }

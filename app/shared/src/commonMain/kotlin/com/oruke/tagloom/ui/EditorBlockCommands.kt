@@ -1,7 +1,7 @@
 package com.oruke.tagloom.ui
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenuItem
@@ -14,7 +14,46 @@ import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.EditorBlockType
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.*
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.editor_block_command_base_table_description
+import tagloom.app.shared.generated.resources.editor_block_command_base_table_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_base_table_label
+import tagloom.app.shared.generated.resources.editor_block_command_bulleted_list_description
+import tagloom.app.shared.generated.resources.editor_block_command_bulleted_list_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_bulleted_list_label
+import tagloom.app.shared.generated.resources.editor_block_command_code_description
+import tagloom.app.shared.generated.resources.editor_block_command_code_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_code_label
+import tagloom.app.shared.generated.resources.editor_block_command_database_description
+import tagloom.app.shared.generated.resources.editor_block_command_database_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_database_label
+import tagloom.app.shared.generated.resources.editor_block_command_divider_description
+import tagloom.app.shared.generated.resources.editor_block_command_divider_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_divider_label
+import tagloom.app.shared.generated.resources.editor_block_command_heading_one_description
+import tagloom.app.shared.generated.resources.editor_block_command_heading_one_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_heading_one_label
+import tagloom.app.shared.generated.resources.editor_block_command_heading_three_description
+import tagloom.app.shared.generated.resources.editor_block_command_heading_three_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_heading_three_label
+import tagloom.app.shared.generated.resources.editor_block_command_heading_two_description
+import tagloom.app.shared.generated.resources.editor_block_command_heading_two_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_heading_two_label
+import tagloom.app.shared.generated.resources.editor_block_command_numbered_list_description
+import tagloom.app.shared.generated.resources.editor_block_command_numbered_list_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_numbered_list_label
+import tagloom.app.shared.generated.resources.editor_block_command_quote_description
+import tagloom.app.shared.generated.resources.editor_block_command_quote_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_quote_label
+import tagloom.app.shared.generated.resources.editor_block_command_tabs_description
+import tagloom.app.shared.generated.resources.editor_block_command_tabs_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_tabs_label
+import tagloom.app.shared.generated.resources.editor_block_command_text_description
+import tagloom.app.shared.generated.resources.editor_block_command_text_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_text_label
+import tagloom.app.shared.generated.resources.editor_block_command_todo_description
+import tagloom.app.shared.generated.resources.editor_block_command_todo_keywords
+import tagloom.app.shared.generated.resources.editor_block_command_todo_label
 
 /**
  * 描述 Slash 菜单和 Block 类型菜单共享的一项命令。
@@ -30,6 +69,8 @@ internal data class EditorBlockCommand(
     val keywordsResource: StringResource,
     /** 菜单左侧使用的紧凑符号。 */
     val symbol: String,
+    /** 是否允许从现有普通 Block 无损转换；结构化 Block 仅在创建菜单中出现。 */
+    val convertible: Boolean = true,
 )
 
 /** 编辑器 v0.2 支持的 Block 创建与转换命令。 */
@@ -104,21 +145,54 @@ internal val EditorBlockCommands: List<EditorBlockCommand> = listOf(
         Res.string.editor_block_command_divider_keywords,
         "—",
     ),
+    EditorBlockCommand(
+        EditorBlockType.BASE_TABLE,
+        Res.string.editor_block_command_base_table_label,
+        Res.string.editor_block_command_base_table_description,
+        Res.string.editor_block_command_base_table_keywords,
+        "▦",
+        convertible = false,
+    ),
+    EditorBlockCommand(
+        EditorBlockType.DATABASE,
+        Res.string.editor_block_command_database_label,
+        Res.string.editor_block_command_database_description,
+        Res.string.editor_block_command_database_keywords,
+        "DB",
+        convertible = false,
+    ),
+    EditorBlockCommand(
+        EditorBlockType.TABS,
+        Res.string.editor_block_command_tabs_label,
+        Res.string.editor_block_command_tabs_description,
+        Res.string.editor_block_command_tabs_keywords,
+        "▤",
+        convertible = false,
+    ),
 )
 
 /**
  * 按用户输入过滤 Slash 命令。
  *
  * @param query 去除 `/` 后的检索文本。
+ * @param databaseAvailable 当前平台是否装配 Database 持久化入口。
  * @return 保持产品定义顺序的匹配命令。
  */
 @Composable
-internal fun filterEditorBlockCommands(query: String): List<EditorBlockCommand> {
+internal fun filterEditorBlockCommands(
+    query: String,
+    databaseAvailable: Boolean,
+): List<EditorBlockCommand> {
     val normalized = query.trim().lowercase()
-    if (normalized.isEmpty()) {
-        return EditorBlockCommands
+    val availableCommands = if (databaseAvailable) {
+        EditorBlockCommands
+    } else {
+        EditorBlockCommands.filterNot { command -> command.type == EditorBlockType.DATABASE }
     }
-    return EditorBlockCommands.filter { command ->
+    if (normalized.isEmpty()) {
+        return availableCommands
+    }
+    return availableCommands.filter { command ->
         command.localizedLabel().lowercase().contains(normalized) ||
             command.localizedKeywords().any { keyword -> keyword.lowercase().contains(normalized) }
     }

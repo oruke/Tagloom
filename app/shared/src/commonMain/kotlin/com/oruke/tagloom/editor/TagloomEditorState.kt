@@ -2,6 +2,7 @@ package com.oruke.tagloom.editor
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.oruke.tagloom.core.markdown.MarkdownCodec
@@ -15,8 +16,8 @@ import com.oruke.tagloom.core.model.CodeBlockContent
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.PropertyDefinition
-import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.core.model.RichTextEditor
+import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.core.model.TodoBlockContent
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 
@@ -62,6 +63,13 @@ class TagloomEditorState(
     var importWarnings: List<String> by mutableStateOf(emptyList())
         private set
 
+    /** 当前解锁 UI 会话中每个 Tabs 容器选择的活动 tab；不会进入 Note 快照。 */
+    internal val activeTabIds = mutableStateMapOf<BlockId, BlockId>()
+
+    /** 最近一次结构化 Block 编辑失败的非敏感提示。 */
+    var structuredEditError: String? by mutableStateOf(null)
+        internal set
+
     /** 基础属性值编辑入口；最终仍通过当前 Note 快照保存。 */
     val propertyEditor: EditorPropertyController = EditorPropertyController(timestampProvider, ::updateSelectedNote)
 
@@ -86,6 +94,7 @@ class TagloomEditorState(
         require(documents.any { document -> document.id == documentId }) { "编辑器文档不存在" }
         selectedDocumentId = documentId
         selection = EditorSelection()
+        structuredEditError = null
         materializeSelectedSnapshotDefaults()
     }
 
@@ -277,6 +286,15 @@ class TagloomEditorState(
     }
 
     /**
+     * 清空当前文本选区。
+     *
+     * 结构化 Block 在切换内部视图时调用该入口，避免把上一页签的光标状态错误应用到新页签内容。
+     */
+    internal fun clearSelection() {
+        selection = EditorSelection()
+    }
+
+    /**
      * 导出当前笔记并保留能力差异清单。
      *
      * @param mode 标准或 Tagloom 扩展 Markdown。
@@ -347,6 +365,8 @@ class TagloomEditorState(
         selectedDocumentId = loadedDocuments.firstOrNull()?.id
         selection = EditorSelection()
         importWarnings = emptyList()
+        activeTabIds.clear()
+        structuredEditError = null
         materializeSelectedSnapshotDefaults()
     }
 
@@ -383,6 +403,8 @@ class TagloomEditorState(
         linkDraft = ""
         importWarnings = emptyList()
         filterText = ""
+        activeTabIds.clear()
+        structuredEditError = null
     }
 
     /**

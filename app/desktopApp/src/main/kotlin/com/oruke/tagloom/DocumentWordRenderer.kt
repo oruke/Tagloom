@@ -1,9 +1,14 @@
 package com.oruke.tagloom
 
 import com.oruke.tagloom.core.model.AttachmentBlockContent
+import com.oruke.tagloom.core.model.BaseTableBlockContent
+import com.oruke.tagloom.core.model.BaseTableBooleanCell
+import com.oruke.tagloom.core.model.BaseTableScalarCell
+import com.oruke.tagloom.core.model.BaseTableTextCell
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockTypes
 import com.oruke.tagloom.core.model.CodeBlockContent
+import com.oruke.tagloom.core.model.DatabaseBlockContent
 import com.oruke.tagloom.core.model.DividerBlockContent
 import com.oruke.tagloom.core.model.HeadingBlockContent
 import com.oruke.tagloom.core.model.InlineMarkAttributes
@@ -13,13 +18,15 @@ import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.NoteReferenceBlockContent
 import com.oruke.tagloom.core.model.RichText
 import com.oruke.tagloom.core.model.RichTextBlockContent
+import com.oruke.tagloom.core.model.TabBlockContent
+import com.oruke.tagloom.core.model.TabsBlockContent
 import com.oruke.tagloom.core.model.TodoBlockContent
 import com.oruke.tagloom.core.model.UnknownBlockContent
-import java.io.ByteArrayOutputStream
 import org.apache.poi.xwpf.usermodel.UnderlinePatterns
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.apache.poi.xwpf.usermodel.XWPFParagraph
 import org.apache.poi.xwpf.usermodel.XWPFRun
+import java.io.ByteArrayOutputStream
 
 /**
  * 使用 Apache POI 生成可继续编辑的 Office Open XML Word 文档。
@@ -105,9 +112,50 @@ internal object DocumentWordRenderer {
                 labels.noteReferencePrefix + content.noteId.value,
             )
 
+            is DatabaseBlockContent -> document.createParagraph().createRun().setText(
+                labels.databaseReferencePrefix + content.databaseId.value,
+            )
+
+            is BaseTableBlockContent -> appendBaseTable(document, content)
+            is TabBlockContent -> document.createParagraph().apply {
+                style = "Heading2"
+                appendRichText(content.title)
+            }
+            TabsBlockContent -> Unit
             is UnknownBlockContent -> document.createParagraph().createRun().setText(
                 labels.unknownBlockPrefix + block.type,
             )
+        }
+    }
+
+    /**
+     * 把正文 BaseTable 写为可继续编辑的 Word 表格。
+     *
+     * @param document 当前 Word 文档。
+     * @param content 表格内容。
+     */
+    private fun appendBaseTable(
+        document: XWPFDocument,
+        content: BaseTableBlockContent,
+    ) {
+        val columns = content.columns.filterNot { column -> column.deleted }.sortedBy { column -> column.orderKey }
+        val rows = content.rows.filterNot { row -> row.deleted }.sortedBy { row -> row.orderKey }
+        if (columns.isEmpty()) return
+        if (content.title.plainText.isNotBlank()) {
+            document.createParagraph().apply { style = "Heading3"; appendRichText(content.title) }
+        }
+        val table = document.createTable(rows.size + 1, columns.size)
+        columns.forEachIndexed { index, column -> table.getRow(0).getCell(index).text = column.name.plainText }
+        rows.forEachIndexed { rowIndex, row ->
+            columns.forEachIndexed { columnIndex, column ->
+                val text = when (val cell = row.cells[column.columnId]) {
+                    is BaseTableTextCell -> cell.richText.plainText
+                    is BaseTableScalarCell -> cell.value
+                    is BaseTableBooleanCell -> if (cell.value) "✓" else ""
+                    else -> ""
+                }
+                table.getRow(rowIndex + 1).getCell(columnIndex).text = text
+            }
         }
     }
 

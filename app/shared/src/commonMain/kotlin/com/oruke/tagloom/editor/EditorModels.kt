@@ -3,6 +3,7 @@ package com.oruke.tagloom.editor
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.ObjectId
+import com.oruke.tagloom.core.model.ObjectRevision
 
 /**
  * 表示编辑器侧一篇拥有稳定 ID 的 Note 文档。
@@ -12,6 +13,8 @@ data class EditorDocument(
     val id: ObjectId,
     /** 当前内存中的 Note payload。 */
     val note: Note,
+    /** 最近一次确认的权威 revision；草稿为空。 */
+    val revision: ObjectRevision? = null,
     /** 首个权威快照的创建时间；未确认草稿使用内存创建时间。 */
     val createdAt: String = "",
     /** 最近权威快照或当前未确认编辑的更新时间。 */

@@ -1,19 +1,25 @@
 package com.oruke.tagloom
 
 import com.oruke.tagloom.core.model.AttachmentBlockContent
+import com.oruke.tagloom.core.model.BaseTableBlockContent
+import com.oruke.tagloom.core.model.BaseTableBooleanCell
+import com.oruke.tagloom.core.model.BaseTableScalarCell
+import com.oruke.tagloom.core.model.BaseTableTextCell
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockTypes
 import com.oruke.tagloom.core.model.CodeBlockContent
+import com.oruke.tagloom.core.model.DatabaseBlockContent
 import com.oruke.tagloom.core.model.DividerBlockContent
 import com.oruke.tagloom.core.model.HeadingBlockContent
 import com.oruke.tagloom.core.model.InlineMark
 import com.oruke.tagloom.core.model.InlineMarkAttributes
 import com.oruke.tagloom.core.model.InlineMarkTypes
-import com.oruke.tagloom.core.model.InlineRun
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.NoteReferenceBlockContent
 import com.oruke.tagloom.core.model.RichText
 import com.oruke.tagloom.core.model.RichTextBlockContent
+import com.oruke.tagloom.core.model.TabBlockContent
+import com.oruke.tagloom.core.model.TabsBlockContent
 import com.oruke.tagloom.core.model.TodoBlockContent
 import com.oruke.tagloom.core.model.UnknownBlockContent
 
@@ -83,7 +89,42 @@ internal object DocumentHtmlRenderer {
             "<p class=\"reference\">${escapeHtml(labels.noteReferencePrefix + content.noteId.value)}</p>"
         }
 
+        is DatabaseBlockContent -> {
+            "<p class=\"reference\">${escapeHtml(labels.databaseReferencePrefix + content.databaseId.value)}</p>"
+        }
+
+        is BaseTableBlockContent -> renderBaseTable(content)
+        is TabBlockContent -> "<h2 class=\"tab-title\">${renderRichText(content.title)}</h2>"
+        TabsBlockContent -> ""
         is UnknownBlockContent -> "<p class=\"unknown\">${escapeHtml(labels.unknownBlockPrefix + block.type)}</p>"
+    }
+
+    /**
+     * 把正文 BaseTable 输出为自包含 HTML 表格。
+     *
+     * @param content 表格内容。
+     * @return 已转义 HTML 片段。
+     */
+    private fun renderBaseTable(content: BaseTableBlockContent): String = buildString {
+        val columns = content.columns.filterNot { column -> column.deleted }.sortedBy { column -> column.orderKey }
+        if (content.title.plainText.isNotBlank()) append("<h3>${renderRichText(content.title)}</h3>")
+        append("<table><thead><tr>")
+        columns.forEach { column -> append("<th>${renderRichText(column.name)}</th>") }
+        append("</tr></thead><tbody>")
+        content.rows.filterNot { row -> row.deleted }.sortedBy { row -> row.orderKey }.forEach { row ->
+            append("<tr>")
+            columns.forEach { column ->
+                val value = when (val cell = row.cells[column.columnId]) {
+                    is BaseTableTextCell -> renderRichText(cell.richText)
+                    is BaseTableScalarCell -> escapeHtml(cell.value)
+                    is BaseTableBooleanCell -> if (cell.value) "✓" else ""
+                    else -> ""
+                }
+                append("<td>$value</td>")
+            }
+            append("</tr>")
+        }
+        append("</tbody></table>")
     }
 
     /**

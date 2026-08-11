@@ -19,6 +19,8 @@ data class Note(
     val propertyStyleOverrides: Map<PropertyId, PropertyStyle> = emptyMap(),
     /** 按树结构和 orderKey 组织的稳定 Block。 */
     val blocks: List<Block> = emptyList(),
+    /** 用户显式设定的默认页签；当前活动页签不进入权威快照。 */
+    val defaultTabId: BlockId? = null,
     /** 由 InlineRun 引用的独立加注。 */
     val annotations: Map<AnnotationId, Annotation> = emptyMap(),
 ) {

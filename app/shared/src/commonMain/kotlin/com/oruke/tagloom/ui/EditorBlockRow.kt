@@ -35,11 +35,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.oruke.tagloom.core.model.BaseTableBlockContent
 import com.oruke.tagloom.core.model.Block
+import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
 import com.oruke.tagloom.core.model.CodeBlockContent
+import com.oruke.tagloom.core.model.DatabaseBlockContent
 import com.oruke.tagloom.core.model.DividerBlockContent
 import com.oruke.tagloom.core.model.HeadingBlockContent
+import com.oruke.tagloom.core.model.ObjectId
+import com.oruke.tagloom.core.model.TabsBlockContent
 import com.oruke.tagloom.core.model.TodoBlockContent
 import com.oruke.tagloom.core.model.UnknownBlockContent
 import com.oruke.tagloom.editor.BlockMoveDirection
@@ -51,12 +56,29 @@ import com.oruke.tagloom.editor.insertBlockAfter
 import com.oruke.tagloom.editor.numberedListOrdinal
 import com.oruke.tagloom.editor.turnBlockInto
 import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.*
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.editor_block_action_convert
+import tagloom.app.shared.generated.resources.editor_block_action_delete
+import tagloom.app.shared.generated.resources.editor_block_action_indent
+import tagloom.app.shared.generated.resources.editor_block_action_move_down
+import tagloom.app.shared.generated.resources.editor_block_action_move_up
+import tagloom.app.shared.generated.resources.editor_block_action_outdent
+import tagloom.app.shared.generated.resources.editor_block_actions_description
+import tagloom.app.shared.generated.resources.editor_block_add_description
+import tagloom.app.shared.generated.resources.editor_block_placeholder_default
+import tagloom.app.shared.generated.resources.editor_block_placeholder_heading
+import tagloom.app.shared.generated.resources.editor_block_placeholder_list
+import tagloom.app.shared.generated.resources.editor_block_placeholder_quote
+import tagloom.app.shared.generated.resources.editor_block_placeholder_todo
+import tagloom.app.shared.generated.resources.editor_block_preserved_data
+import tagloom.app.shared.generated.resources.editor_block_read_only
+import tagloom.app.shared.generated.resources.editor_block_unknown_uneditable
 
 /**
  * 渲染一行没有卡片边框的 Block，并按需显示加号和拖动把手。
  *
  * @param state 编辑器状态。
+ * @param databaseController Database Block 可用的目录与写入控制器。
  * @param block 当前 Block。
  * @param depth 嵌套深度。
  * @param cursorRequest 外部焦点请求。
@@ -65,19 +87,24 @@ import tagloom.app.shared.generated.resources.*
  * @param onCursorConsumed 已消费光标请求。
  * @param onCommandMenuRequest 请求指定 Block 打开命令菜单。
  * @param onCommandMenuDismiss 关闭命令菜单。
+ * @param onCreateDatabaseBlock 请求通过当前 Block 创建并绑定 Database。
+ * @param onOpenNote 从 Database 投影打开原始 Note。
  * @param onSaveRequest 保存快捷键动作。
  */
 @Composable
 internal fun EditorBlockRow(
     state: TagloomEditorState,
+    databaseController: WorkspaceDatabaseController?,
     block: Block,
     depth: Int,
     cursorRequest: EditorCursorTarget?,
     commandMenuRequested: Boolean,
     onCursorRequest: (EditorCursorTarget) -> Unit,
     onCursorConsumed: () -> Unit,
-    onCommandMenuRequest: (com.oruke.tagloom.core.model.BlockId) -> Unit,
+    onCommandMenuRequest: (BlockId) -> Unit,
     onCommandMenuDismiss: () -> Unit,
+    onCreateDatabaseBlock: (BlockId) -> Unit,
+    onOpenNote: (ObjectId) -> Unit,
     onSaveRequest: () -> Unit,
 ) {
     val interactionSource = remember(block.id) { MutableInteractionSource() }
@@ -104,7 +131,23 @@ internal fun EditorBlockRow(
             onOpenActions = { actionMenuOpen = true },
         )
         Box(Modifier.weight(1f)) {
-            when (block.content) {
+            if (databaseController?.isCreatingBlock(block.id) == true) {
+                DatabaseBlockCreatingPlaceholder()
+            } else when (val content = block.content) {
+                is BaseTableBlockContent -> BaseTableBlockEditor(
+                    state = state,
+                    block = block,
+                    content = content,
+                )
+                TabsBlockContent -> TabsBlockEditor(
+                    state = state,
+                    block = block,
+                )
+                is DatabaseBlockContent -> DatabaseBlockEditor(
+                    controller = databaseController,
+                    content = content,
+                    onOpenNote = onOpenNote,
+                )
                 is CodeBlockContent -> EditorCodeField(
                     state = state,
                     block = block,
@@ -127,6 +170,8 @@ internal fun EditorBlockRow(
                         onCursorRequest = onCursorRequest,
                         onCursorConsumed = onCursorConsumed,
                         onCommandMenuDismiss = onCommandMenuDismiss,
+                        databaseCreationAvailable = databaseController != null,
+                        onCreateDatabaseBlock = onCreateDatabaseBlock,
                         onSaveRequest = onSaveRequest,
                     )
                 } else {
@@ -168,10 +213,12 @@ private fun BlockActionMenus(
     onCursorRequest: (EditorCursorTarget) -> Unit,
 ) {
     DropdownMenu(expanded = actionMenuOpen, onDismissRequest = { onActionMenuChange(false) }) {
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_convert)) }, onClick = {
-            onActionMenuChange(false)
-            onTypeMenuChange(true)
-        })
+        if (block.editableRichText() != null || block.content == DividerBlockContent) {
+            DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_convert)) }, onClick = {
+                onActionMenuChange(false)
+                onTypeMenuChange(true)
+            })
+        }
         DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_move_up)) }, onClick = {
             state.moveBlock(block.id, BlockMoveDirection.UP)
             onActionMenuChange(false)
@@ -194,7 +241,7 @@ private fun BlockActionMenus(
         })
     }
     DropdownMenu(expanded = typeMenuOpen, onDismissRequest = { onTypeMenuChange(false) }) {
-        EditorBlockCommands.forEach { command ->
+        EditorBlockCommands.filter(EditorBlockCommand::convertible).forEach { command ->
             EditorBlockCommandItem(command) {
                 state.turnBlockInto(block.id, command.type)?.let(onCursorRequest)
                 onTypeMenuChange(false)
@@ -293,6 +340,8 @@ private fun GutterButton(
  * @param onCursorRequest 请求光标移动。
  * @param onCursorConsumed 当前 Block 已获得焦点。
  * @param onCommandMenuDismiss 关闭 Slash 菜单。
+ * @param databaseCreationAvailable 当前平台是否装配 Database 写入入口。
+ * @param onCreateDatabaseBlock 请求通过当前 Block 创建并绑定 Database。
  * @param onSaveRequest 保存快捷键动作。
  */
 @Composable
@@ -304,6 +353,8 @@ private fun TextBlockContent(
     onCursorRequest: (EditorCursorTarget) -> Unit,
     onCursorConsumed: () -> Unit,
     onCommandMenuDismiss: () -> Unit,
+    databaseCreationAvailable: Boolean,
+    onCreateDatabaseBlock: (BlockId) -> Unit,
     onSaveRequest: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = blockVerticalAlignment(block)) {
@@ -332,6 +383,8 @@ private fun TextBlockContent(
             onCursorRequest = onCursorRequest,
             onCursorConsumed = onCursorConsumed,
             onCommandMenuDismiss = onCommandMenuDismiss,
+            databaseCreationAvailable = databaseCreationAvailable,
+            onCreateDatabaseBlock = onCreateDatabaseBlock,
             onSaveRequest = onSaveRequest,
             modifier = Modifier.weight(1f),
         )

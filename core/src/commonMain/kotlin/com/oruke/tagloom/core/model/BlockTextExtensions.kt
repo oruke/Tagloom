@@ -17,6 +17,21 @@ fun Block.extractPlainText(includeAttachmentFileName: Boolean = true): String? {
             if (includeAttachmentFileName) add(value.fileName)
             add(value.caption.plainText)
         }.filter(String::isNotBlank).joinToString(separator = " ")
+        is TabBlockContent -> value.title.plainText
+        is BaseTableBlockContent -> buildList {
+            add(value.title.plainText)
+            addAll(value.columns.filterNot(BaseTableColumn::deleted).map { column -> column.name.plainText })
+            value.rows.filterNot(BaseTableRow::deleted).forEach { row ->
+                row.cells.values.forEach { cell ->
+                    when (cell) {
+                        is BaseTableTextCell -> add(cell.richText.plainText)
+                        is BaseTableScalarCell -> add(cell.value)
+                        is BaseTableBooleanCell -> add(cell.value.toString())
+                        is UnknownBaseTableCell -> Unit
+                    }
+                }
+            }
+        }.filter(String::isNotBlank).joinToString(separator = " ")
         else -> null
     }?.takeIf(String::isNotBlank)
 }
@@ -33,6 +48,7 @@ fun Block.richTextOrNull(): RichText? {
         is HeadingBlockContent -> value.richText
         is TodoBlockContent -> value.richText
         is AttachmentBlockContent -> value.caption
+        is TabBlockContent -> value.title
         else -> null
     }
 }

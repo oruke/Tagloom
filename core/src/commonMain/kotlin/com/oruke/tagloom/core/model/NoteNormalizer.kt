@@ -42,9 +42,17 @@ object NoteNormalizer {
                 caption = RichTextNormalizer.normalize(content.caption),
             )
 
+            is TabBlockContent -> content.copy(
+                title = RichTextNormalizer.normalize(content.title),
+            )
+
+            is BaseTableBlockContent -> BaseTableNormalizer.normalize(content)
+
             is CodeBlockContent,
+            is DatabaseBlockContent,
             DividerBlockContent,
             is NoteReferenceBlockContent,
+            TabsBlockContent,
             is UnknownBlockContent,
             -> content
         },

@@ -11,17 +11,17 @@ import com.oruke.tagloom.core.model.NoteReferenceBlockContent
 import com.oruke.tagloom.core.model.RichTextBlockContent
 import com.oruke.tagloom.core.model.TodoBlockContent
 import com.oruke.tagloom.core.model.UnknownBlockContent
-import java.io.ByteArrayOutputStream
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import org.apache.fontbox.ttf.TrueTypeCollection
+import org.apache.fontbox.ttf.TrueTypeFont
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.PDPage
 import org.apache.pdfbox.pdmodel.PDPageContentStream
 import org.apache.pdfbox.pdmodel.common.PDRectangle
 import org.apache.pdfbox.pdmodel.font.PDType0Font
-import org.apache.fontbox.ttf.TrueTypeCollection
-import org.apache.fontbox.ttf.TrueTypeFont
+import java.io.ByteArrayOutputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * 使用 PDFBox 和系统可用的 CJK 字体生成真实 PDF 文档。
@@ -202,6 +202,40 @@ private class PdfPageWriter(
                 SMALL_SPACING,
             )
 
+            is com.oruke.tagloom.core.model.DatabaseBlockContent -> writeParagraph(
+                labels.databaseReferencePrefix + content.databaseId.value,
+                BODY_FONT_SIZE,
+                0f,
+                SMALL_SPACING,
+            )
+
+            is com.oruke.tagloom.core.model.BaseTableBlockContent -> {
+                if (content.title.plainText.isNotBlank()) {
+                    writeParagraph(content.title.plainText, headingFontSize(3), 0f, SMALL_SPACING)
+                }
+                val columns = content.columns.filterNot { column -> column.deleted }.sortedBy { column -> column.orderKey }
+                writeParagraph(columns.joinToString(" | ") { column -> column.name.plainText }, CODE_FONT_SIZE, 0f, SMALL_SPACING)
+                content.rows.filterNot { row -> row.deleted }.sortedBy { row -> row.orderKey }.forEach { row ->
+                    val line = columns.joinToString(" | ") { column ->
+                        when (val cell = row.cells[column.columnId]) {
+                            is com.oruke.tagloom.core.model.BaseTableTextCell -> cell.richText.plainText
+                            is com.oruke.tagloom.core.model.BaseTableScalarCell -> cell.value
+                            is com.oruke.tagloom.core.model.BaseTableBooleanCell -> if (cell.value) "✓" else ""
+                            else -> ""
+                        }
+                    }
+                    writeParagraph(line, CODE_FONT_SIZE, 0f, SMALL_SPACING)
+                }
+            }
+
+            is com.oruke.tagloom.core.model.TabBlockContent -> writeParagraph(
+                content.title.plainText,
+                headingFontSize(2),
+                0f,
+                SMALL_SPACING,
+            )
+
+            com.oruke.tagloom.core.model.TabsBlockContent -> Unit
             is UnknownBlockContent -> writeParagraph(
                 labels.unknownBlockPrefix + block.type,
                 BODY_FONT_SIZE,

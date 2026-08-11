@@ -407,11 +407,11 @@ link
 
 不为 InlineRun 分配长期稳定 ID。同步和历史的最小权威单元仍是 Block；并发修改同一 Block 时，对其规范化富文本执行三方合并。
 
-## 7.3 BaseTable 正文表格 Block（规划，后续实现）
+## 7.3 BaseTable 正文表格 Block（首版已实现）
 
-BaseTable 是 Note 内的叶子 Block，用于在单篇 Note 正文中维护结构化行列，属于 Block / RichText 编辑体系的一部分。它不是数据库，也不是第 14 节 Database 的 Table View 展示：行、列、单元格均不代表 Note 或 PropertyDefinition。本节全部内容为规划，后续实现；不改变“当前 v0.2 功能已实现”的事实。
+BaseTable 是 Note 内的叶子 Block，用于在单篇 Note 正文中维护结构化行列，属于 Block / RichText 编辑体系的一部分。它不是数据库，也不是第 14 节 Database 的 Table View 展示：行、列、单元格均不代表 Note 或 PropertyDefinition。首版协议、确定性规范化、校验、编辑命令、网格编辑展示、未知类型只读降级和单元格级三方合并已经实现；CSV / TSV / GFM 导入预览与跨 Note 转换仍是后续能力。
 
-规划结构沿用统一 `id / type / parentId / orderKey / content / attributes` 外壳（示例 ID 仅用于讲解，不代表生产 ID 形态）：
+协议结构沿用统一 `id / type / parentId / orderKey / content / attributes` 外壳（示例 ID 仅用于讲解，不代表生产 ID 形态）：
 
 ```json
 {
@@ -449,7 +449,7 @@ BaseTable 是 Note 内的叶子 Block，用于在单篇 Note 正文中维护结�
 - BaseTable 可位于 Note 顶层，也可作为 `tab` 的子 Block（见第 7.4 节）；行、列、单元格不是 `tab` 的子 Block。
 - 不支持单元格内嵌 Block、跨行 / 跨列合并、跨 Note 关系与自动同步。公式形式的 `=` 文本按普通文本处理，不执行求值；公式能力后续如需引入，必须单独 ADR 评估，不得以字符串求值方式进入 MVP。
 
-编辑与一致性（规划）：
+编辑与一致性（首版实现与后续边界）：
 
 - 所有编辑（增删行 / 列、改单元格、改列类型）都经 Note 应用服务，携带 `expectedRevision` 并通过 TransactionCoordinator 提交，产生新的 Note 快照事务；不存在绕过 Note 的“表格行写入”。
 - 同一 Note 内移动 BaseTable（含跨 tab 移动）保留 Block ID、RowId、ColumnId；跨 Note 首版只复制内容并重写 Block / Row / Column / 局部选项 ID，不保留任何引用关系。
@@ -457,15 +457,15 @@ BaseTable 是 Note 内的叶子 Block，用于在单篇 Note 正文中维护结�
 - “从 Database 固化为正文表格”仅是一次性、显式的静态复制：结果为当前投影的快照副本，不保留与 Database / View / 属性的任何连接，后续变化不影响该表格。
 - “从正文表格创建数据集”必须先显示预览：会为每一行创建一个新的 Note 并创建所需属性；原表格保持独立，不会与数据集自动同步。
 
-删除、合并与前向兼容（规划）：
+删除、合并与前向兼容（首版已实现）：
 
 - 删除 BaseTable 即删除外层 Block，先生成 Block tombstone；行、列采用内部 tombstone 语义，删除列时保留其单元格数据用于恢复与冲突解释，达到保留期且同步确认后才能物理清理。
-- 上线前必须实现按 RowId / ColumnId / Cell 粒度的 `BaseTableMergeStrategy` 三方合并；同一文本单元格复用 RichText 三方合并（见第 16 节），`number` / `boolean` / `date` / `datetime` 标量单元格使用确定性 LWW。
-- 未知 BaseTable schema 或未知列类型必须原样保留并以只读网格展示，旧客户端不得因无法解析而丢失内容。以上能力均为规划，不暗示现有实现已具备。
+- 已按 RowId / ColumnId / Cell 粒度实现 `BaseTableThreeWayMerge`：同一文本单元格复用 RichText 三方合并（见第 16 节），不同单元格独立组合，无法解释的同单元格重叠修改进入既有 Block 冲突证据；行列 tombstone 保留另一侧更新后的可恢复内容。
+- 未知 BaseTable schema 或未知列类型原样保留并以只读网格展示，旧客户端不得因无法解析而丢失内容。
 
-## 7.4 Tabs 容器 Block（规划，后续实现）
+## 7.4 Tabs 容器 Block（首版已实现）
 
-Tab 是 Note 内的结构化 Block，不是独立的 workspace/tab 实体。规划结构：
+Tab 是 Note 内的结构化 Block，不是独立的 workspace/tab 实体。首版已实现协议校验、规范化、会话活动页签、显式默认页签、添加、改名、移动、解包删除与级联 tombstone。结构如下：
 
 ```text
 tabs          容器 Block，直接活动子节点仅可为 tab
@@ -872,11 +872,11 @@ linkType
 
 ---
 
-# 14. 数据库、视图与查询（规划，后续实现）
+# 14. 数据库、视图与查询（首版协议与受限视图已实现）
 
-查询能力覆盖标签、属性、全文、双链、语义与混合查询；规划中查询与数据库视图的筛选、排序统一由第 14.4 节的 QuerySpec 表达。
+查询能力覆盖标签、属性、全文、双链、语义与混合查询；查询与数据库视图的筛选、排序统一由第 14.4 节的 QuerySpec 表达。
 
-> 本节描述的 Database/View 配置对象、QuerySpec 与三种受限展示视图（Table / Kanban / Gallery）属于规划中的后续切片，尚未实现；BaseTable 正文表格是 Note 内容 Block，定义见第 7.3 节，不属于本节 Database/View 体系。本节不改变“当前 v0.2 功能已实现”的事实，不得把预留协议表述为终端用户可用功能。
+> DatabaseDefinition / ViewDefinition 加密快照、原子创建、QuerySpec 类型化 AST、DatasetProjection、Table / Kanban / Gallery 受限展示、视图创建切换、按 `creationTypeId` 新建 Note 与 Note expectedRevision 单元格写回已经实现。Database 不再作为侧栏一级页面创建；用户在 Note 编辑器输入 `/database`，原位创建一个 `database` 引用 Block，并在 Block 内修改名称、来源类型和视图。当前 UI 只开放全文筛选和字段显隐；复杂谓词编辑器、多排序器、看板拖动和删除级联仍未实现。BaseTable 正文表格是 Note 内容 Block，定义见第 7.3 节，不属于本节 Database/View 体系。
 
 ## 14.1 DatasetProjection：Database Table View 的派生展示
 
@@ -895,7 +895,7 @@ Database Table View 是 `ViewDefinition.presentation.kind = table` 时对多个 
 
 ## 14.2 权威配置对象：DatabaseDefinition 与 ViewDefinition
 
-规划新增两类权威配置对象，均使用第 26 节的版本化快照头。
+已新增两类权威配置对象，均使用第 26 节的版本化快照头。
 
 `DatabaseDefinition`（数据集）只保存稳定数据集身份与来源约束，示例字段（示例 ID 仅用于讲解，不代表生产 ID 形态）：
 
@@ -931,6 +931,8 @@ Database Table View 是 `ViewDefinition.presentation.kind = table` 时对多个 
 - `query` 是 QuerySpec；`presentation` 只描述展示方式（Table / Kanban / Gallery 与列配置），不承载查询语义。
 - Database/View 不保存 Note、属性 schema、查询结果或权限；这些仍由对应权威对象与统一权限层提供。
 - “创建 Database + 首个 View”“删除默认 View 后调整 `defaultViewId`”等跨对象操作必须在一个 TransactionCoordinator 事务内确认，不能出现 Database 已确认而 View 缺失的中间状态。
+- Note 正文中的 `database` Block 只保存 `{ databaseId }` 稳定引用，不复制 Database/View 配置和投影行；Block 删除先 tombstone 引用，Database/View 对象仍按独立对象的历史与删除策略处理。
+- `/database` 创建时先原子确认 Database + 首个 View，再把发起命令的原始 Block 绑定为 `database` 引用；完成时必须按原始 Note ID 与 Block ID 定位，不能依赖用户是否仍停留在该笔记。
 - 新增对象类型之前，必须先具备 manifest / `objectType` 未知值安全拒绝与只读兼容策略；不能假定旧客户端可以解析新对象类型。
 
 ## 14.3 SavedQuery 与 QuerySpec 的复用边界
@@ -969,12 +971,12 @@ eq / ne / isEmpty / isNotEmpty
 - 用户界面只能显示当前对象类型的有效属性；`dynamic` / `snapshot` 默认值、属性继承与同级冲突必须采用与 EffectivePropertyResolver 一致的语义，不得在 UI 与领域层出现两套解释。
 - 类型或属性定义变动时，允许先把对应结构索引整体标记为落后并重建；索引只能消费已确认快照，落后期间 UI 必须提示查询结果可能不完整。
 
-## 14.5 多视图交互（规划）
+## 14.5 多视图交互（首版实现与进阶规划）
 
-UI 术语与入口边界（规划）：
+UI 术语与入口边界：
 
 - “正文表格”指 BaseTable Block（第 7.3 节），只从 Note 编辑器的“插入 Block”菜单进入；其工具栏使用行 / 列 / 单元格语义（添加行、添加列、调整等），不得出现“新建数据集 / 添加视图 / 转为看板 / 按类型建表”等数据库入口。
-- “数据集视图”指 Database View，由侧边栏或“新建数据集”流程进入；“表格视图”仅指 Database 的 Table View。Table View 工具栏显示来源类型、视图切换、筛选、排序与属性列配置。
+- “数据集视图”指正文中的 Database Block，通过 `/database` 或 Block 加号菜单原位创建；“表格视图”仅指 Database 的 Table View。Table View 工具栏显示来源类型、视图切换、筛选、排序与属性列配置，侧栏不再提供独立 Database 导航或创建入口。
 - 界面必须可读地提示边界：正文表格标注“只属于当前 Note，不会创建属性，也不会生成新的 Note”；数据集视图标注“编辑单元格会更新对应 Note 的属性”。
 - 删除正文表格中的一行只删除文档内容，不删除 Note；Database 不提供“删除行”，只能通过调整筛选、更改对象类型或删除 Note 表达。
 - 筛选只属于 Database View，不适用于 BaseTable；BaseTable 可提供表格内的局部派生排序 / 过滤（只影响当前展示），不复用 QuerySpec，也不持久化结果。
@@ -1547,9 +1549,9 @@ Direct Provider
 - 混合搜索。
 - RAG 上下文构建。
 
-## 阶段七：BaseTable、数据库视图与 Tabs（规划，后续实现）
+## 阶段七：BaseTable、数据库视图与 Tabs（首版已实现，继续迭代）
 
-BaseTable、数据库视图与 Tabs 均属于受架构前提约束的后续切片，不属于阶段一与阶段二构成的首个对外 MVP，当前均未实现；本节不改变“当前 v0.2 功能已实现”的事实。三者是相互独立的路线，可以按各自前提并行推进：
+BaseTable、数据库视图与 Tabs 的首版协议、编辑状态、持久化和受限 UI 已按相互独立的路线实现；它们仍不改变阶段一与阶段二构成的 v0.2 首个对外 MVP 边界。以下清单同时记录已完成内核与仍需继续补齐的产品能力：
 
 BaseTable 独立路线（不依赖 Database）：
 
@@ -1560,6 +1562,8 @@ BaseTable 独立路线（不依赖 Database）：
 4. BaseTable 应用服务：编辑命令、expectedRevision 与 TransactionCoordinator 提交。
 5. 最小网格 UI：插入菜单、行 / 列 / 单元格编辑、CSV / TSV / GFM 有损导入导出预览。
 ```
+
+当前已完成 1 至 4，以及第 5 项中的插入、行列与单元格编辑、未知类型只读展示；CSV / TSV / GFM 导入导出预览后续实现。
 
 Database 路线（不依赖 BaseTable）：
 
@@ -1572,12 +1576,16 @@ Database 路线（不依赖 BaseTable）：
 6. Kanban / Gallery 受限视图。
 ```
 
+当前已完成 QuerySpec 核心、Database / View 加密快照与原子创建、Database 引用 Block、`/database` 原位创建、DatasetProjection、Table / Kanban / Gallery 受限展示、全文筛选、字段显隐、视图创建切换、按 `creationTypeId` 新建 Note 与 Note revision 写回；复杂谓词 UI、多排序器、看板拖动和删除级联后续实现。
+
 Tabs 独立路线（不依赖 Database 与 BaseTable）：
 
 ```text
 1. tabs 容器 Block 与 tab 子 Block 的结构校验、规范化与删除语义。
 2. 同 Note 内 Block 移动、默认 Tab 与最小页签编辑界面。
 ```
+
+当前两项均已完成首版实现；跨 Note 引用、拖动预览与更复杂的嵌套布局后续实现。
 
 每个阶段都必须维持“对象快照是唯一权威来源、索引可重建、写入经 TransactionCoordinator”的既有约束；BaseTable 细节见第 7.3 节，数据库视图交互见第 14 节。
 
@@ -1701,7 +1709,7 @@ Domain 层不能直接依赖 Compose、SQLite、Ktor 或具体 AI SDK。
 - 不提供自部署 Sync Server、WebDAV 自动同步和跨设备自动合并；只要求模型为后续同步保留稳定 ID、revision 和 Change Log。
 - 不提供远程 AI Gateway、自动 RAG、向量搜索和模型供应商账户托管。
 - 不提供写入型 MCP、批量 Agent 自动修改和无人确认的后台整理。
-- 不实现公式属性、Rollup、复杂数据库视图（不限嵌套筛选、自由布局、自动化等）、插件市场和完整自动化平台；Database 公式 / Rollup、BaseTable 单元格公式（`=` 文本不求值，见第 7.3 节）、三种受限展示视图（Table / Kanban / Gallery）、Tabs 与 BaseTable 正文表格均属于受架构前提约束的后续切片，不属于已交付 MVP。
+- 不实现公式属性、Rollup、复杂数据库视图（不限嵌套筛选、自由布局、自动化等）、插件市场和完整自动化平台；BaseTable 单元格公式中的 `=` 文本仍按普通文本处理（见第 7.3 节）。Table / Kanban / Gallery、Tabs 与 BaseTable 的首版受限切片已实现，但不属于 v0.2 首个对外 MVP 的验收承诺。
 - 不追求所有 Block、属性和加注都能与标准 Markdown 无损往返。
 - 不以文件夹作为主要组织模型，也不把每篇笔记暴露为可直接编辑的明文 Markdown 文件。
 

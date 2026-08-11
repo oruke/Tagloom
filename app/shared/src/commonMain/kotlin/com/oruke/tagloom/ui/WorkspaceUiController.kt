@@ -14,8 +14,8 @@ import com.oruke.tagloom.editor.applyFreePropertyOption
 import com.oruke.tagloom.editor.bindPropertyToTag
 import com.oruke.tagloom.editor.materializeSelectedSnapshotDefaults
 import com.oruke.tagloom.editor.planFreePropertyOption
-import com.oruke.tagloom.editor.setPropertyAttached
 import com.oruke.tagloom.editor.setAppliedObjectType
+import com.oruke.tagloom.editor.setPropertyAttached
 import com.oruke.tagloom.editor.upsertPropertyDefinition
 import com.oruke.tagloom.editor.upsertTagDefinition
 import com.oruke.tagloom.editor.validateTagDefinition
@@ -98,6 +98,9 @@ internal class WorkspaceUiController(
     /** 当前工作区已确认保存查询。 */
     var savedQueries: List<WorkspaceSavedQuery> by mutableStateOf(emptyList())
         private set
+
+    /** Database/View 目录、投影和单元格写入控制器。 */
+    val databaseController: WorkspaceDatabaseController = WorkspaceDatabaseController(gateway, editorState)
 
     /** 统一编排 Note 保存与自动保存版本去重。 */
     private val noteSaveDelegate = WorkspaceNoteSaveDelegate(gateway, editorState)
@@ -414,6 +417,7 @@ internal class WorkspaceUiController(
     suspend fun lock() = runOperation {
         gateway.lock()
         editorState.clearWorkspace()
+        databaseController.clear()
         noteSaveDelegate.resetAutoSaveAttempt()
         preparedRecoveryKey = null
         rotatedRecoveryKey = null
@@ -436,11 +440,13 @@ internal class WorkspaceUiController(
         recoveryMessages = result.recoveryMessages
         if (result.readOnly) {
             editorState.clearWorkspace()
+            databaseController.clear()
             savedQueries = emptyList()
             phase = WorkspaceUiPhase.READ_ONLY
             return
         }
         savedQueries = result.savedQueries
+        databaseController.load(result.databaseDefinitions, result.viewDefinitions)
         if (result.recoveryMessages.isNotEmpty()) {
             statusMessage = WorkspaceUiMessage.IntegrityNotice
         }
@@ -449,6 +455,7 @@ internal class WorkspaceUiController(
                 EditorDocument(
                     id = note.id,
                     note = note.note,
+                    revision = note.revision,
                     createdAt = note.createdAt,
                     updatedAt = note.updatedAt,
                     persisted = true,

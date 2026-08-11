@@ -1,7 +1,7 @@
 package com.oruke.tagloom.core.model
 
-import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 /**
  * 表示工作区内稳定且不透明的业务对象标识。
@@ -30,6 +30,66 @@ value class BlockId(
 ) {
     init {
         requireValidOpaqueIdentifier(value, "Block ID")
+    }
+}
+
+/**
+ * 表示 BaseTable 内稳定且不透明的行标识。
+ *
+ * RowId 只在所属 BaseTable 内容中有意义，不代表 Note，也不得由行号或单元格内容派生。
+ */
+@Serializable
+@JvmInline
+value class BaseTableRowId(
+    /** 行的稳定标识文本。 */
+    val value: String,
+) {
+    init {
+        requireValidOpaqueIdentifier(value, "BaseTable Row ID")
+    }
+}
+
+/**
+ * 表示 BaseTable 内稳定且不透明的列标识。
+ *
+ * ColumnId 属于正文表格的局部 schema，不能作为工作区属性 ID 使用。
+ */
+@Serializable
+@JvmInline
+value class BaseTableColumnId(
+    /** 列的稳定标识文本。 */
+    val value: String,
+) {
+    init {
+        requireValidOpaqueIdentifier(value, "BaseTable Column ID")
+    }
+}
+
+/**
+ * 表示工作区 DatabaseDefinition 的稳定业务标识。
+ */
+@Serializable
+@JvmInline
+value class DatabaseId(
+    /** 数据集的稳定标识文本。 */
+    val value: String,
+) {
+    init {
+        requireValidOpaqueIdentifier(value, "Database ID")
+    }
+}
+
+/**
+ * 表示工作区 ViewDefinition 的稳定业务标识。
+ */
+@Serializable
+@JvmInline
+value class ViewId(
+    /** 视图的稳定标识文本。 */
+    val value: String,
+) {
+    init {
+        requireValidOpaqueIdentifier(value, "View ID")
     }
 }
 

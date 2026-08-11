@@ -1,10 +1,13 @@
 package com.oruke.tagloom.platform
 
+import com.oruke.tagloom.core.model.DatabaseDefinition
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.ObjectId
+import com.oruke.tagloom.core.model.ObjectRevision
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.SavedQuery
 import com.oruke.tagloom.core.model.TagDefinition
+import com.oruke.tagloom.core.model.ViewDefinition
 import com.oruke.tagloom.core.transaction.TransactionRecoveryAction
 import com.oruke.tagloom.core.workspace.ManifestObjectKind
 
@@ -16,6 +19,8 @@ data class WorkspaceNote(
     val id: ObjectId,
     /** 当前已确认 Note payload。 */
     val note: Note,
+    /** 当前权威 revision，用于乐观并发校验。 */
+    val revision: ObjectRevision? = null,
     /** 权威 Note 快照的创建时间。 */
     val createdAt: String = "",
     /** 权威 Note 快照的最近更新时间。 */
@@ -78,6 +83,10 @@ data class WorkspaceOpenResult(
     val tagDefinitions: List<WorkspaceTagDefinition> = emptyList(),
     /** 当前全部未删除属性定义。 */
     val propertyDefinitions: List<WorkspacePropertyDefinition> = emptyList(),
+    /** 当前全部未删除 Database 定义。 */
+    val databaseDefinitions: List<WorkspaceDatabaseDefinition> = emptyList(),
+    /** 当前全部未删除 View 定义。 */
+    val viewDefinitions: List<WorkspaceViewDefinition> = emptyList(),
     /** 无法自动证明新旧状态完整时为真。 */
     val readOnly: Boolean,
     /** 面向恢复界面的脱敏语义说明。 */
@@ -108,6 +117,26 @@ data class WorkspaceTagDefinition(
 data class WorkspacePropertyDefinition(
     /** 属性定义完整 payload。 */
     val definition: PropertyDefinition,
+)
+
+/** 表示共享 UI 可使用的已确认 DatabaseDefinition。 */
+data class WorkspaceDatabaseDefinition(
+    /** Database 权威完整定义。 */
+    val definition: DatabaseDefinition,
+)
+
+/** 表示共享 UI 可使用的已确认 ViewDefinition。 */
+data class WorkspaceViewDefinition(
+    /** View 权威完整定义。 */
+    val definition: ViewDefinition,
+)
+
+/** 表示 Database 与首个 View 的原子创建结果。 */
+data class WorkspaceDatabaseCatalog(
+    /** 新确认 Database。 */
+    val database: WorkspaceDatabaseDefinition,
+    /** 新确认首个 View。 */
+    val initialView: WorkspaceViewDefinition,
 )
 
 /**
@@ -291,11 +320,13 @@ interface WorkspaceGateway {
      *
      * @param objectId 已持久化 Note ID；新草稿为空。
      * @param note 待保存完整 payload。
+     * @param expectedRevision 调用方读取时的权威 revision；创建时为空。
      * @return 新确认 Note 与最终稳定 ID。
      */
     suspend fun saveNote(
         objectId: ObjectId?,
         note: Note,
+        expectedRevision: ObjectRevision? = null,
     ): WorkspaceNote
 
     /**
@@ -336,6 +367,42 @@ interface WorkspaceGateway {
      * @return 新确认属性定义。
      */
     suspend fun savePropertyDefinition(definition: PropertyDefinition): WorkspacePropertyDefinition
+
+    /**
+     * 原子创建 Database 与首个 View。
+     *
+     * @param database Database 完整定义。
+     * @param initialView 首个 View 完整定义。
+     * @return 单一事务确认的目录对象。
+     */
+    suspend fun createDatabase(
+        database: DatabaseDefinition,
+        initialView: ViewDefinition,
+    ): WorkspaceDatabaseCatalog
+
+    /**
+     * 更新一个已确认 DatabaseDefinition。
+     *
+     * @param definition 新完整定义。
+     * @return 新确认 Database。
+     */
+    suspend fun saveDatabaseDefinition(definition: DatabaseDefinition): WorkspaceDatabaseDefinition
+
+    /**
+     * 在已确认 Database 下创建一个新 ViewDefinition。
+     *
+     * @param definition 新视图完整定义。
+     * @return 新确认 View。
+     */
+    suspend fun createViewDefinition(definition: ViewDefinition): WorkspaceViewDefinition
+
+    /**
+     * 更新一个已确认 ViewDefinition。
+     *
+     * @param definition 新完整定义。
+     * @return 新确认 View。
+     */
+    suspend fun saveViewDefinition(definition: ViewDefinition): WorkspaceViewDefinition
 
     /**
      * 运行一个已确认保存查询。

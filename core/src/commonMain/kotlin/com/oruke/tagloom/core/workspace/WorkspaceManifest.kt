@@ -33,6 +33,12 @@ enum class ManifestObjectKind {
     /** 工作区级保存查询对象快照。 */
     SAVED_QUERY,
 
+    /** 工作区 Database 权威定义快照。 */
+    DATABASE,
+
+    /** 独立于 Database 保存的 View 权威定义快照。 */
+    VIEW,
+
     /** 冲突证据或审计历史。 */
     HISTORY,
 }
