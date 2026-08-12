@@ -6,6 +6,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.platform.DocumentFileGateway
 import com.oruke.tagloom.platform.WorkspaceGateway
+import com.oruke.tagloom.ui.PreviewDatabaseController
 import com.oruke.tagloom.ui.TagloomTheme
 import com.oruke.tagloom.ui.TagloomWorkspaceScreen
 import com.oruke.tagloom.ui.WorkspaceLifecycleScreen
@@ -25,7 +26,12 @@ fun App(
     TagloomTheme {
         if (workspaceGateway == null) {
             val editorState = remember { TagloomEditorState.demo() }
-            TagloomWorkspaceScreen(state = editorState, documentFileGateway = documentFileGateway)
+            val databaseController = remember(editorState) { PreviewDatabaseController(editorState) }
+            TagloomWorkspaceScreen(
+                state = editorState,
+                databaseController = databaseController,
+                documentFileGateway = documentFileGateway,
+            )
         } else {
             WorkspaceLifecycleScreen(workspaceGateway, documentFileGateway)
         }

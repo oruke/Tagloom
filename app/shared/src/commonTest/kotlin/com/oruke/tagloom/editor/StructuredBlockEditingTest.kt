@@ -10,7 +10,9 @@ import com.oruke.tagloom.core.model.NoteValidator
 import com.oruke.tagloom.core.model.TabBlockContent
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -76,6 +78,36 @@ class StructuredBlockEditingTest {
     }
 
     /**
+     * 验证正文表格行列菜单和尺寸调整都通过稳定 ID、tombstone 与规范排序落入 Note。
+     */
+    @Test
+    fun editsInlineTableStructureWithoutLosingHistory() {
+        val state = testState()
+        state.createDocument()
+        val blockId = state.selectedDocument!!.note.blocks.single().id
+        assertNotNull(state.turnBlockIntoBaseTable(blockId, rowCount = 3, columnCount = 4))
+        var table = assertIs<BaseTableBlockContent>(state.selectedDocument!!.note.blocks.single().content)
+        val sourceRow = table.rows.first { row -> !row.deleted }
+        val sourceColumn = table.columns.first { column -> !column.deleted }
+
+        assertTrue(state.updateBaseTableCellText(blockId, sourceRow.rowId, sourceColumn.columnId, "保留值"))
+        assertTrue(state.duplicateBaseTableRow(blockId, sourceRow.rowId))
+        assertTrue(state.duplicateBaseTableColumn(blockId, sourceColumn.columnId))
+        table = assertIs(state.selectedDocument!!.note.blocks.single().content)
+        assertEquals(4, table.rows.count { row -> !row.deleted })
+        assertEquals(5, table.columns.count { column -> !column.deleted })
+        assertTrue(state.baseTableResizeWouldHideData(blockId, rowCount = 1, columnCount = 1))
+
+        assertTrue(state.resizeBaseTable(blockId, rowCount = 2, columnCount = 2))
+        table = assertIs(state.selectedDocument!!.note.blocks.single().content)
+        assertEquals(2, table.rows.count { row -> !row.deleted })
+        assertEquals(2, table.columns.count { column -> !column.deleted })
+        assertTrue(table.rows.any { row -> row.deleted })
+        assertTrue(table.columns.any { column -> column.deleted })
+        assertTrue(NoteValidator.validate(state.selectedDocument!!.note).isEmpty())
+    }
+
+    /**
      * 验证活动页签只属于 UI 会话，默认页签显式持久化，删除时默认解包正文。
      */
     @Test
@@ -108,6 +140,38 @@ class StructuredBlockEditingTest {
         assertTrue(unpacked.blocks.single { block -> block.id == secondTab.id }.deleted)
         assertTrue(unpacked.blocks.any { block -> !block.deleted && block.parentId == tabs.parentId && block.id != tabs.id })
         assertTrue(NoteValidator.validate(unpacked).isEmpty())
+    }
+
+    /**
+     * 验证页签复制、左右移动和容器内正文投影保持独立 Block 身份。
+     */
+    @Test
+    fun duplicatesMovesAndProjectsTabContentInsideContainer() {
+        val state = testState()
+        state.createDocument()
+        val sourceId = state.selectedDocument!!.note.blocks.single().id
+        state.updateBlockText(sourceId, "第一页正文")
+        assertNotNull(state.turnBlockInto(sourceId, EditorBlockType.TABS))
+        var note = state.selectedDocument!!.note
+        val tabs = note.blocks.single { block -> block.type == BlockTypes.TABS }
+        val sourceTab = note.blocks
+            .filter { block -> block.type == BlockTypes.TAB && block.parentId == tabs.id }
+            .minBy { block -> block.orderKey }
+
+        val duplicateId = assertNotNull(state.duplicateTab(tabs.id, sourceTab.id))
+        note = state.selectedDocument!!.note
+        val duplicateBody = state.visibleBlocksInTab(tabs.id, note).single()
+        assertNotEquals(sourceId, duplicateBody.id)
+        assertEquals("第一页正文", duplicateBody.editableRichText()?.plainText)
+        assertEquals(duplicateId, state.activeTabId(tabs.id))
+        assertFalse(state.visibleRootEditorBlocks(note).any { block -> block.id == duplicateBody.id })
+
+        state.moveTab(tabs.id, duplicateId, BlockMoveDirection.DOWN)
+        val orderedTabs = state.selectedDocument!!.note.blocks
+            .filter { block -> !block.deleted && block.parentId == tabs.id && block.type == BlockTypes.TAB }
+            .sortedBy { block -> block.orderKey }
+        assertEquals(duplicateId, orderedTabs.last().id)
+        assertTrue(NoteValidator.validate(state.selectedDocument!!.note).isEmpty())
     }
 
     /**

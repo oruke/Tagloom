@@ -7,6 +7,7 @@ import com.oruke.tagloom.core.model.BaseTableColumnTypes
 import com.oruke.tagloom.core.model.BaseTableEditor
 import com.oruke.tagloom.core.model.BaseTableRowId
 import com.oruke.tagloom.core.model.BaseTableScalarCell
+import com.oruke.tagloom.core.model.BaseTableStructureEditor
 import com.oruke.tagloom.core.model.BaseTableTextCell
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.RichText
@@ -37,6 +38,53 @@ fun TagloomEditorState.addBaseTableRow(blockId: BlockId): Boolean = editBaseTabl
 }
 
 /**
+ * 在锚点前后插入正文表格空行。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param rowId 锚点稳定行 ID。
+ * @param after 是否插入到锚点之后。
+ * @return 编辑是否成功。
+ */
+fun TagloomEditorState.insertBaseTableRow(
+    blockId: BlockId,
+    rowId: BaseTableRowId,
+    after: Boolean,
+): Boolean = editBaseTable(blockId) { content ->
+    BaseTableStructureEditor.insertRow(
+        content = content,
+        anchorRowId = rowId,
+        rowId = BaseTableRowId(createEditorId("table-row")),
+        after = after,
+    )
+}
+
+/**
+ * 复制一行及其单元格并插入到原行之后。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param rowId 来源稳定行 ID。
+ * @return 编辑是否成功。
+ */
+fun TagloomEditorState.duplicateBaseTableRow(
+    blockId: BlockId,
+    rowId: BaseTableRowId,
+): Boolean = editBaseTable(blockId) { content ->
+    BaseTableStructureEditor.duplicateRow(content, rowId, BaseTableRowId(createEditorId("table-row")))
+}
+
+/**
+ * 清空一行但保留行身份与位置。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param rowId 目标稳定行 ID。
+ * @return 编辑是否成功。
+ */
+fun TagloomEditorState.clearBaseTableRow(
+    blockId: BlockId,
+    rowId: BaseTableRowId,
+): Boolean = editBaseTable(blockId) { content -> BaseTableStructureEditor.clearRow(content, rowId) }
+
+/**
  * 将正文表格行标记为内部 tombstone。
  *
  * @param blockId BaseTable Block ID。
@@ -61,6 +109,104 @@ fun TagloomEditorState.addBaseTableColumn(blockId: BlockId): Boolean = editBaseT
         columnId = BaseTableColumnId(createEditorId("table-column")),
         name = RichTextDocumentReducer.fromPlainText("列 $ordinal"),
     )
+}
+
+/**
+ * 在锚点前后插入正文表格文本列。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param columnId 锚点稳定列 ID。
+ * @param after 是否插入到锚点之后。
+ * @return 编辑是否成功。
+ */
+fun TagloomEditorState.insertBaseTableColumn(
+    blockId: BlockId,
+    columnId: BaseTableColumnId,
+    after: Boolean,
+): Boolean = editBaseTable(blockId) { content ->
+    val ordinal = content.columns.count { column -> !column.deleted } + 1
+    BaseTableStructureEditor.insertColumn(
+        content = content,
+        anchorColumnId = columnId,
+        columnId = BaseTableColumnId(createEditorId("table-column")),
+        name = RichTextDocumentReducer.fromPlainText("列 $ordinal"),
+        after = after,
+    )
+}
+
+/**
+ * 复制一列定义及全部对应单元格并插入到原列之后。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param columnId 来源稳定列 ID。
+ * @return 编辑是否成功。
+ */
+fun TagloomEditorState.duplicateBaseTableColumn(
+    blockId: BlockId,
+    columnId: BaseTableColumnId,
+): Boolean = editBaseTable(blockId) { content ->
+    val source = content.columns.single { column -> column.columnId == columnId && !column.deleted }
+    BaseTableStructureEditor.duplicateColumn(
+        content = content,
+        sourceColumnId = columnId,
+        columnId = BaseTableColumnId(createEditorId("table-column")),
+        name = RichTextDocumentReducer.fromPlainText("${source.name.plainText} 副本"),
+    )
+}
+
+/**
+ * 清空一列在全部活动行中的值，但保留列定义。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param columnId 目标稳定列 ID。
+ * @return 编辑是否成功。
+ */
+fun TagloomEditorState.clearBaseTableColumn(
+    blockId: BlockId,
+    columnId: BaseTableColumnId,
+): Boolean = editBaseTable(blockId) { content -> BaseTableStructureEditor.clearColumn(content, columnId) }
+
+/**
+ * 一次性调整正文表格活动行列数量。
+ *
+ * 缩小只把末尾结构标记为 tombstone，历史内容仍由 Note 快照保留。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param rowCount 目标活动行数。
+ * @param columnCount 目标活动列数。
+ * @return 编辑是否成功。
+ */
+fun TagloomEditorState.resizeBaseTable(
+    blockId: BlockId,
+    rowCount: Int,
+    columnCount: Int,
+): Boolean = editBaseTable(blockId) { content ->
+    BaseTableStructureEditor.resize(
+        content = content,
+        rowCount = rowCount,
+        columnCount = columnCount,
+        rowIdFactory = { BaseTableRowId(createEditorId("table-row")) },
+        columnIdFactory = { BaseTableColumnId(createEditorId("table-column")) },
+    )
+}
+
+/**
+ * 判断目标尺寸是否会把非空值移出活动表格。
+ *
+ * @param blockId BaseTable Block ID。
+ * @param rowCount 目标活动行数。
+ * @param columnCount 目标活动列数。
+ * @return 会隐藏非空值时为 true；目标不是正文表格时为 false。
+ */
+fun TagloomEditorState.baseTableResizeWouldHideData(
+    blockId: BlockId,
+    rowCount: Int,
+    columnCount: Int,
+): Boolean {
+    val content = selectedDocument?.note?.blocks
+        ?.singleOrNull { block -> block.id == blockId && !block.deleted }
+        ?.content as? BaseTableBlockContent ?: return false
+    return BaseTableStructureEditor.wouldDiscardVisibleData(content, rowCount, columnCount)
 }
 
 /**

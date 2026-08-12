@@ -29,6 +29,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
@@ -36,6 +37,7 @@ import com.oruke.tagloom.core.model.BlockTypes
 import com.oruke.tagloom.core.model.InlineMarkTypes
 import com.oruke.tagloom.editor.BlockMoveDirection
 import com.oruke.tagloom.editor.EditorCursorTarget
+import com.oruke.tagloom.editor.EditorBlockType
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.TextEditDelta
 import com.oruke.tagloom.editor.adjacentCursor
@@ -47,6 +49,7 @@ import com.oruke.tagloom.editor.pasteMarkdownAtBlock
 import com.oruke.tagloom.editor.splitBlock
 import com.oruke.tagloom.editor.toggleSelectionMark
 import com.oruke.tagloom.editor.turnBlockInto
+import com.oruke.tagloom.editor.turnBlockIntoBaseTable
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.editor_block_no_matching_commands
@@ -102,6 +105,7 @@ internal fun EditorRichTextField(
     var focused by remember(block.id) { mutableStateOf(false) }
     var dismissedSlashText by remember(block.id) { mutableStateOf<String?>(null) }
     var selectedCommandIndex by remember(block.id) { mutableIntStateOf(0) }
+    var tablePickerOpen by remember(block.id) { mutableStateOf(false) }
     val slashTrigger = findSlashCommandTrigger(fieldValue)
     val commands = filterEditorBlockCommands(
         query = slashTrigger?.query.orEmpty(),
@@ -216,15 +220,20 @@ internal fun EditorRichTextField(
                             true
                         }
                         event.key == Key.Enter && !event.isShiftPressed && showCommandMenu && commands.isNotEmpty() -> {
-                            applyCommand(
-                                state = state,
-                                block = block,
-                                command = commands[selectedCommandIndex],
-                                slashTrigger = slashTrigger,
-                                onCursorRequest = onCursorRequest,
-                                onCreateDatabaseBlock = onCreateDatabaseBlock,
-                            )
-                            onCommandMenuDismiss()
+                            val command = commands[selectedCommandIndex]
+                            if (command.type == EditorBlockType.BASE_TABLE) {
+                                tablePickerOpen = true
+                            } else {
+                                applyCommand(
+                                    state = state,
+                                    block = block,
+                                    command = command,
+                                    slashTrigger = slashTrigger,
+                                    onCursorRequest = onCursorRequest,
+                                    onCreateDatabaseBlock = onCreateDatabaseBlock,
+                                )
+                                onCommandMenuDismiss()
+                            }
                             true
                         }
                         event.key == Key.Enter && !event.isShiftPressed -> {
@@ -254,6 +263,7 @@ internal fun EditorRichTextField(
                             state.adjacentCursor(block.id, BlockMoveDirection.DOWN)?.let(onCursorRequest) != null
                         }
                         showCommandMenu && event.key == Key.Escape -> {
+                            tablePickerOpen = false
                             dismissedSlashText = fieldValue.text
                             onCommandMenuDismiss()
                             true
@@ -277,7 +287,7 @@ internal fun EditorRichTextField(
             },
         )
         DropdownMenu(
-            expanded = showCommandMenu,
+            expanded = showCommandMenu && !tablePickerOpen,
             properties = PopupProperties(focusable = false),
             onDismissRequest = {
                 dismissedSlashText = fieldValue.text
@@ -294,18 +304,45 @@ internal fun EditorRichTextField(
             } else {
                 commands.forEachIndexed { index, command ->
                     EditorBlockCommandItem(command, selected = index == selectedCommandIndex) {
-                        applyCommand(
-                            state = state,
-                            block = block,
-                            command = command,
-                            slashTrigger = slashTrigger,
-                            onCursorRequest = onCursorRequest,
-                            onCreateDatabaseBlock = onCreateDatabaseBlock,
-                        )
-                        onCommandMenuDismiss()
+                        if (command.type == EditorBlockType.BASE_TABLE) {
+                            tablePickerOpen = true
+                        } else {
+                            applyCommand(
+                                state = state,
+                                block = block,
+                                command = command,
+                                slashTrigger = slashTrigger,
+                                onCursorRequest = onCursorRequest,
+                                onCreateDatabaseBlock = onCreateDatabaseBlock,
+                            )
+                            onCommandMenuDismiss()
+                        }
                     }
                 }
             }
+        }
+        DropdownMenu(
+            expanded = tablePickerOpen,
+            onDismissRequest = { tablePickerOpen = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 8.dp,
+        ) {
+            BaseTableInsertPicker(
+                onCreate = { rows, columns ->
+                applyBaseTableCommand(
+                    state = state,
+                    block = block,
+                    slashTrigger = slashTrigger,
+                    rows = rows,
+                    columns = columns,
+                    onCursorRequest = onCursorRequest,
+                )
+                tablePickerOpen = false
+                onCommandMenuDismiss()
+                },
+                onCancel = { tablePickerOpen = false },
+            )
         }
     }
 }
@@ -358,6 +395,31 @@ private fun applyCommand(
         return
     }
     state.turnBlockInto(block.id, command.type)?.let(onCursorRequest)
+}
+
+/**
+ * 清除 Slash 查询文本并按用户选择的尺寸创建正文表格。
+ *
+ * @param state 编辑器状态。
+ * @param block 当前命令 Block。
+ * @param slashTrigger Slash 触发范围；由加号打开时为空。
+ * @param rows 初始活动行数。
+ * @param columns 初始活动列数。
+ * @param onCursorRequest 转换后的焦点请求。
+ */
+private fun applyBaseTableCommand(
+    state: TagloomEditorState,
+    block: Block,
+    slashTrigger: SlashCommandTrigger?,
+    rows: Int,
+    columns: Int,
+    onCursorRequest: (EditorCursorTarget) -> Unit,
+) {
+    if (slashTrigger != null) {
+        val currentText = block.editableRichText()?.plainText.orEmpty()
+        state.updateBlockText(block.id, currentText.removeRange(slashTrigger.start, slashTrigger.endExclusive))
+    }
+    state.turnBlockIntoBaseTable(block.id, rows, columns)?.let(onCursorRequest)
 }
 
 /**

@@ -53,7 +53,7 @@ import kotlin.coroutines.cancellation.CancellationException
 internal class WorkspaceDatabaseController(
     private val gateway: WorkspaceGateway,
     private val editorState: TagloomEditorState,
-) {
+) : DatabaseEditorController {
     /** 当前已认证 Database 定义。 */
     val databases = mutableStateListOf<DatabaseDefinition>()
 
@@ -64,11 +64,11 @@ internal class WorkspaceDatabaseController(
     private val creatingBlockIds = mutableStateListOf<BlockId>()
 
     /** Database 目录或单元格写入是否正在执行。 */
-    var busy: Boolean by mutableStateOf(false)
+    override var busy: Boolean by mutableStateOf(false)
         private set
 
     /** 最近一次不包含用户内容的失败状态。 */
-    var operationFailed: Boolean by mutableStateOf(false)
+    override var operationFailed: Boolean by mutableStateOf(false)
         private set
 
     /**
@@ -104,7 +104,8 @@ internal class WorkspaceDatabaseController(
      * @param databaseId 待查找的稳定 ID。
      * @return 当前目录中的定义；引用尚未加载或已经删除时为空。
      */
-    fun database(databaseId: DatabaseId): DatabaseDefinition? = databases.firstOrNull { item -> item.id == databaseId }
+    override fun database(databaseId: DatabaseId): DatabaseDefinition? =
+        databases.firstOrNull { item -> item.id == databaseId }
 
     /**
      * 返回指定 Database 下按稳定顺序排列的全部 View。
@@ -112,7 +113,7 @@ internal class WorkspaceDatabaseController(
      * @param databaseId 所属 Database ID。
      * @return 不可变的 View 列表。
      */
-    fun viewsFor(databaseId: DatabaseId): List<ViewDefinition> =
+    override fun viewsFor(databaseId: DatabaseId): List<ViewDefinition> =
         views.filter { view -> view.databaseId == databaseId }.sortedBy(ViewDefinition::orderKey)
 
     /**
@@ -121,7 +122,7 @@ internal class WorkspaceDatabaseController(
      * @param blockId Slash 命令所在 Block ID。
      * @return 正在创建时为 true。
      */
-    fun isCreatingBlock(blockId: BlockId): Boolean = blockId in creatingBlockIds
+    override fun isCreatingBlock(blockId: BlockId): Boolean = blockId in creatingBlockIds
 
     /**
      * 原子创建 Database 与首个 Table View，并把命令所在文本 Block 绑定为引用 Block。
@@ -132,7 +133,7 @@ internal class WorkspaceDatabaseController(
      * @param sourceTypeId 初始来源对象类型。
      * @return 创建并绑定成功后的 Database ID；失败或已有写入进行中时为空。
      */
-    suspend fun createDatabaseBlock(
+    override suspend fun createDatabaseBlock(
         documentId: ObjectId,
         blockId: BlockId,
         name: String,
@@ -180,7 +181,7 @@ internal class WorkspaceDatabaseController(
      * @param name 新视图用户可见名称。
      * @return 新确认的 View ID；失败时为空。
      */
-    suspend fun createView(
+    override suspend fun createView(
         databaseId: DatabaseId,
         currentViewId: ViewId,
         name: String,
@@ -203,7 +204,7 @@ internal class WorkspaceDatabaseController(
      *
      * @param databaseId 目标 Database ID。
      */
-    suspend fun createRow(databaseId: DatabaseId) = runOperation {
+    override suspend fun createRow(databaseId: DatabaseId) = runOperation {
         val database = requireNotNull(database(databaseId)) { "Database 不存在" }
         val note = Note(
             title = "",
@@ -237,7 +238,7 @@ internal class WorkspaceDatabaseController(
      * @param databaseId 目标 Database ID。
      * @param transform 纯定义转换。
      */
-    suspend fun updateDatabase(
+    override suspend fun updateDatabase(
         databaseId: DatabaseId,
         transform: (DatabaseDefinition) -> DatabaseDefinition,
     ) = runOperation {
@@ -252,7 +253,7 @@ internal class WorkspaceDatabaseController(
      * @param viewId 目标 View ID。
      * @param transform 纯视图转换。
      */
-    suspend fun updateView(
+    override suspend fun updateView(
         viewId: ViewId,
         transform: (ViewDefinition) -> ViewDefinition,
     ) = runOperation {
@@ -267,7 +268,7 @@ internal class WorkspaceDatabaseController(
      * @param viewId 目标 View ID。
      * @param text 用户查询文本；空文本恢复恒真过滤。
      */
-    suspend fun setFullTextFilter(
+    override suspend fun setFullTextFilter(
         viewId: ViewId,
         text: String,
     ) = updateView(viewId) { view ->
@@ -285,7 +286,7 @@ internal class WorkspaceDatabaseController(
      * @param viewId View ID。
      * @return 当前目录完整且归属匹配时的投影；否则为空。
      */
-    fun projection(
+    override fun projection(
         databaseId: DatabaseId,
         viewId: ViewId,
     ): DatasetProjection? {
@@ -309,7 +310,7 @@ internal class WorkspaceDatabaseController(
      * @param databaseId Database ID。
      * @return 按编辑器加载顺序排列的不可变副本。
      */
-    fun propertyDefinitions(databaseId: DatabaseId): List<PropertyDefinition> = database(databaseId)
+    override fun propertyDefinitions(databaseId: DatabaseId): List<PropertyDefinition> = database(databaseId)
         ?.let { database -> propertyDefinitionsFor(database.sourceTypeId) }
         .orEmpty()
 
@@ -318,7 +319,7 @@ internal class WorkspaceDatabaseController(
      *
      * @return 按编辑器加载顺序排列的不可变副本。
      */
-    fun tagDefinitions(): List<TagDefinition> = editorState.tagDefinitions.toList()
+    override fun tagDefinitions(): List<TagDefinition> = editorState.tagDefinitions.toList()
 
     /**
      * 通过 Note expectedRevision 写入一个 Database 投影单元格。
@@ -327,7 +328,7 @@ internal class WorkspaceDatabaseController(
      * @param field 稳定字段引用。
      * @param value 新 JSON 值；为空表示清除属性。
      */
-    suspend fun updateCell(
+    override suspend fun updateCell(
         noteId: ObjectId,
         field: FieldRef,
         value: JsonElement?,

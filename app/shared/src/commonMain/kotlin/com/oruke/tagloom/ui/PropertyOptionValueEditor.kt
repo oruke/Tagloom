@@ -193,7 +193,7 @@ private fun PropertyOptionChip(
  * @return chip 背景色与前景色。
  */
 @Composable
-private fun optionChipColors(colorToken: String?): Pair<Color, Color> = when (colorToken) {
+internal fun optionChipColors(colorToken: String?): Pair<Color, Color> = when (colorToken) {
     "priority-high" -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
     "status-active", "status-success" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
     else -> MaterialTheme.colorScheme.surfaceContainer to MaterialTheme.colorScheme.onSurfaceVariant

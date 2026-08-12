@@ -93,6 +93,56 @@ class BaseTableProtocolTest {
     }
 
     /**
+     * 验证尺寸创建、行列插入复制和缩小操作保持稳定身份与 tombstone。
+     */
+    @Test
+    fun structuralEditingPreservesDataAndDeterministicOrder() {
+        var rowIndex = 0
+        var columnIndex = 0
+        var table = BaseTableStructureEditor.create(
+            rowCount = 3,
+            columnCount = 4,
+            rowIdFactory = { BaseTableRowId("row-${rowIndex++}") },
+            columnIdFactory = { BaseTableColumnId("column-${columnIndex++}") },
+        )
+        val sourceRowId = table.rows.first().rowId
+        val sourceColumnId = table.columns.first().columnId
+        table = BaseTableEditor.setCell(table, sourceRowId, sourceColumnId, BaseTableTextCell(richText("设计完成")))
+
+        table = BaseTableStructureEditor.duplicateRow(table, sourceRowId, BaseTableRowId("row-copy"))
+        table = BaseTableStructureEditor.duplicateColumn(
+            table,
+            sourceColumnId,
+            BaseTableColumnId("column-copy"),
+            richText("名称副本"),
+        )
+
+        assertEquals(4, table.rows.count { row -> !row.deleted })
+        assertEquals(5, table.columns.count { column -> !column.deleted })
+        assertEquals(
+            "设计完成",
+            assertIs<BaseTableTextCell>(
+                table.rows.single { row -> row.rowId == BaseTableRowId("row-copy") }.cells.getValue(sourceColumnId),
+            ).richText.plainText,
+        )
+        assertTrue(BaseTableStructureEditor.wouldDiscardVisibleData(table, rowCount = 1, columnCount = 1))
+
+        val resized = BaseTableStructureEditor.resize(
+            table,
+            rowCount = 1,
+            columnCount = 2,
+            rowIdFactory = { BaseTableRowId("row-${rowIndex++}") },
+            columnIdFactory = { BaseTableColumnId("column-${columnIndex++}") },
+        )
+
+        assertEquals(1, resized.rows.count { row -> !row.deleted })
+        assertEquals(2, resized.columns.count { column -> !column.deleted })
+        assertTrue(resized.rows.any(BaseTableRow::deleted))
+        assertTrue(resized.columns.any(BaseTableColumn::deleted))
+        assertTrue(BaseTableValidator.validate(resized).isEmpty())
+    }
+
+    /**
      * 创建带一个非空文本单元格的默认表格。
      *
      * @param value 单元格文本。

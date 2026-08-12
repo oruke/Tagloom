@@ -60,6 +60,22 @@ fun TagloomEditorState.turnBlockInto(
 }
 
 /**
+ * 把当前 Block 转换为用户指定初始尺寸的正文表格。
+ *
+ * @param blockId 目标 Block。
+ * @param rowCount 初始活动行数。
+ * @param columnCount 初始活动列数。
+ * @return 转换后的光标目标。
+ */
+fun TagloomEditorState.turnBlockIntoBaseTable(
+    blockId: BlockId,
+    rowCount: Int,
+    columnCount: Int,
+): EditorCursorTarget? = applyDocumentEdit { blocks ->
+    BlockDocumentReducer.turnIntoBaseTable(blocks, blockId, rowCount, columnCount, ::createEditorId)
+}
+
+/**
  * 识别行首 Markdown 前缀并转换整个空白命令 Block。
  *
  * @param blockId 当前 Block。

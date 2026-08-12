@@ -351,6 +351,7 @@
     <string name="database_filter_placeholder">Filter title and content</string>
     <string name="database_filter_apply">Apply</string>
     <string name="database_fields">Fields</string>
+    <string name="database_system_title">Title</string>
     <string name="database_operation_failed">The change was not saved. Reload the latest note or view and try again.</string>
     <string name="database_unknown_view">This view type is newer than this client and is preserved read-only.</string>
     <string name="database_kanban_requires_select">Choose or create a Select property before using Board view.</string>

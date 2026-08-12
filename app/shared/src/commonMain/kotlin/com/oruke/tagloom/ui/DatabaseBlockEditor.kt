@@ -25,7 +25,7 @@ import tagloom.app.shared.generated.resources.database_missing
  */
 @Composable
 internal fun DatabaseBlockEditor(
-    controller: WorkspaceDatabaseController?,
+    controller: DatabaseEditorController?,
     content: DatabaseBlockContent,
     onOpenNote: (ObjectId) -> Unit,
 ) {

@@ -1,12 +1,13 @@
 package com.oruke.tagloom.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,10 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.DatabaseDefinition
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.Res
-import tagloom.app.shared.generated.resources.database_change_source
-import tagloom.app.shared.generated.resources.database_source_summary
 
 /**
  * 在 Database Block 内联切换来源对象类型，不再要求创建前经过独立页面或弹窗。
@@ -32,7 +29,7 @@ import tagloom.app.shared.generated.resources.database_source_summary
  */
 @Composable
 internal fun DatabaseSourceSelector(
-    controller: WorkspaceDatabaseController,
+    controller: DatabaseEditorController,
     database: DatabaseDefinition,
     sourceName: String,
     enabled: Boolean,
@@ -40,22 +37,35 @@ internal fun DatabaseSourceSelector(
     var menuOpen by remember(database.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     Box {
-        TextButton(
-            onClick = { menuOpen = true },
-            enabled = enabled,
-        ) {
-            Text(
-                stringResource(Res.string.database_source_summary, sourceName),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = "${sourceName.uppercase()}  ⌄",
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), MaterialTheme.shapes.extraSmall)
+                .clickable(enabled = enabled) { menuOpen = true }
+                .padding(horizontal = 9.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         DropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 8.dp,
         ) {
+            DropdownMenuItem(
+                text = { Text("${if (database.includeDescendants) "✓  " else ""}包含子类型") },
+                onClick = {
+                    scope.launch {
+                        controller.updateDatabase(database.id) { current ->
+                            current.copy(includeDescendants = !current.includeDescendants)
+                        }
+                    }
+                    menuOpen = false
+                },
+            )
             Text(
-                stringResource(Res.string.database_change_source),
+                "来源类型",
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

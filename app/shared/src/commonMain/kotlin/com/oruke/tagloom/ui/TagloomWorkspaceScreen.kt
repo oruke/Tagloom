@@ -78,7 +78,7 @@ import tagloom.app.shared.generated.resources.editor_export_word_name
 @Composable
 internal fun TagloomWorkspaceScreen(
     state: TagloomEditorState,
-    databaseController: WorkspaceDatabaseController? = null,
+    databaseController: DatabaseEditorController? = null,
     documentFileGateway: DocumentFileGateway? = null,
     onSaveRequest: () -> Unit = {},
     onSearchRequest: (() -> Unit)? = null,

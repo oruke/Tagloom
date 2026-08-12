@@ -1,13 +1,18 @@
 package com.oruke.tagloom.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.PropertyTypes
 import kotlinx.serialization.json.JsonArray
@@ -40,14 +46,27 @@ internal fun DatabaseSelectCell(
     onCommit: (JsonElement?) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
+    val selectedOption = property.options.firstOrNull { option -> option.id == (value as? JsonPrimitive)?.contentOrNull }
+    val colors = optionChipColors(selectedOption?.colorToken)
     Box {
-        TextButton(onClick = { open = true }) {
+        Box(
+            modifier = Modifier.background(colors.first, RoundedCornerShape(4.dp)).clickable { open = true }
+                .padding(horizontal = 7.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
-                property.options.firstOrNull { option -> option.id == (value as? JsonPrimitive)?.contentOrNull }?.label
-                    ?: stringResource(Res.string.database_group_empty),
+                selectedOption?.label ?: stringResource(Res.string.database_group_empty),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.second,
             )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 8.dp,
+        ) {
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.database_group_empty)) },
                 onClick = { onCommit(null); open = false },
@@ -82,10 +101,24 @@ internal fun DatabaseMultiSelectCell(
         .orEmpty()
     val label = property.options.filter { option -> option.id in selectedIds }.joinToString(", ") { option -> option.label }
     Box {
-        TextButton(onClick = { open = true }) {
-            Text(label.ifBlank { stringResource(Res.string.database_group_empty) })
+        Box(
+            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(4.dp))
+                .clickable { open = true }.padding(horizontal = 7.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label.ifBlank { stringResource(Res.string.database_group_empty) },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 8.dp,
+        ) {
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.database_group_empty)) },
                 onClick = { onCommit(null); open = false },
@@ -133,8 +166,8 @@ internal fun DatabaseTextCell(
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         )
         if (draft != value) {
-            TextButton(
-                onClick = {
+            Box(
+                modifier = Modifier.width(24.dp).height(24.dp).clickable {
                     val next = when {
                         draft.isBlank() -> null
                         propertyType == PropertyTypes.NUMBER -> draft.toDoubleOrNull()?.let(::JsonPrimitive)
@@ -142,8 +175,9 @@ internal fun DatabaseTextCell(
                     }
                     if (draft.isBlank() || next != null) onCommit(next)
                 },
+                contentAlignment = Alignment.Center,
             ) {
-                Text("✓")
+                Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

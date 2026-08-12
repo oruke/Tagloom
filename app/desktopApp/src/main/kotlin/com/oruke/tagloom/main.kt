@@ -44,7 +44,8 @@ fun main(args: Array<String>) = application {
         state = windowState,
     ) {
         LaunchedEffect(Unit) {
-            window.minimumSize = Dimension(900, 640)
+            // 预览窗口允许收窄到手机尺寸，以便在 Windows 上验收 commonMain 的触控布局；正式桌面窗口保持可用下限。
+            window.minimumSize = if (previewEditor) Dimension(360, 480) else Dimension(900, 640)
             installTrayIcon(
                 window = window,
                 iconImage = loadTrayIconImage(),

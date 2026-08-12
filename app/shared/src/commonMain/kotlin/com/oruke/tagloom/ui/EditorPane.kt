@@ -1,6 +1,7 @@
 package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,7 @@ import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.editableRichText
 import com.oruke.tagloom.editor.visibleBlockDepth
 import com.oruke.tagloom.editor.visibleEditorBlocks
+import com.oruke.tagloom.editor.visibleRootEditorBlocks
 import com.oruke.tagloom.platform.DocumentExportFormat
 
 /**
@@ -53,7 +55,7 @@ import com.oruke.tagloom.platform.DocumentExportFormat
 internal fun EditorPane(
     state: TagloomEditorState,
     document: EditorDocument,
-    databaseController: WorkspaceDatabaseController? = null,
+    databaseController: DatabaseEditorController? = null,
     onCreateDatabaseBlock: (BlockId) -> Unit = {},
     onExport: (DocumentExportFormat) -> Unit,
     onSaveRequest: () -> Unit,
@@ -69,8 +71,9 @@ internal fun EditorPane(
     var commandMenuBlockId by remember(document.id) {
         mutableStateOf<com.oruke.tagloom.core.model.BlockId?>(null)
     }
-    val activeBlocks = state.visibleEditorBlocks(document.note)
-    val firstBlock = activeBlocks.firstOrNull { block ->
+    val allVisibleBlocks = state.visibleEditorBlocks(document.note)
+    val rootBlocks = state.visibleRootEditorBlocks(document.note)
+    val firstBlock = allVisibleBlocks.firstOrNull { block ->
         block.editableRichText() != null || block.content is CodeBlockContent
     }
 
@@ -81,7 +84,7 @@ internal fun EditorPane(
                 contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
             ) {
                 item(key = "page-header") {
-                    CenteredEditorContent {
+                    AnchoredEditorContent {
                         PageHeader(
                             state = state,
                             document = document,
@@ -99,17 +102,17 @@ internal fun EditorPane(
                     }
                 }
                 itemsIndexed(
-                    items = activeBlocks,
+                    items = rootBlocks,
                     key = { _, block -> block.id.value },
                 ) { _, block ->
-                    CenteredEditorContent {
+                    AnchoredEditorContent {
                         EditorBlockRow(
                             state = state,
                             databaseController = databaseController,
                             block = block,
                             depth = state.visibleBlockDepth(block, document.note),
                             cursorRequest = cursorRequest,
-                            commandMenuRequested = commandMenuBlockId == block.id,
+                            commandMenuBlockId = commandMenuBlockId,
                             onCursorRequest = { target -> cursorRequest = target },
                             onCursorConsumed = { cursorRequest = null },
                             onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
@@ -133,19 +136,24 @@ internal fun EditorPane(
 }
 
 /**
- * 把页面标题、正文和尾部点击区限制在舒适阅读宽度内。
+ * 把页面标题和正文左锚到编辑区，并为结构化 Block 保留足够宽度。
  *
- * @param content 居中的编辑内容。
+ * @param content 左锚的编辑内容。
  */
 @Composable
-private fun CenteredEditorContent(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxWidth()) {
+private fun AnchoredEditorContent(content: @Composable () -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val startPadding = when {
+            maxWidth < 600.dp -> 16.dp
+            maxWidth < 900.dp -> 40.dp
+            else -> EDITOR_START_PADDING
+        }
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
+                .align(Alignment.TopStart)
                 .widthIn(max = EDITOR_CONTENT_WIDTH)
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
+                .padding(start = startPadding, end = if (maxWidth < 600.dp) 16.dp else 24.dp),
         ) {
             content()
         }
@@ -153,4 +161,7 @@ private fun CenteredEditorContent(content: @Composable () -> Unit) {
 }
 
 /** 编辑正文的最大舒适宽度。 */
-private val EDITOR_CONTENT_WIDTH = 820.dp
+private val EDITOR_CONTENT_WIDTH = 1080.dp
+
+/** 页面相对内容区左边缘的固定锚点间距。 */
+private val EDITOR_START_PADDING = 104.dp

@@ -2,7 +2,6 @@ package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,15 +24,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.BaseTableBlockContent
@@ -50,21 +46,11 @@ import com.oruke.tagloom.core.model.UnknownBlockContent
 import com.oruke.tagloom.editor.BlockMoveDirection
 import com.oruke.tagloom.editor.EditorCursorTarget
 import com.oruke.tagloom.editor.TagloomEditorState
-import com.oruke.tagloom.editor.deleteBlockAndFocus
 import com.oruke.tagloom.editor.editableRichText
 import com.oruke.tagloom.editor.insertBlockAfter
 import com.oruke.tagloom.editor.numberedListOrdinal
-import com.oruke.tagloom.editor.turnBlockInto
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.Res
-import tagloom.app.shared.generated.resources.editor_block_action_convert
-import tagloom.app.shared.generated.resources.editor_block_action_delete
-import tagloom.app.shared.generated.resources.editor_block_action_indent
-import tagloom.app.shared.generated.resources.editor_block_action_move_down
-import tagloom.app.shared.generated.resources.editor_block_action_move_up
-import tagloom.app.shared.generated.resources.editor_block_action_outdent
-import tagloom.app.shared.generated.resources.editor_block_actions_description
-import tagloom.app.shared.generated.resources.editor_block_add_description
 import tagloom.app.shared.generated.resources.editor_block_placeholder_default
 import tagloom.app.shared.generated.resources.editor_block_placeholder_heading
 import tagloom.app.shared.generated.resources.editor_block_placeholder_list
@@ -82,7 +68,7 @@ import tagloom.app.shared.generated.resources.editor_block_unknown_uneditable
  * @param block 当前 Block。
  * @param depth 嵌套深度。
  * @param cursorRequest 外部焦点请求。
- * @param commandMenuRequested 是否强制打开 Slash 菜单。
+ * @param commandMenuBlockId 当前强制打开 Slash 菜单的 Block。
  * @param onCursorRequest 请求光标移动。
  * @param onCursorConsumed 已消费光标请求。
  * @param onCommandMenuRequest 请求指定 Block 打开命令菜单。
@@ -94,11 +80,11 @@ import tagloom.app.shared.generated.resources.editor_block_unknown_uneditable
 @Composable
 internal fun EditorBlockRow(
     state: TagloomEditorState,
-    databaseController: WorkspaceDatabaseController?,
+    databaseController: DatabaseEditorController?,
     block: Block,
     depth: Int,
     cursorRequest: EditorCursorTarget?,
-    commandMenuRequested: Boolean,
+    commandMenuBlockId: BlockId?,
     onCursorRequest: (EditorCursorTarget) -> Unit,
     onCursorConsumed: () -> Unit,
     onCommandMenuRequest: (BlockId) -> Unit,
@@ -112,25 +98,13 @@ internal fun EditorBlockRow(
     val active = state.selection.blockId == block.id
     var actionMenuOpen by remember(block.id) { mutableStateOf(false) }
     var typeMenuOpen by remember(block.id) { mutableStateOf(false) }
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = (depth * 22).dp, bottom = blockBottomSpacing(block))
             .hoverable(interactionSource),
-        verticalAlignment = blockVerticalAlignment(block),
     ) {
-        BlockGutter(
-            visible = hovered || active || actionMenuOpen || typeMenuOpen,
-            onAdd = {
-                state.insertBlockAfter(block.id)?.let { target ->
-                    onCursorRequest(target)
-                    onCommandMenuRequest(target.blockId)
-                }
-            },
-            onMove = { direction -> state.moveBlock(block.id, direction) },
-            onOpenActions = { actionMenuOpen = true },
-        )
-        Box(Modifier.weight(1f)) {
+        Box(Modifier.fillMaxWidth()) {
             if (databaseController?.isCreatingBlock(block.id) == true) {
                 DatabaseBlockCreatingPlaceholder()
             } else when (val content = block.content) {
@@ -141,7 +115,17 @@ internal fun EditorBlockRow(
                 )
                 TabsBlockContent -> TabsBlockEditor(
                     state = state,
+                    databaseController = databaseController,
                     block = block,
+                    cursorRequest = cursorRequest,
+                    commandMenuBlockId = commandMenuBlockId,
+                    onCursorRequest = onCursorRequest,
+                    onCursorConsumed = onCursorConsumed,
+                    onCommandMenuRequest = onCommandMenuRequest,
+                    onCommandMenuDismiss = onCommandMenuDismiss,
+                    onCreateDatabaseBlock = onCreateDatabaseBlock,
+                    onOpenNote = onOpenNote,
+                    onSaveRequest = onSaveRequest,
                 )
                 is DatabaseBlockContent -> DatabaseBlockEditor(
                     controller = databaseController,
@@ -166,7 +150,7 @@ internal fun EditorBlockRow(
                         state = state,
                         block = block,
                         cursorRequest = cursorRequest,
-                        commandMenuRequested = commandMenuRequested,
+                        commandMenuRequested = commandMenuBlockId == block.id,
                         onCursorRequest = onCursorRequest,
                         onCursorConsumed = onCursorConsumed,
                         onCommandMenuDismiss = onCommandMenuDismiss,
@@ -188,147 +172,24 @@ internal fun EditorBlockRow(
                 onCursorRequest = onCursorRequest,
             )
         }
-    }
-}
-
-/**
- * 渲染 Block 的操作菜单与类型转换菜单。
- *
- * @param state 编辑器状态。
- * @param block 当前 Block。
- * @param actionMenuOpen 操作菜单是否打开。
- * @param typeMenuOpen 类型菜单是否打开。
- * @param onActionMenuChange 操作菜单状态变更。
- * @param onTypeMenuChange 类型菜单状态变更。
- * @param onCursorRequest 转换或删除后的焦点请求。
- */
-@Composable
-private fun BlockActionMenus(
-    state: TagloomEditorState,
-    block: Block,
-    actionMenuOpen: Boolean,
-    typeMenuOpen: Boolean,
-    onActionMenuChange: (Boolean) -> Unit,
-    onTypeMenuChange: (Boolean) -> Unit,
-    onCursorRequest: (EditorCursorTarget) -> Unit,
-) {
-    DropdownMenu(expanded = actionMenuOpen, onDismissRequest = { onActionMenuChange(false) }) {
-        if (block.editableRichText() != null || block.content == DividerBlockContent) {
-            DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_convert)) }, onClick = {
-                onActionMenuChange(false)
-                onTypeMenuChange(true)
-            })
-        }
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_move_up)) }, onClick = {
-            state.moveBlock(block.id, BlockMoveDirection.UP)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_move_down)) }, onClick = {
-            state.moveBlock(block.id, BlockMoveDirection.DOWN)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_indent)) }, onClick = {
-            state.indentBlock(block.id)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_outdent)) }, onClick = {
-            state.outdentBlock(block.id)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_delete)) }, onClick = {
-            state.deleteBlockAndFocus(block.id)?.let(onCursorRequest)
-            onActionMenuChange(false)
-        })
-    }
-    DropdownMenu(expanded = typeMenuOpen, onDismissRequest = { onTypeMenuChange(false) }) {
-        EditorBlockCommands.filter(EditorBlockCommand::convertible).forEach { command ->
-            EditorBlockCommandItem(command) {
-                state.turnBlockInto(block.id, command.type)?.let(onCursorRequest)
-                onTypeMenuChange(false)
-            }
-        }
-    }
-}
-
-/**
- * 渲染 Block 左侧加号与可拖动把手。
- *
- * @param visible 当前是否悬停、聚焦或打开菜单。
- * @param onAdd 新增后续 Block。
- * @param onMove 拖动达到阈值后的移动动作。
- * @param onOpenActions 打开 Block 菜单。
- */
-@Composable
-private fun BlockGutter(
-    visible: Boolean,
-    onAdd: () -> Unit,
-    onMove: (BlockMoveDirection) -> Unit,
-    onOpenActions: () -> Unit,
-) {
-    var dragDistance by remember { mutableFloatStateOf(0f) }
-    Row(
-        modifier = Modifier.width(BLOCK_GUTTER_WIDTH),
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (visible) {
-            GutterButton("+", stringResource(Res.string.editor_block_add_description), onAdd)
-            GutterButton(
-                label = "⠿",
-                description = stringResource(Res.string.editor_block_actions_description),
-                onClick = onOpenActions,
-                modifier = Modifier.pointerInput(Unit) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = { dragDistance = 0f },
-                        onDragEnd = { dragDistance = 0f },
-                        onDragCancel = { dragDistance = 0f },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            dragDistance += dragAmount.y
-                            when {
-                                dragDistance <= -DRAG_MOVE_THRESHOLD.toPx() -> {
-                                    onMove(BlockMoveDirection.UP)
-                                    dragDistance = 0f
-                                }
-                                dragDistance >= DRAG_MOVE_THRESHOLD.toPx() -> {
-                                    onMove(BlockMoveDirection.DOWN)
-                                    dragDistance = 0f
-                                }
-                            }
-                        },
-                    )
+        Box(
+            modifier = Modifier.align(Alignment.CenterStart).offset(x = -BLOCK_GUTTER_WIDTH),
+        ) {
+            BlockGutter(
+                visible = hovered || active || actionMenuOpen || typeMenuOpen,
+                onAdd = {
+                    state.insertBlockAfter(block.id)?.let { target ->
+                        onCursorRequest(target)
+                        onCommandMenuRequest(target.blockId)
+                    }
                 },
+                onMove = { direction -> state.moveBlock(block.id, direction) },
+                onOpenActions = { actionMenuOpen = true },
             )
         }
     }
 }
 
-/**
- * 渲染 Block gutter 中一个紧凑图标按钮。
- *
- * @param label 可见符号。
- * @param description 无障碍说明。
- * @param onClick 点击动作。
- * @param modifier 外部布局修饰符。
- */
-@Composable
-private fun GutterButton(
-    label: String,
-    description: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .size(23.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(5.dp))
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
 
 /**
  * 按 Block 类型渲染 Todo、列表前缀、引用和连续 RichText 输入。
@@ -489,15 +350,11 @@ private fun blockVerticalAlignment(block: Block): Alignment.Vertical = when (blo
  * @param block 当前 Block。
  * @return 标题和代码使用更大下间距。
  */
-private fun blockBottomSpacing(block: Block) = when (block.type) {
-    BlockTypes.HEADING -> 13.dp
-    BlockTypes.CODE -> 12.dp
-    BlockTypes.DIVIDER -> 8.dp
-    else -> 5.dp
+private fun blockBottomSpacing(block: Block) = when {
+    block.content is DatabaseBlockContent || block.content is BaseTableBlockContent || block.content == TabsBlockContent -> 20.dp
+    block.type == BlockTypes.HEADING -> 14.dp
+    block.type == BlockTypes.CODE -> 16.dp
+    block.type == BlockTypes.DIVIDER -> 14.dp
+    block.type in setOf(BlockTypes.BULLETED_LIST, BlockTypes.NUMBERED_LIST, BlockTypes.TODO) -> 4.dp
+    else -> 10.dp
 }
-
-/** Block 左侧加号和拖动把手占用的固定宽度。 */
-internal val BLOCK_GUTTER_WIDTH = 52.dp
-
-/** 长按拖动把手触发一次 Block 移动的垂直距离。 */
-private val DRAG_MOVE_THRESHOLD = 34.dp

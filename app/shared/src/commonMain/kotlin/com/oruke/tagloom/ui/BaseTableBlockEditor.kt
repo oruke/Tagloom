@@ -2,25 +2,27 @@ package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.BaseTableBlockContent
@@ -45,30 +49,30 @@ import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.addBaseTableColumn
 import com.oruke.tagloom.editor.addBaseTableRow
 import com.oruke.tagloom.editor.changeBaseTableColumnType
+import com.oruke.tagloom.editor.clearBaseTableColumn
+import com.oruke.tagloom.editor.clearBaseTableRow
 import com.oruke.tagloom.editor.deleteBaseTableColumn
 import com.oruke.tagloom.editor.deleteBaseTableRow
+import com.oruke.tagloom.editor.duplicateBaseTableColumn
+import com.oruke.tagloom.editor.duplicateBaseTableRow
+import com.oruke.tagloom.editor.insertBaseTableColumn
+import com.oruke.tagloom.editor.insertBaseTableRow
 import com.oruke.tagloom.editor.renameBaseTableColumn
 import com.oruke.tagloom.editor.updateBaseTableBooleanCell
 import com.oruke.tagloom.editor.updateBaseTableCellText
-import com.oruke.tagloom.editor.updateBaseTableTitle
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.editor_base_table_add_column
 import tagloom.app.shared.generated.resources.editor_base_table_add_row
-import tagloom.app.shared.generated.resources.editor_base_table_delete_column
-import tagloom.app.shared.generated.resources.editor_base_table_kind
 import tagloom.app.shared.generated.resources.editor_base_table_read_only
-import tagloom.app.shared.generated.resources.editor_base_table_scope
-import tagloom.app.shared.generated.resources.editor_base_table_title_placeholder
 import tagloom.app.shared.generated.resources.editor_base_table_type_boolean
 import tagloom.app.shared.generated.resources.editor_base_table_type_date
 import tagloom.app.shared.generated.resources.editor_base_table_type_datetime
 import tagloom.app.shared.generated.resources.editor_base_table_type_number
 import tagloom.app.shared.generated.resources.editor_base_table_type_text
-import tagloom.app.shared.generated.resources.editor_block_command_base_table_label
 
 /**
- * 渲染保存在单个 Note Block 内的可编辑 BaseTable。
+ * 渲染 Stitch 定稿的无标题正文表格。
  *
  * @param state 编辑器状态，所有变更仍通过当前 Note 快照保存。
  * @param block BaseTable 所属 Block。
@@ -80,66 +84,45 @@ internal fun BaseTableBlockEditor(
     block: Block,
     content: BaseTableBlockContent,
 ) {
-    val activeColumns = content.columns.filterNot(BaseTableColumn::deleted)
-    val activeRows = content.rows.filterNot(BaseTableRow::deleted)
+    val activeColumns = content.columns.filterNot(BaseTableColumn::deleted).sortedBy(BaseTableColumn::orderKey)
+    val activeRows = content.rows.filterNot(BaseTableRow::deleted).sortedBy(BaseTableRow::orderKey)
     val knownSchema = content.schemaVersion == BaseTableBlockContent.CURRENT_SCHEMA_VERSION
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(Res.string.editor_base_table_kind),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            InlineTableTextField(
-                value = content.title.plainText,
-                onValueChange = { value -> state.updateBaseTableTitle(block.id, value) },
-                placeholder = stringResource(Res.string.editor_base_table_title_placeholder),
-                enabled = knownSchema,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Text(
-            stringResource(Res.string.editor_base_table_scope),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    val tableChromeWidth = ROW_GUTTER_WIDTH +
+        activeColumns.sumOf { column -> column.width ?: DEFAULT_COLUMN_WIDTH }.dp + 28.dp
+    Column(Modifier.fillMaxWidth()) {
         if (!knownSchema) {
             TableNotice(stringResource(Res.string.editor_base_table_read_only))
         }
-        val editError = state.structuredEditError
-        if (editError != null) {
-            TableNotice(editError)
-        }
+        state.structuredEditError?.let { message -> TableNotice(message) }
         Column(Modifier.horizontalScroll(rememberScrollState())) {
-            Row {
-                Box(Modifier.width(ROW_ACTION_WIDTH).padding(top = 9.dp), contentAlignment = Alignment.Center) {
-                    Text("#", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            Row(modifier = Modifier.width(tableChromeWidth), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(ROW_GUTTER_WIDTH).height(TABLE_ROW_HEIGHT))
                 activeColumns.forEach { column ->
-                    BaseTableColumnHeader(state, block, column, knownSchema)
+                    BaseTableColumnHeader(
+                        state = state,
+                        block = block,
+                        column = column,
+                        enabled = knownSchema,
+                        canDelete = activeColumns.size > 1,
+                    )
                 }
+                TableIconAction(
+                    label = "+",
+                    description = stringResource(Res.string.editor_base_table_add_column),
+                    onClick = { state.addBaseTableColumn(block.id) },
+                    enabled = knownSchema,
+                )
             }
             activeRows.forEachIndexed { index, row ->
-                Row {
-                    Box(
-                        Modifier.width(ROW_ACTION_WIDTH).heightIn(min = CELL_MIN_HEIGHT),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        TextButton(
-                            onClick = { state.deleteBaseTableRow(block.id, row.rowId) },
-                            enabled = knownSchema,
-                        ) {
-                            Text((index + 1).toString(), style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BaseTableRowMenu(
+                        state = state,
+                        block = block,
+                        row = row,
+                        ordinal = index + 1,
+                        enabled = knownSchema,
+                        canDelete = activeRows.size > 1,
+                    )
                     activeColumns.forEach { column ->
                         BaseTableCellEditor(
                             state = state,
@@ -152,27 +135,31 @@ internal fun BaseTableBlockEditor(
                     }
                 }
             }
-        }
-        if (knownSchema) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TextButton(onClick = { state.addBaseTableRow(block.id) }) {
-                    Text("+ ${stringResource(Res.string.editor_base_table_add_row)}")
-                }
-                TextButton(onClick = { state.addBaseTableColumn(block.id) }) {
-                    Text("+ ${stringResource(Res.string.editor_base_table_add_column)}")
-                }
+            Row(modifier = Modifier.width(tableChromeWidth), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(ROW_GUTTER_WIDTH))
+                Text(
+                    text = "+ ${stringResource(Res.string.editor_base_table_add_row)}",
+                    modifier = Modifier.padding(top = 7.dp, bottom = 4.dp).clickable(enabled = knownSchema) {
+                        state.addBaseTableRow(block.id)
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Box(Modifier.weight(1f))
+                BaseTableResizeMenu(state, block, activeRows.size, activeColumns.size, knownSchema)
             }
         }
     }
 }
 
 /**
- * 渲染可重命名、换类型和删除的列头。
+ * 渲染列标题、类型和结构菜单。
  *
  * @param state 编辑器状态。
  * @param block 表格 Block。
  * @param column 当前列。
  * @param enabled 当前 schema 是否可写。
+ * @param canDelete 是否仍有其他活动列。
  */
 @Composable
 private fun BaseTableColumnHeader(
@@ -180,54 +167,151 @@ private fun BaseTableColumnHeader(
     block: Block,
     column: BaseTableColumn,
     enabled: Boolean,
+    canDelete: Boolean,
 ) {
+    val interactionSource = remember(column.columnId) { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
     var menuOpen by remember(column.columnId) { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .width((column.width ?: DEFAULT_COLUMN_WIDTH).dp)
-            .heightIn(min = CELL_MIN_HEIGHT)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .height(TABLE_ROW_HEIGHT)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f))
             .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+            .hoverable(interactionSource)
             .padding(start = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         InlineTableTextField(
             value = column.name.plainText,
             onValueChange = { value -> state.renameBaseTableColumn(block.id, column.columnId, value) },
-            placeholder = stringResource(Res.string.editor_block_command_base_table_label),
+            placeholder = baseTableTypeLabel(column.type),
             enabled = enabled && column.type in BaseTableColumnTypes.EDITABLE,
             modifier = Modifier.weight(1f),
             fontWeight = FontWeight.SemiBold,
         )
         Box {
-            TextButton(onClick = { menuOpen = true }, enabled = enabled) {
-                Text("···", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (hovered || menuOpen) {
+                TableIconAction("⌄", "列菜单", { menuOpen = true }, enabled)
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                BaseTableColumnTypes.EDITABLE.forEach { type ->
-                    DropdownMenuItem(
-                        text = { Text(baseTableTypeLabel(type)) },
-                        onClick = {
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                shadowElevation = 8.dp,
+            ) {
+                Column(Modifier.widthIn(min = 154.dp)) {
+                    BaseTableColumnTypes.EDITABLE.forEach { type ->
+                        BaseTableMenuItem("${if (column.type == type) "✓  " else ""}${baseTableTypeLabel(type)}") {
                             state.changeBaseTableColumnType(block.id, column.columnId, type)
                             menuOpen = false
-                        },
-                        leadingIcon = { if (column.type == type) Text("✓") },
-                    )
-                }
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.editor_base_table_delete_column)) },
-                    onClick = {
+                        }
+                    }
+                    HorizontalDivider()
+                    BaseTableMenuItem("在左侧插入") {
+                        state.insertBaseTableColumn(block.id, column.columnId, after = false)
+                        menuOpen = false
+                    }
+                    BaseTableMenuItem("在右侧插入") {
+                        state.insertBaseTableColumn(block.id, column.columnId, after = true)
+                        menuOpen = false
+                    }
+                    BaseTableMenuItem("复制列") {
+                        state.duplicateBaseTableColumn(block.id, column.columnId)
+                        menuOpen = false
+                    }
+                    BaseTableMenuItem("清空内容") {
+                        state.clearBaseTableColumn(block.id, column.columnId)
+                        menuOpen = false
+                    }
+                    HorizontalDivider()
+                    BaseTableMenuItem(
+                        label = "删除列",
+                        color = MaterialTheme.colorScheme.error,
+                        enabled = canDelete,
+                    ) {
                         state.deleteBaseTableColumn(block.id, column.columnId)
                         menuOpen = false
-                    },
-                )
+                    }
+                }
             }
         }
     }
 }
 
 /**
- * 按列类型渲染一个单元格输入。
+ * 渲染 24dp 行号 gutter 与行结构菜单。
+ *
+ * @param state 编辑器状态。
+ * @param block 表格 Block。
+ * @param row 当前行。
+ * @param ordinal 展示序号。
+ * @param enabled 当前 schema 是否可写。
+ * @param canDelete 是否仍有其他活动行。
+ */
+@Composable
+private fun BaseTableRowMenu(
+    state: TagloomEditorState,
+    block: Block,
+    row: BaseTableRow,
+    ordinal: Int,
+    enabled: Boolean,
+    canDelete: Boolean,
+) {
+    val interactionSource = remember(row.rowId) { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    var menuOpen by remember(row.rowId) { mutableStateOf(false) }
+    Box(
+        modifier = Modifier.width(ROW_GUTTER_WIDTH).height(TABLE_ROW_HEIGHT).hoverable(interactionSource),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (hovered || menuOpen) "⋮" else ordinal.toString(),
+            modifier = Modifier.clickable(enabled = enabled) { menuOpen = true },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 8.dp,
+        ) {
+            Column(Modifier.widthIn(min = 132.dp)) {
+                BaseTableMenuItem("在上方插入") {
+                    state.insertBaseTableRow(block.id, row.rowId, after = false)
+                    menuOpen = false
+                }
+                BaseTableMenuItem("在下方插入") {
+                    state.insertBaseTableRow(block.id, row.rowId, after = true)
+                    menuOpen = false
+                }
+                BaseTableMenuItem("复制行") {
+                    state.duplicateBaseTableRow(block.id, row.rowId)
+                    menuOpen = false
+                }
+                BaseTableMenuItem("清空内容") {
+                    state.clearBaseTableRow(block.id, row.rowId)
+                    menuOpen = false
+                }
+                HorizontalDivider()
+                BaseTableMenuItem(
+                    label = "删除行",
+                    color = MaterialTheme.colorScheme.error,
+                    enabled = canDelete,
+                ) {
+                    state.deleteBaseTableRow(block.id, row.rowId)
+                    menuOpen = false
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 按列类型渲染一个 36dp 高的单元格输入。
  *
  * @param state 编辑器状态。
  * @param block 表格 Block。
@@ -248,9 +332,9 @@ private fun BaseTableCellEditor(
     Box(
         modifier = Modifier
             .width((column.width ?: DEFAULT_COLUMN_WIDTH).dp)
-            .heightIn(min = CELL_MIN_HEIGHT)
+            .height(TABLE_ROW_HEIGHT)
             .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 10.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         when {
@@ -266,10 +350,8 @@ private fun BaseTableCellEditor(
             )
             else -> InlineTableTextField(
                 value = cell.editableText(),
-                onValueChange = { value ->
-                    state.updateBaseTableCellText(block.id, row.rowId, column.columnId, value)
-                },
-                placeholder = baseTableTypeLabel(column.type),
+                onValueChange = { value -> state.updateBaseTableCellText(block.id, row.rowId, column.columnId, value) },
+                placeholder = "",
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -309,7 +391,7 @@ private fun InlineTableTextField(
         singleLine = true,
         decorationBox = { inner ->
             Box {
-                if (value.isEmpty()) {
+                if (value.isEmpty() && placeholder.isNotEmpty()) {
                     Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                 }
                 inner()
@@ -319,20 +401,71 @@ private fun InlineTableTextField(
 }
 
 /**
+ * 渲染表格紧凑图标动作。
+ *
+ * @param label 可见符号。
+ * @param description 无障碍说明文本。
+ * @param onClick 点击动作。
+ * @param enabled 是否可点击。
+ */
+@Composable
+internal fun TableIconAction(
+    label: String,
+    description: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
+    Box(
+        modifier = Modifier.width(28.dp).height(28.dp)
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * 渲染 Stitch 规定的 34dp 表格结构菜单项。
+ *
+ * @param label 动作文本。
+ * @param color 文本颜色。
+ * @param enabled 是否可执行。
+ * @param onClick 点击动作。
+ */
+@Composable
+private fun BaseTableMenuItem(
+    label: String,
+    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(34.dp).clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (enabled) color else MaterialTheme.colorScheme.outline,
+        )
+    }
+}
+
+/**
  * 渲染结构化表格的安全提示。
  *
  * @param message 不包含正文数据的提示。
  */
 @Composable
 private fun TableNotice(message: String) {
-    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(6.dp)) {
-        Text(
-            message,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-        )
-    }
+    Text(
+        message,
+        modifier = Modifier.padding(bottom = 6.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.error,
+    )
 }
 
 /**
@@ -365,8 +498,8 @@ private fun BaseTableCell?.editableText(): String = when (this) {
 /** 默认正文表格列宽。 */
 private const val DEFAULT_COLUMN_WIDTH: Int = 180
 
-/** 行号与删除入口的固定宽度。 */
-private val ROW_ACTION_WIDTH = 48.dp
+/** Stitch 规范中的行号和行菜单 gutter。 */
+private val ROW_GUTTER_WIDTH = 24.dp
 
-/** 表头与单元格最小高度。 */
-private val CELL_MIN_HEIGHT = 42.dp
+/** Stitch 规范中的表头与单元格高度。 */
+private val TABLE_ROW_HEIGHT = 36.dp

@@ -1,93 +1,199 @@
 package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.Block
+import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
+import com.oruke.tagloom.core.model.CodeBlockContent
+import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.TabBlockContent
+import com.oruke.tagloom.editor.BlockMoveDirection
+import com.oruke.tagloom.editor.EditorCursorTarget
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.activeTabId
 import com.oruke.tagloom.editor.addTab
 import com.oruke.tagloom.editor.deleteTab
+import com.oruke.tagloom.editor.duplicateTab
+import com.oruke.tagloom.editor.editableRichText
+import com.oruke.tagloom.editor.moveTab
 import com.oruke.tagloom.editor.renameTab
 import com.oruke.tagloom.editor.selectTab
-import com.oruke.tagloom.editor.setDefaultTab
-import org.jetbrains.compose.resources.stringResource
-import tagloom.app.shared.generated.resources.Res
-import tagloom.app.shared.generated.resources.editor_tabs_add
-import tagloom.app.shared.generated.resources.editor_tabs_default
-import tagloom.app.shared.generated.resources.editor_tabs_delete_cascade
-import tagloom.app.shared.generated.resources.editor_tabs_delete_unpack
-import tagloom.app.shared.generated.resources.editor_tabs_set_default
+import com.oruke.tagloom.editor.visibleBlockDepth
+import com.oruke.tagloom.editor.visibleBlocksInTab
 
 /**
- * 渲染 Tabs 容器的会话切换、标题编辑和删除策略入口。
+ * 渲染 Stitch 定稿的 Tabs 容器，并把活动页正文真正放入容器边框内。
  *
  * @param state 编辑器状态。
+ * @param databaseController Database Block 可用的目录与写入控制器。
  * @param block 当前 Tabs 容器 Block。
+ * @param cursorRequest 外部焦点请求。
+ * @param commandMenuBlockId 当前强制打开 Slash 菜单的 Block。
+ * @param onCursorRequest 请求光标移动。
+ * @param onCursorConsumed 已消费光标请求。
+ * @param onCommandMenuRequest 请求指定 Block 打开命令菜单。
+ * @param onCommandMenuDismiss 关闭命令菜单。
+ * @param onCreateDatabaseBlock 请求创建并绑定 Database。
+ * @param onOpenNote 从 Database 投影打开原始 Note。
+ * @param onSaveRequest 保存快捷键动作。
  */
 @Composable
 internal fun TabsBlockEditor(
     state: TagloomEditorState,
+    databaseController: DatabaseEditorController?,
     block: Block,
+    cursorRequest: EditorCursorTarget?,
+    commandMenuBlockId: BlockId?,
+    onCursorRequest: (EditorCursorTarget) -> Unit,
+    onCursorConsumed: () -> Unit,
+    onCommandMenuRequest: (BlockId) -> Unit,
+    onCommandMenuDismiss: () -> Unit,
+    onCreateDatabaseBlock: (BlockId) -> Unit,
+    onOpenNote: (ObjectId) -> Unit,
+    onSaveRequest: () -> Unit,
 ) {
     val note = state.selectedDocument?.note ?: return
     val tabs = note.blocks
         .filter { child -> !child.deleted && child.parentId == block.id && child.type == BlockTypes.TAB }
         .sortedWith(compareBy(Block::orderKey, { child -> child.id.value }))
     val activeTabId = state.activeTabId(block.id)
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.Bottom,
+    var renamingTabId by remember(block.id) { mutableStateOf<BlockId?>(null) }
+    var deleteRequest by remember(block.id) { mutableStateOf<BlockId?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)),
     ) {
-        tabs.forEach { tab ->
-            TabHeader(
-                state = state,
-                tabsBlock = block,
-                tab = tab,
-                selected = tab.id == activeTabId,
-                default = tab.id == note.defaultTabId,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(TAB_STRIP_HEIGHT)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEach { tab ->
+                TabHeader(
+                    state = state,
+                    tabsBlock = block,
+                    tab = tab,
+                    selected = tab.id == activeTabId,
+                    renaming = tab.id == renamingTabId,
+                    onRenameStart = { renamingTabId = tab.id },
+                    onRenameEnd = { renamingTabId = null },
+                    onDeleteRequest = {
+                        if (tabHasUserContent(tab.id, note.blocks)) {
+                            deleteRequest = tab.id
+                        } else {
+                            state.deleteTab(block.id, tab.id, cascade = true)
+                        }
+                    },
+                )
+            }
+            QuietTabAction("+") {
+                state.addTab(block.id)?.let { tabId -> renamingTabId = tabId }
+            }
+        }
+        if (renamingTabId != null) {
+            Text(
+                "Enter 确认 · Esc 取消",
+                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        TextButton(onClick = { state.addTab(block.id) }) {
-            Text("+ ${stringResource(Res.string.editor_tabs_add)}")
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        deleteRequest?.let { tabId ->
+            TabDeleteConfirmation(
+                blockCount = tabUserContentCount(tabId, note.blocks),
+                onCancel = { deleteRequest = null },
+                onDeleteContents = {
+                    state.deleteTab(block.id, tabId, cascade = true)
+                    deleteRequest = null
+                },
+                onMoveContents = {
+                    state.deleteTab(block.id, tabId, cascade = false)
+                    deleteRequest = null
+                },
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+        ) {
+            state.visibleBlocksInTab(block.id, note).forEach { child ->
+                EditorBlockRow(
+                    state = state,
+                    databaseController = databaseController,
+                    block = child,
+                    depth = state.visibleBlockDepth(child, note),
+                    cursorRequest = cursorRequest,
+                    commandMenuBlockId = commandMenuBlockId,
+                    onCursorRequest = onCursorRequest,
+                    onCursorConsumed = onCursorConsumed,
+                    onCommandMenuRequest = onCommandMenuRequest,
+                    onCommandMenuDismiss = onCommandMenuDismiss,
+                    onCreateDatabaseBlock = onCreateDatabaseBlock,
+                    onOpenNote = onOpenNote,
+                    onSaveRequest = onSaveRequest,
+                )
+            }
         }
     }
 }
 
 /**
- * 渲染一个可选择的页签标题及其策略菜单。
+ * 渲染一个页签及悬停时出现的下拉菜单入口。
  *
  * @param state 编辑器状态。
  * @param tabsBlock 所属 Tabs 容器。
- * @param tab 当前 tab Block。
+ * @param tab 当前页签。
  * @param selected 是否为会话活动页签。
- * @param default 是否为 Note 显式默认页签。
+ * @param renaming 是否正在内联重命名。
+ * @param onRenameStart 开始重命名。
+ * @param onRenameEnd 完成或取消重命名。
+ * @param onDeleteRequest 请求安全删除。
  */
 @Composable
 private fun TabHeader(
@@ -95,85 +201,270 @@ private fun TabHeader(
     tabsBlock: Block,
     tab: Block,
     selected: Boolean,
-    default: Boolean,
+    renaming: Boolean,
+    onRenameStart: () -> Unit,
+    onRenameEnd: () -> Unit,
+    onDeleteRequest: () -> Unit,
 ) {
     val content = tab.content as? TabBlockContent ?: return
+    val interactionSource = remember(tab.id) { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
     var menuOpen by remember(tab.id) { mutableStateOf(false) }
-    Column(
+    var draft by remember(tab.id, renaming) { mutableStateOf(content.title.plainText) }
+    val focusRequester = remember(tab.id) { FocusRequester() }
+    if (renaming) {
+        LaunchedEffect(tab.id) { focusRequester.requestFocus() }
+    }
+
+    Row(
         modifier = Modifier
-            .widthIn(min = 104.dp, max = 220.dp)
+            .widthIn(min = 68.dp, max = 220.dp)
+            .height(28.dp)
             .background(
-                if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-                else MaterialTheme.colorScheme.surface,
+                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.09f) else MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(4.dp),
             )
-            .clickable { state.selectTab(tabsBlock.id, tab.id) }
-            .padding(start = 12.dp, top = 8.dp, bottom = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .hoverable(interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null) {
+                state.selectTab(tabsBlock.id, tab.id)
+            }
+            .padding(start = 10.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (selected) {
-                BasicTextField(
-                    value = content.title.plainText,
-                    onValueChange = { value -> state.renameTab(tab.id, value) },
-                    modifier = Modifier.weight(1f),
-                    textStyle = MaterialTheme.typography.labelLarge.copy(
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        fontWeight = FontWeight.SemiBold,
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    singleLine = true,
-                )
-            } else {
-                Text(
-                    content.title.plainText,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                )
-            }
-            Box {
-                TextButton(onClick = { menuOpen = true }) {
-                    Text("···", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.editor_tabs_set_default)) },
-                        onClick = {
-                            state.setDefaultTab(tabsBlock.id, tab.id)
-                            menuOpen = false
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.editor_tabs_delete_unpack)) },
-                        onClick = {
-                            state.deleteTab(tabsBlock.id, tab.id, cascade = false)
-                            menuOpen = false
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.editor_tabs_delete_cascade)) },
-                        onClick = {
-                            state.deleteTab(tabsBlock.id, tab.id, cascade = true)
-                            menuOpen = false
-                        },
-                    )
-                }
-            }
-        }
-        if (default) {
+        if (renaming) {
+            BasicTextField(
+                value = draft,
+                onValueChange = { value -> draft = value },
+                modifier = Modifier
+                    .widthIn(min = 68.dp, max = 160.dp)
+                    .height(28.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp))
+                    .padding(horizontal = 8.dp)
+                    .focusRequester(focusRequester)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) {
+                            false
+                        } else when (event.key) {
+                            Key.Enter -> {
+                                state.renameTab(tab.id, draft.ifBlank { "未命名" })
+                                onRenameEnd()
+                                true
+                            }
+                            Key.Escape -> {
+                                onRenameEnd()
+                                true
+                            }
+                            else -> false
+                        }
+                    },
+                textStyle = MaterialTheme.typography.labelLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                singleLine = true,
+            )
+        } else {
             Text(
-                stringResource(Res.string.editor_tabs_default),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                text = content.title.plainText,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
             )
         }
-        Box(
-            Modifier
-                .padding(end = 12.dp)
-                .background(
-                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                )
-                .padding(vertical = 1.dp),
+        Box {
+            if (!renaming && (hovered || menuOpen)) {
+                QuietTabAction("⌄") { menuOpen = true }
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                shadowElevation = 8.dp,
+            ) {
+                Column(Modifier.widthIn(min = 154.dp)) {
+                    TabMenuItem("✎", "重命名") {
+                        onRenameStart()
+                        menuOpen = false
+                    }
+                    TabMenuItem("▣", "复制标签页") {
+                        state.duplicateTab(tabsBlock.id, tab.id)
+                        menuOpen = false
+                    }
+                    TabMenuItem("←", "向左移动") {
+                        state.moveTab(tabsBlock.id, tab.id, BlockMoveDirection.UP)
+                        menuOpen = false
+                    }
+                    TabMenuItem("→", "向右移动") {
+                        state.moveTab(tabsBlock.id, tab.id, BlockMoveDirection.DOWN)
+                        menuOpen = false
+                    }
+                    HorizontalDivider()
+                    TabMenuItem("♲", "删除标签页", color = MaterialTheme.colorScheme.error) {
+                        onDeleteRequest()
+                        menuOpen = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 渲染 34dp 高的紧凑页签菜单项。
+ *
+ * @param icon 左侧动作符号。
+ * @param label 动作名称。
+ * @param color 文本颜色。
+ * @param onClick 点击动作。
+ */
+@Composable
+private fun TabMenuItem(
+    icon: String,
+    label: String,
+    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(34.dp).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(icon, modifier = Modifier.widthIn(min = 16.dp), style = MaterialTheme.typography.bodyMedium, color = color)
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
+        }
+    }
+}
+
+/**
+ * 渲染不抢占视觉层级的页签图标动作。
+ *
+ * @param label 可见符号。
+ * @param onClick 点击动作。
+ */
+@Composable
+private fun QuietTabAction(
+    label: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .widthIn(min = 24.dp)
+            .height(24.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * 在 Tabs 内部渲染非模态删除确认条。
+ *
+ * @param blockCount 将受影响的用户内容 Block 数量。
+ * @param onCancel 取消删除。
+ * @param onDeleteContents 连同内容删除。
+ * @param onMoveContents 把内容移到容器外后删除页签。
+ */
+@Composable
+private fun TabDeleteConfirmation(
+    blockCount: Int,
+    onCancel: () -> Unit,
+    onDeleteContents: () -> Unit,
+    onMoveContents: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("⚠  当前标签页包含 $blockCount 个 Block", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+        Text("取消", modifier = Modifier.clickable(onClick = onCancel), style = MaterialTheme.typography.labelMedium)
+        TabDeleteAction("连同内容删除", destructive = true, filled = false, onClick = onDeleteContents)
+        TabDeleteAction("移出内容后删除", destructive = false, filled = true, onClick = onMoveContents)
+    }
+}
+
+/**
+ * 渲染安全删除条中的明确结果按钮。
+ *
+ * @param label 动作结果文本。
+ * @param destructive 是否会连同正文删除。
+ * @param filled 是否使用主色填充。
+ * @param onClick 点击动作。
+ */
+@Composable
+private fun TabDeleteAction(
+    label: String,
+    destructive: Boolean,
+    filled: Boolean,
+    onClick: () -> Unit,
+) {
+    val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier.height(30.dp)
+            .background(if (filled) color else MaterialTheme.colorScheme.surface, RoundedCornerShape(3.dp))
+            .border(1.dp, color, RoundedCornerShape(3.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (filled) MaterialTheme.colorScheme.onPrimary else color,
         )
     }
 }
+
+/**
+ * 判断页签是否包含需要保护的用户正文。
+ *
+ * @param tabId 页签 ID。
+ * @param blocks Note 全部 Block。
+ * @return 存在非空文本、代码或结构化 Block 时为 true。
+ */
+private fun tabHasUserContent(
+    tabId: BlockId,
+    blocks: List<Block>,
+): Boolean = tabUserContentCount(tabId, blocks) > 0
+
+/**
+ * 统计一个页签后代中需要保护的用户内容 Block。
+ *
+ * @param tabId 页签 ID。
+ * @param blocks Note 全部 Block。
+ * @return 非空文本、代码或结构化 Block 数量。
+ */
+private fun tabUserContentCount(
+    tabId: BlockId,
+    blocks: List<Block>,
+): Int {
+    val byId = blocks.associateBy(Block::id)
+    return blocks.count { block ->
+        if (block.deleted || block.type == BlockTypes.TAB || block.type == BlockTypes.TABS) {
+            false
+        } else {
+            var parentId = block.parentId
+            var inside = false
+            val visited = mutableSetOf<BlockId>()
+            while (parentId != null && visited.add(parentId)) {
+                if (parentId == tabId) {
+                    inside = true
+                    break
+                }
+                parentId = byId[parentId]?.parentId
+            }
+            inside && when (val content = block.content) {
+                is CodeBlockContent -> content.text.isNotBlank()
+                else -> block.editableRichText()?.plainText?.isNotBlank() ?: true
+            }
+        }
+    }
+}
+
+/** Tabs 顶部固定条高度。 */
+private val TAB_STRIP_HEIGHT = 36.dp

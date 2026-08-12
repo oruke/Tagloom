@@ -101,7 +101,7 @@ fun TagloomEditorState.addTab(tabsId: BlockId): BlockId? {
                     type = BlockTypes.TAB,
                     parentId = tabsId,
                     orderKey = EditorBlockFactory.orderKey(tabs.size),
-                    content = TabBlockContent(RichTextDocumentReducer.fromPlainText("页签 ${tabs.size + 1}")),
+                    content = TabBlockContent(RichTextDocumentReducer.fromPlainText("未命名")),
                 ),
                 Block(
                     id = paragraphId,
@@ -115,6 +115,80 @@ fun TagloomEditorState.addTab(tabsId: BlockId): BlockId? {
     }
     activeTabIds[tabsId] = tabId
     return tabId
+}
+
+/**
+ * 复制一个页签及其完整正文子树，并把副本插入到来源页签之后。
+ *
+ * 新页签和全部后代都生成新稳定 ID，避免两个分支共享可写 Block 身份。
+ *
+ * @param tabsId Tabs 容器 ID。
+ * @param tabId 来源页签 ID。
+ * @return 新页签 ID；来源不存在时为空。
+ */
+fun TagloomEditorState.duplicateTab(
+    tabsId: BlockId,
+    tabId: BlockId,
+): BlockId? {
+    val note = selectedDocument?.note ?: return null
+    val source = note.blocks.singleOrNull { block ->
+        block.id == tabId && !block.deleted && block.parentId == tabsId && block.type == BlockTypes.TAB
+    } ?: return null
+    val descendants = BlockTreeReducer.orderedActive(note.blocks).filter { block ->
+        block.id == tabId || hasAncestor(note.blocks, block, tabId)
+    }
+    val idMap = descendants.associate { block -> block.id to BlockId(createEditorId("block")) }
+    val duplicateTabId = idMap.getValue(tabId)
+    val clones = descendants.map { block ->
+        val clonedContent = if (block.id == source.id) {
+            val tabContent = block.content as TabBlockContent
+            tabContent.copy(title = RichTextDocumentReducer.fromPlainText("${tabContent.title.plainText} 副本"))
+        } else {
+            block.content
+        }
+        block.copy(
+            id = idMap.getValue(block.id),
+            parentId = if (block.id == source.id) tabsId else block.parentId?.let(idMap::getValue),
+            content = clonedContent,
+            deleted = false,
+        )
+    }
+    updateSelectedNote { current ->
+        val withClones = current.blocks + clones
+        val tabs = withClones
+            .filter { block -> !block.deleted && block.parentId == tabsId && block.type == BlockTypes.TAB }
+            .sortedWith(BLOCK_ORDER)
+            .toMutableList()
+        tabs.removeAll { block -> block.id == duplicateTabId }
+        val sourceIndex = tabs.indexOfFirst { block -> block.id == tabId }
+        tabs.add((sourceIndex + 1).coerceAtMost(tabs.size), clones.first())
+        val orderById = tabs.mapIndexed { index, block -> block.id to EditorBlockFactory.orderKey(index) }.toMap()
+        current.copy(
+            blocks = withClones.map { block ->
+                orderById[block.id]?.let { orderKey -> block.copy(orderKey = orderKey) } ?: block
+            },
+        )
+    }
+    activeTabIds[tabsId] = duplicateTabId
+    clearSelection()
+    return duplicateTabId
+}
+
+/**
+ * 把页签向左或向右移动一个位置，同时保持页签及正文 Block ID 不变。
+ *
+ * @param tabsId Tabs 容器 ID。
+ * @param tabId 目标页签 ID。
+ * @param direction 左移使用 UP，右移使用 DOWN。
+ */
+fun TagloomEditorState.moveTab(
+    tabsId: BlockId,
+    tabId: BlockId,
+    direction: BlockMoveDirection,
+) {
+    val note = selectedDocument?.note ?: return
+    require(tabId in activeTabs(note, tabsId)) { "待移动 tab 不属于当前 Tabs" }
+    updateSelectedNote { current -> current.copy(blocks = BlockTreeReducer.move(current.blocks, tabId, direction)) }
 }
 
 /**
@@ -324,6 +398,31 @@ private fun isAncestor(
 ): Boolean {
     val byId = blocks.associateBy(Block::id)
     var current = byId[candidateId]?.parentId
+    val visited = mutableSetOf<BlockId>()
+    while (current != null && visited.add(current)) {
+        if (current == ancestorId) {
+            return true
+        }
+        current = byId[current]?.parentId
+    }
+    return false
+}
+
+/**
+ * 判断一个 Block 是否位于指定祖先的活动子树中。
+ *
+ * @param blocks 当前全部 Block。
+ * @param block 待判断 Block。
+ * @param ancestorId 目标祖先 ID。
+ * @return 沿父边可到达目标祖先时为 true。
+ */
+private fun hasAncestor(
+    blocks: List<Block>,
+    block: Block,
+    ancestorId: BlockId,
+): Boolean {
+    val byId = blocks.associateBy(Block::id)
+    var current = block.parentId
     val visited = mutableSetOf<BlockId>()
     while (current != null && visited.add(current)) {
         if (current == ancestorId) {

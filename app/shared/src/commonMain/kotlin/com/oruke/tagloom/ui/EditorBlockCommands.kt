@@ -158,7 +158,7 @@ internal val EditorBlockCommands: List<EditorBlockCommand> = listOf(
         Res.string.editor_block_command_database_label,
         Res.string.editor_block_command_database_description,
         Res.string.editor_block_command_database_keywords,
-        "DB",
+        "▦",
         convertible = false,
     ),
     EditorBlockCommand(

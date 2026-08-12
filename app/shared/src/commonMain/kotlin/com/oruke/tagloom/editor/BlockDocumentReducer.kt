@@ -3,6 +3,7 @@ package com.oruke.tagloom.editor
 import com.oruke.tagloom.core.model.BaseTableColumnId
 import com.oruke.tagloom.core.model.BaseTableEditor
 import com.oruke.tagloom.core.model.BaseTableRowId
+import com.oruke.tagloom.core.model.BaseTableStructureEditor
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
@@ -187,6 +188,37 @@ internal object BlockDocumentReducer {
             blocks = insertSiblingAfter(replaced, converted, continuation),
             cursor = EditorCursorTarget(continuation.id, 0),
         )
+    }
+
+    /**
+     * 把当前可编辑 Block 转换为指定初始尺寸的正文表格。
+     *
+     * @param blocks 当前全部 Block。
+     * @param blockId 目标 Block。
+     * @param rowCount 初始活动行数。
+     * @param columnCount 初始活动列数。
+     * @param idFactory 稳定 ID 生成函数。
+     * @return 转换结果；目标不存在或不可转换时为空。
+     */
+    fun turnIntoBaseTable(
+        blocks: List<Block>,
+        blockId: BlockId,
+        rowCount: Int,
+        columnCount: Int,
+        idFactory: (String) -> String,
+    ): BlockDocumentEdit? {
+        val target = blocks.singleOrNull { block -> block.id == blockId && !block.deleted } ?: return null
+        if (editableText(target) == null && target.content != DividerBlockContent) {
+            return null
+        }
+        val content = BaseTableStructureEditor.create(
+            rowCount = rowCount,
+            columnCount = columnCount,
+            rowIdFactory = { BaseTableRowId(idFactory("table-row")) },
+            columnIdFactory = { BaseTableColumnId(idFactory("table-column")) },
+        )
+        val converted = target.copy(type = BlockTypes.BASE_TABLE, content = content)
+        return BlockDocumentEdit(replace(blocks, converted), EditorCursorTarget(converted.id, 0))
     }
 
     /**
