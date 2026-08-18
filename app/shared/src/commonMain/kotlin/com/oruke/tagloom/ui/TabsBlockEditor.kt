@@ -228,8 +228,16 @@ private fun TabHeader(
                 shape = RoundedCornerShape(4.dp),
             )
             .hoverable(interactionSource)
-            .clickable(interactionSource = interactionSource, indication = null) {
-                state.selectTab(tabsBlock.id, tab.id)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = !renaming,
+            ) {
+                if (!selected) {
+                    state.selectTab(tabsBlock.id, tab.id)
+                } else {
+                    menuOpen = !menuOpen
+                }
             }
             .padding(start = 10.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -281,8 +289,7 @@ private fun TabHeader(
                 Box(
                     modifier = Modifier
                         .widthIn(min = 24.dp)
-                        .height(24.dp)
-                        .clickable { menuOpen = true },
+                        .height(24.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     TagloomChevronDown(Modifier.size(12.dp))
