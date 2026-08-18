@@ -161,7 +161,7 @@ private fun AnchoredEditorContent(content: @Composable () -> Unit) {
 }
 
 /** 编辑正文的最大舒适宽度。 */
-private val EDITOR_CONTENT_WIDTH = 1080.dp
+private val EDITOR_CONTENT_WIDTH = 860.dp
 
 /** 页面相对内容区左边缘的固定锚点间距。 */
 private val EDITOR_START_PADDING = 104.dp

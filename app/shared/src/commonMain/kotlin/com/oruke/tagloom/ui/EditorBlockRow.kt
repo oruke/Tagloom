@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.height
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +32,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import com.oruke.tagloom.core.model.BaseTableBlockContent
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
@@ -101,7 +105,11 @@ internal fun EditorBlockRow(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (depth * 22).dp, bottom = blockBottomSpacing(block))
+            .padding(
+                start = (depth * 22).dp,
+                top = blockTopSpacing(block),
+                bottom = blockBottomSpacing(block)
+            )
             .hoverable(interactionSource),
     ) {
         Box(Modifier.fillMaxWidth()) {
@@ -142,7 +150,7 @@ internal fun EditorBlockRow(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 DividerBlockContent -> HorizontalDivider(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.42f),
                 )
                 else -> if (block.editableRichText() != null) {
@@ -173,7 +181,7 @@ internal fun EditorBlockRow(
             )
         }
         Box(
-            modifier = Modifier.align(Alignment.CenterStart).offset(x = -BLOCK_GUTTER_WIDTH),
+            modifier = Modifier.align(Alignment.TopStart).offset(x = -BLOCK_GUTTER_WIDTH),
         ) {
             BlockGutter(
                 visible = hovered || active || actionMenuOpen || typeMenuOpen,
@@ -220,24 +228,112 @@ private fun TextBlockContent(
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = blockVerticalAlignment(block)) {
         when (val content = block.content) {
-            is TodoBlockContent -> Checkbox(
-                checked = content.checked,
-                onCheckedChange = { state.toggleTodo(block.id) },
-                modifier = Modifier.size(30.dp).padding(end = 6.dp),
-            )
+            is TodoBlockContent -> {
+                val interactionSource = remember { MutableInteractionSource() }
+                val isHovered by interactionSource.collectIsHoveredAsState()
+                val checked = content.checked
+                val outlineColor = MaterialTheme.colorScheme.outline
+                val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
+                val primaryColor = MaterialTheme.colorScheme.primary
+                
+                Box(
+                    modifier = Modifier
+                        .width(22.dp)
+                        .height(24.dp)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { state.toggleTodo(block.id) }
+                        )
+                        .hoverable(interactionSource),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    androidx.compose.foundation.Canvas(modifier = Modifier.padding(top = 2.5.dp).size(16.dp)) {
+                        val cornerRadius = 3.5.dp.toPx()
+                        val strokeWidth = 1.5.dp.toPx()
+                        
+                        if (checked) {
+                            drawRoundRect(
+                                color = primaryColor,
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                            )
+                            val path = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(size.width * 0.28f, size.height * 0.5f)
+                                lineTo(size.width * 0.45f, size.height * 0.68f)
+                                lineTo(size.width * 0.72f, size.height * 0.32f)
+                            }
+                            drawPath(
+                                path = path,
+                                color = androidx.compose.ui.graphics.Color.White,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = 1.8.dp.toPx(),
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                    join = androidx.compose.ui.graphics.StrokeJoin.Round
+                                )
+                            )
+                        } else {
+                            val borderColor = if (isHovered) outlineColor else outlineVariantColor
+                            drawRoundRect(
+                                color = borderColor,
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                            )
+                        }
+                    }
+                }
+            }
             else -> blockPrefix(state, block)?.let { prefix ->
-                Text(
-                    prefix,
-                    modifier = Modifier.width(30.dp),
-                    style = blockTextStyle(block),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Box(
+                    modifier = Modifier.width(22.dp).height(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        prefix,
+                        style = blockTextStyle(block),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
+        val quoteBorderColor = MaterialTheme.colorScheme.primary
+        val quoteModifier = if (block.type == BlockTypes.QUOTE) {
+            Modifier.weight(1f)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(0.dp, 4.dp, 4.dp, 0.dp)
+                )
+                .drawBehind {
+                    val borderThickness = 3.5.dp.toPx()
+                    val cornerRadius = 1.75.dp.toPx()
+                    drawRoundRect(
+                        color = quoteBorderColor,
+                        topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        size = androidx.compose.ui.geometry.Size(borderThickness, size.height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                    )
+                }
+                .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 8.dp)
+        } else {
+            Modifier.weight(1f).let {
+                if (block.type == BlockTypes.TODO && (block.content as? TodoBlockContent)?.checked == true) {
+                    it.alpha(0.6f)
+                } else {
+                    it
+                }
+            }
+        }
+        
         EditorRichTextField(
             state = state,
             block = block,
-            textStyle = blockTextStyle(block),
+            textStyle = if (block.type == BlockTypes.QUOTE) {
+                blockTextStyle(block).copy(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            } else {
+                blockTextStyle(block)
+            },
             placeholder = blockPlaceholder(block),
             cursorRequest = cursorRequest,
             commandMenuRequested = commandMenuRequested,
@@ -247,7 +343,7 @@ private fun TextBlockContent(
             databaseCreationAvailable = databaseCreationAvailable,
             onCreateDatabaseBlock = onCreateDatabaseBlock,
             onSaveRequest = onSaveRequest,
-            modifier = Modifier.weight(1f),
+            modifier = quoteModifier,
         )
     }
 }
@@ -290,11 +386,11 @@ private fun ReadOnlyBlockPlaceholder(block: Block) {
 @Composable
 private fun blockTextStyle(block: Block) = when (val content = block.content) {
     is HeadingBlockContent -> when (content.level) {
-        1 -> MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
-        2 -> MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold)
-        else -> MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+        1 -> MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)
+        2 -> MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
+        else -> MaterialTheme.typography.titleLarge.copy(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
     }
-    else -> MaterialTheme.typography.bodyLarge
+    else -> MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
 }
 
 /**
@@ -327,7 +423,6 @@ private fun blockPrefix(
 ): String? = when (block.type) {
     BlockTypes.BULLETED_LIST -> "•"
     BlockTypes.NUMBERED_LIST -> "${state.numberedListOrdinal(block.id)}."
-    BlockTypes.QUOTE -> "“"
     else -> null
 }
 
@@ -337,12 +432,7 @@ private fun blockPrefix(
  * @param block 当前 Block。
  * @return 代码块顶部对齐，其他内容居中。
  */
-private fun blockVerticalAlignment(block: Block): Alignment.Vertical = when (block.content) {
-    is CodeBlockContent,
-    is UnknownBlockContent,
-    -> Alignment.Top
-    else -> Alignment.CenterVertically
-}
+private fun blockVerticalAlignment(block: Block): Alignment.Vertical = Alignment.Top
 
 /**
  * 返回不同 Block 之间的排版节奏。
@@ -351,10 +441,29 @@ private fun blockVerticalAlignment(block: Block): Alignment.Vertical = when (blo
  * @return 标题和代码使用更大下间距。
  */
 private fun blockBottomSpacing(block: Block) = when {
-    block.content is DatabaseBlockContent || block.content is BaseTableBlockContent || block.content == TabsBlockContent -> 20.dp
-    block.type == BlockTypes.HEADING -> 14.dp
-    block.type == BlockTypes.CODE -> 16.dp
-    block.type == BlockTypes.DIVIDER -> 14.dp
-    block.type in setOf(BlockTypes.BULLETED_LIST, BlockTypes.NUMBERED_LIST, BlockTypes.TODO) -> 4.dp
-    else -> 10.dp
+    block.content is DatabaseBlockContent || block.content is BaseTableBlockContent || block.content == TabsBlockContent -> 16.dp
+    block.content is HeadingBlockContent -> when ((block.content as HeadingBlockContent).level) {
+        1 -> 6.dp
+        2 -> 4.dp
+        else -> 4.dp
+    }
+    block.type == BlockTypes.CODE -> 14.dp
+    block.type == BlockTypes.DIVIDER -> 0.dp
+    block.type == BlockTypes.QUOTE -> 8.dp
+    block.type in setOf(BlockTypes.BULLETED_LIST, BlockTypes.NUMBERED_LIST, BlockTypes.TODO) -> 3.dp
+    else -> 8.dp
+}
+
+private fun blockTopSpacing(block: Block) = when {
+    block.content is DatabaseBlockContent || block.content is BaseTableBlockContent || block.content == TabsBlockContent -> 8.dp
+    block.content is HeadingBlockContent -> when ((block.content as HeadingBlockContent).level) {
+        1 -> 20.dp
+        2 -> 16.dp
+        else -> 12.dp
+    }
+    block.type == BlockTypes.CODE -> 6.dp
+    block.type == BlockTypes.QUOTE -> 4.dp
+    block.type in setOf(BlockTypes.BULLETED_LIST, BlockTypes.NUMBERED_LIST, BlockTypes.TODO) -> 0.dp
+    block.type == BlockTypes.DIVIDER -> 0.dp
+    else -> 0.dp
 }

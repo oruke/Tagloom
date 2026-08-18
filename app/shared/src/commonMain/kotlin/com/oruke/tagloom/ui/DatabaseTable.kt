@@ -383,7 +383,7 @@ private fun DatasetProjection.columnWidthDp(column: DatasetProjectionColumn): In
 private const val DATABASE_COLUMN_WIDTH = 190
 
 /** 桌面 Table 单元格高度。 */
-private val DATABASE_CELL_HEIGHT = 40.dp
+private val DATABASE_CELL_HEIGHT = 38.dp
 
 /** Table 序号列宽度。 */
 private val DATABASE_INDEX_COLUMN_WIDTH = 44.dp

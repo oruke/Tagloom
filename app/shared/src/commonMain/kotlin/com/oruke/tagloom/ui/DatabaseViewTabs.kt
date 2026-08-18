@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -84,20 +85,22 @@ internal fun DatabaseViewTabs(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            datasetViewKindIcon(view.presentation.kind),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (selected) {
+                            Text(
+                                datasetViewKindIcon(view.presentation.kind),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                         Text(
                             view.name,
-                            modifier = Modifier.padding(start = 6.dp),
+                            modifier = if (selected) Modifier.padding(start = 6.dp) else Modifier,
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         )
                         if (selected) {
-                            Text("⌄", modifier = Modifier.padding(start = 5.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TagloomChevronDown(Modifier.size(11.dp).padding(start = 4.dp))
                         }
                     }
                     Box(

@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -95,16 +98,50 @@ internal fun BaseTableBlockEditor(
         }
         state.structuredEditError?.let { message -> TableNotice(message) }
         Column(Modifier.horizontalScroll(rememberScrollState())) {
-            Row(modifier = Modifier.width(tableChromeWidth), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.width(ROW_GUTTER_WIDTH).height(TABLE_ROW_HEIGHT))
-                activeColumns.forEach { column ->
-                    BaseTableColumnHeader(
-                        state = state,
-                        block = block,
-                        column = column,
-                        enabled = knownSchema,
-                        canDelete = activeColumns.size > 1,
-                    )
+            Row(verticalAlignment = Alignment.Top) {
+                Column {
+                    Box(Modifier.width(ROW_GUTTER_WIDTH).height(TABLE_ROW_HEIGHT))
+                    activeRows.forEachIndexed { index, row ->
+                        BaseTableRowMenu(
+                            state = state,
+                            block = block,
+                            row = row,
+                            ordinal = index + 1,
+                            enabled = knownSchema,
+                            canDelete = activeRows.size > 1,
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        activeColumns.forEach { column ->
+                            BaseTableColumnHeader(
+                                state = state,
+                                block = block,
+                                column = column,
+                                enabled = knownSchema,
+                                canDelete = activeColumns.size > 1,
+                            )
+                        }
+                    }
+                    activeRows.forEach { row ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            activeColumns.forEach { column ->
+                                BaseTableCellEditor(
+                                    state = state,
+                                    block = block,
+                                    row = row,
+                                    column = column,
+                                    cell = row.cells[column.columnId],
+                                    enabled = knownSchema && column.type in BaseTableColumnTypes.EDITABLE,
+                                )
+                            }
+                        }
+                    }
                 }
                 TableIconAction(
                     label = "+",
@@ -112,28 +149,6 @@ internal fun BaseTableBlockEditor(
                     onClick = { state.addBaseTableColumn(block.id) },
                     enabled = knownSchema,
                 )
-            }
-            activeRows.forEachIndexed { index, row ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    BaseTableRowMenu(
-                        state = state,
-                        block = block,
-                        row = row,
-                        ordinal = index + 1,
-                        enabled = knownSchema,
-                        canDelete = activeRows.size > 1,
-                    )
-                    activeColumns.forEach { column ->
-                        BaseTableCellEditor(
-                            state = state,
-                            block = block,
-                            row = row,
-                            column = column,
-                            cell = row.cells[column.columnId],
-                            enabled = knownSchema && column.type in BaseTableColumnTypes.EDITABLE,
-                        )
-                    }
-                }
             }
             Row(modifier = Modifier.width(tableChromeWidth), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(ROW_GUTTER_WIDTH))
@@ -176,7 +191,7 @@ private fun BaseTableColumnHeader(
         modifier = Modifier
             .width((column.width ?: DEFAULT_COLUMN_WIDTH).dp)
             .height(TABLE_ROW_HEIGHT)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             .hoverable(interactionSource)
             .padding(start = 10.dp),
@@ -192,7 +207,14 @@ private fun BaseTableColumnHeader(
         )
         Box {
             if (hovered || menuOpen) {
-                TableIconAction("⌄", "列菜单", { menuOpen = true }, enabled)
+                Box(
+                    modifier = Modifier.width(28.dp).height(28.dp)
+                        .clickable(enabled = enabled) { menuOpen = true }
+                        .semantics { contentDescription = "列菜单" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TagloomChevronDown(Modifier.size(12.dp))
+                }
             }
             DropdownMenu(
                 expanded = menuOpen,
@@ -502,4 +524,4 @@ private const val DEFAULT_COLUMN_WIDTH: Int = 180
 private val ROW_GUTTER_WIDTH = 24.dp
 
 /** Stitch 规范中的表头与单元格高度。 */
-private val TABLE_ROW_HEIGHT = 36.dp
+private val TABLE_ROW_HEIGHT = 34.dp

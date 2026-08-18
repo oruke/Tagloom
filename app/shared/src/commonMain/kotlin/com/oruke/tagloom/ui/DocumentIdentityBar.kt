@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -203,7 +204,7 @@ private fun ObjectTypeSelector(
             ) {
                 Text("◇", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 Text(label, style = MaterialTheme.typography.labelMedium)
-                Text("⌄", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TagloomChevronDown(Modifier.size(10.dp))
             }
         }
         DropdownMenu(

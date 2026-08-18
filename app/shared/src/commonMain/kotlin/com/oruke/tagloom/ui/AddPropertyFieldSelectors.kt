@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -170,7 +171,7 @@ private fun PopoverSelectValue(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            Text("⌄", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TagloomChevronDown(Modifier.size(12.dp))
         }
     }
 }

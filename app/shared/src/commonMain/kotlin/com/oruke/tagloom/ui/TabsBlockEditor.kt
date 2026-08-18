@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
@@ -102,7 +104,8 @@ internal fun TabsBlockEditor(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)),
+            .clip(RoundedCornerShape(6.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(6.dp)),
     ) {
         Row(
             modifier = Modifier
@@ -274,8 +277,16 @@ private fun TabHeader(
             )
         }
         Box {
-            if (!renaming && (hovered || menuOpen)) {
-                QuietTabAction("⌄") { menuOpen = true }
+            if (!renaming && (selected || menuOpen)) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 24.dp)
+                        .height(24.dp)
+                        .clickable { menuOpen = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TagloomChevronDown(Modifier.size(12.dp))
+                }
             }
             DropdownMenu(
                 expanded = menuOpen,
@@ -467,4 +478,4 @@ private fun tabUserContentCount(
 }
 
 /** Tabs 顶部固定条高度。 */
-private val TAB_STRIP_HEIGHT = 36.dp
+private val TAB_STRIP_HEIGHT = 32.dp

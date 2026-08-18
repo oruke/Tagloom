@@ -1,6 +1,7 @@
 package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.CodeBlockContent
 import com.oruke.tagloom.editor.BlockMoveDirection
@@ -96,8 +98,9 @@ internal fun EditorCodeField(
 
     Column(
         modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.44f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -164,6 +167,8 @@ internal fun EditorCodeField(
             textStyle = MaterialTheme.typography.bodyMedium.copy(
                 color = MaterialTheme.colorScheme.onSurface,
                 fontFamily = FontFamily.Monospace,
+                fontSize = 13.5.sp,
+                lineHeight = 21.sp,
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             decorationBox = { innerTextField ->
@@ -171,7 +176,7 @@ internal fun EditorCodeField(
                     if (fieldValue.text.isEmpty() && !focused) {
                         Text(
                             stringResource(Res.string.editor_code_placeholder),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace, fontSize = 13.5.sp, lineHeight = 21.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

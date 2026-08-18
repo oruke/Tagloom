@@ -31,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
@@ -83,11 +84,13 @@ internal fun DatabaseViewPane(
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val compact = maxWidth < DATASET_COMPACT_BREAKPOINT
         Column(
-            Modifier.fillMaxWidth().border(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant,
-                RoundedCornerShape(4.dp),
-            ),
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(6.dp))
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                    RoundedCornerShape(6.dp),
+                ),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().heightIn(min = if (compact) 52.dp else 46.dp)

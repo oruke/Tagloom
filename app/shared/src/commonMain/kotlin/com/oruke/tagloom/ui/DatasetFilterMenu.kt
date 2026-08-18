@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -247,7 +248,7 @@ private fun <T> DatasetChoiceButton(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            Text("⌄", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TagloomChevronDown(Modifier.size(12.dp))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             choices.forEach { (value, choiceLabel) ->

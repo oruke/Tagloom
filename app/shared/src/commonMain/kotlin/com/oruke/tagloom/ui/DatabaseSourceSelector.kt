@@ -1,9 +1,11 @@
 package com.oruke.tagloom.ui
+import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.DatabaseDefinition
@@ -37,15 +40,20 @@ internal fun DatabaseSourceSelector(
     var menuOpen by remember(database.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     Box {
-        Text(
-            text = "${sourceName.uppercase()}  ⌄",
+        Row(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), MaterialTheme.shapes.extraSmall)
                 .clickable(enabled = enabled) { menuOpen = true }
                 .padding(horizontal = 9.dp, vertical = 5.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = sourceName.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TagloomChevronDown(Modifier.size(10.dp).padding(start = 4.dp))
+        }
         DropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
