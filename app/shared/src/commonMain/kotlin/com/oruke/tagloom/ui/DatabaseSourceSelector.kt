@@ -6,8 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,15 +52,16 @@ internal fun DatabaseSourceSelector(
             )
             TagloomChevronDown(Modifier.size(10.dp).padding(start = 4.dp))
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 8.dp,
         ) {
-            DropdownMenuItem(
-                text = { Text("${if (database.includeDescendants) "✓  " else ""}包含子类型") },
+            TagloomMenuItem(
+                text = "包含子类型",
+                leadingIcon = if (database.includeDescendants) {
+                    { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                } else null,
+                selected = database.includeDescendants,
                 onClick = {
                     scope.launch {
                         controller.updateDatabase(database.id) { current ->
@@ -72,24 +71,16 @@ internal fun DatabaseSourceSelector(
                     menuOpen = false
                 },
             )
-            Text(
-                "来源类型",
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            TagloomMenuDivider()
+            TagloomMenuSectionHeader(title = "来源类型")
             controller.tagDefinitions().forEach { tag ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            tag.name,
-                            color = if (tag.id == database.sourceTypeId) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
-                    },
+                val selected = tag.id == database.sourceTypeId
+                TagloomMenuItem(
+                    text = tag.name,
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    selected = selected,
                     onClick = {
                         menuOpen = false
                         scope.launch {

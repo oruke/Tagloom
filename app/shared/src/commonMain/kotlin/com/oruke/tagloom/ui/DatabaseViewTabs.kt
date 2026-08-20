@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -126,16 +123,14 @@ internal fun DatabaseViewTabs(
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            DropdownMenu(
+            TagloomDropdownMenu(
                 expanded = createMenuOpen,
                 onDismissRequest = { createMenuOpen = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp,
             ) {
                 datasetViewKinds(controller, databaseId).forEach { choice ->
-                    DropdownMenuItem(
-                        text = { Text("${datasetViewKindIcon(choice.kind)}  ${choice.label}") },
+                    TagloomMenuItem(
+                        text = choice.label,
+                        leadingIcon = { Text(datasetViewKindIcon(choice.kind), style = MaterialTheme.typography.bodyMedium) },
                         enabled = choice.enabled,
                         onClick = {
                             createMenuOpen = false
@@ -220,13 +215,10 @@ private fun DatabaseViewSettingsMenu(
             }
         }
     } else {
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = onDismiss,
             modifier = Modifier.widthIn(min = 260.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 8.dp,
         ) {
             content()
         }
@@ -252,7 +244,7 @@ private fun DatabaseViewSettingsContent(
     onSaveName: () -> Unit,
     onSelectKind: (String) -> Unit,
 ) {
-    Column(Modifier.widthIn(min = 260.dp).padding(vertical = 8.dp)) {
+    Column(Modifier.widthIn(min = 260.dp).padding(vertical = 4.dp)) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("视图名称", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -275,17 +267,17 @@ private fun DatabaseViewSettingsContent(
                 )
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Text(
-            "显示布局",
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        TagloomMenuDivider()
+        TagloomMenuSectionHeader(title = "显示布局")
         datasetViewKinds(controller, view.databaseId).forEach { choice ->
             val selected = view.presentation.kind == choice.kind
-            DropdownMenuItem(
-                text = { Text("${if (selected) "✓  " else ""}${datasetViewKindIcon(choice.kind)}  ${choice.label}") },
+            TagloomMenuItem(
+                text = choice.label,
+                leadingIcon = { Text(datasetViewKindIcon(choice.kind), style = MaterialTheme.typography.bodyMedium) },
+                trailingIcon = if (selected) {
+                    { Text("✓", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                } else null,
+                selected = selected,
                 enabled = choice.enabled,
                 onClick = { onSelectKind(choice.kind) },
             )

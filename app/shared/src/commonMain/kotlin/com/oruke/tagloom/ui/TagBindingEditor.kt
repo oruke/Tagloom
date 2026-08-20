@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -116,11 +114,15 @@ private fun DefaultPolicyEditor(
                     ),
                 )
             }
-            DropdownMenu(expanded = policyMenuOpen, onDismissRequest = { policyMenuOpen = false }) {
+            TagloomDropdownMenu(expanded = policyMenuOpen, onDismissRequest = { policyMenuOpen = false }) {
                 DefaultValuePolicy.entries.forEach { policy ->
-                    DropdownMenuItem(
-                        text = { Text(policy.localizedDisplayName()) },
-                        leadingIcon = { Text(if (policy == draft.defaultPolicy) "✓" else "") },
+                    val selected = policy == draft.defaultPolicy
+                    TagloomMenuItem(
+                        text = policy.localizedDisplayName(),
+                        leadingIcon = if (selected) {
+                            { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                        } else null,
+                        selected = selected,
                         onClick = {
                             onChange(draft.copy(defaultPolicy = policy))
                             policyMenuOpen = false
@@ -166,11 +168,15 @@ private fun DefaultValueInput(
                 OutlinedButton(onClick = { menuOpen = true }) {
                     Text(selected?.label ?: stringResource(Res.string.editor_tag_select_default_option))
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                TagloomDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     definition.options.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option.label) },
-                            leadingIcon = { Text(if (option.id == draft.defaultValueText) "✓" else "") },
+                        val selectedOption = option.id == draft.defaultValueText
+                        TagloomMenuItem(
+                            text = option.label,
+                            leadingIcon = if (selectedOption) {
+                                { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                            } else null,
+                            selected = selectedOption,
                             onClick = {
                                 onChange(draft.copy(defaultValueText = option.id))
                                 menuOpen = false

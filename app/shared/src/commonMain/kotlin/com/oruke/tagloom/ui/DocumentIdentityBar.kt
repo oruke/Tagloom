@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -207,13 +204,12 @@ private fun ObjectTypeSelector(
                 TagloomChevronDown(Modifier.size(10.dp))
             }
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = {
                 expanded = false
                 query = ""
             },
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
             PopoverSearchField(
                 value = query,
@@ -230,27 +226,20 @@ private fun ObjectTypeSelector(
                 } else {
                     definition.id == typeState.appliedTypeId
                 }
-                DropdownMenuItem(
-                    text = {
-                        Row(
-                            modifier = Modifier.width(292.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(definition.name, modifier = Modifier.weight(1f))
-                            Text(
-                                when {
-                                    definition.id == rootType.id -> {
-                                        stringResource(Res.string.editor_identity_root_type_readonly)
-                                    }
-                                    selected -> stringResource(Res.string.editor_identity_applied)
-                                    else -> ""
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                TagloomMenuItem(
+                    text = definition.name,
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else {
+                        { Text("◇", style = MaterialTheme.typography.labelMedium) }
                     },
-                    leadingIcon = { Text(if (selected) "✓" else "◇") },
+                    trailingText = when {
+                        definition.id == rootType.id -> {
+                            stringResource(Res.string.editor_identity_root_type_readonly)
+                        }
+                        selected -> stringResource(Res.string.editor_identity_applied)
+                        else -> null
+                    },
                     trailingIcon = {
                         Text(
                             if (definition.id == rootType.id) {
@@ -267,6 +256,7 @@ private fun ObjectTypeSelector(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     },
+                    selected = selected,
                     onClick = {
                         state.setAppliedObjectType(definition.id.takeUnless { id -> id == rootType.id })
                         expanded = false
@@ -274,19 +264,15 @@ private fun ObjectTypeSelector(
                     },
                 )
             }
-            HorizontalDivider()
+            TagloomMenuDivider()
             val normalized = query.trim()
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        if (normalized.isEmpty()) {
-                            stringResource(Res.string.editor_identity_create_object_type)
-                        } else {
-                            stringResource(Res.string.editor_identity_create_named_object_type, normalized)
-                        },
-                    )
+            TagloomMenuItem(
+                text = if (normalized.isEmpty()) {
+                    stringResource(Res.string.editor_identity_create_object_type)
+                } else {
+                    stringResource(Res.string.editor_identity_create_named_object_type, normalized)
                 },
-                leadingIcon = { Text("+") },
+                leadingIcon = { Text("+", style = MaterialTheme.typography.bodyMedium) },
                 onClick = {
                     expanded = false
                     query = ""
@@ -347,13 +333,12 @@ private fun OrdinaryTagSelector(
                 onClick = { expanded = true },
             )
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = {
                 expanded = false
                 query = ""
             },
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
             PopoverSearchField(
                 value = query,
@@ -367,9 +352,14 @@ private fun OrdinaryTagSelector(
             }
             candidates.forEach { option ->
                 val selected = option.id in selectedSet
-                DropdownMenuItem(
-                    text = { Text("#${option.label}") },
-                    leadingIcon = { Text(if (selected) "✓" else "#") },
+                TagloomMenuItem(
+                    text = "#${option.label}",
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else {
+                        { Text("#", style = MaterialTheme.typography.labelMedium) }
+                    },
+                    selected = selected,
                     onClick = {
                         val next = if (selected) selectedSet - option.id else selectedSet + option.id
                         state.propertyEditor.updateMultiSelect(definition.id, next.sorted())
@@ -382,10 +372,10 @@ private fun OrdinaryTagSelector(
                     option.label.equals(normalized, ignoreCase = true)
                 }
             if (canCreate) {
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.editor_identity_create_tag, normalized)) },
-                    leadingIcon = { Text("+") },
+                TagloomMenuDivider()
+                TagloomMenuItem(
+                    text = stringResource(Res.string.editor_identity_create_tag, normalized),
+                    leadingIcon = { Text("+", style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         expanded = false
                         query = ""
@@ -394,8 +384,8 @@ private fun OrdinaryTagSelector(
                 )
             }
             if (candidates.isEmpty() && !canCreate && query.isNotBlank()) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.editor_identity_no_matching_tags)) },
+                TagloomMenuItem(
+                    text = stringResource(Res.string.editor_identity_no_matching_tags),
                     enabled = false,
                     onClick = {},
                 )

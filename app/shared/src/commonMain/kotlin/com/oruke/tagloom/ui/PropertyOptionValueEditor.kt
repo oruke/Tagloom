@@ -6,9 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -89,13 +86,12 @@ internal fun MetadataSelectProperty(
                 ) { menuOpen = true }
             }
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = menuOpen,
             onDismissRequest = {
                 menuOpen = false
                 query = ""
             },
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
             PopoverSearchField(
                 value = query,
@@ -105,9 +101,12 @@ internal fun MetadataSelectProperty(
             )
             visibleOptions.forEach { option ->
                 val selected = option.id in selectedIds
-                DropdownMenuItem(
-                    text = { Text(option.label) },
-                    leadingIcon = { Text(if (selected) "✓" else "") },
+                TagloomMenuItem(
+                    text = option.label,
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    selected = selected,
                     onClick = {
                         if (multiple) {
                             val next = if (selected) selectedIds - option.id else selectedIds + option.id
@@ -126,10 +125,10 @@ internal fun MetadataSelectProperty(
                     option.label.equals(normalized, ignoreCase = true)
                 }
             if (canCreate) {
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.editor_property_create_option, normalized)) },
-                    leadingIcon = { Text("+") },
+                TagloomMenuDivider()
+                TagloomMenuItem(
+                    text = stringResource(Res.string.editor_property_create_option, normalized),
+                    leadingIcon = { Text("+", style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         menuOpen = false
                         query = ""
@@ -138,15 +137,11 @@ internal fun MetadataSelectProperty(
                 )
             }
             if (visibleOptions.isEmpty() && !canCreate) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (definition.optionInputMode == PropertyOptionInputMode.FIXED && definition.options.isEmpty()) {
-                                stringResource(Res.string.editor_property_fixed_options_required)
-                            } else {
-                                stringResource(Res.string.editor_property_no_matching_options)
-                            },
-                        )
+                TagloomMenuItem(
+                    text = if (definition.optionInputMode == PropertyOptionInputMode.FIXED && definition.options.isEmpty()) {
+                        stringResource(Res.string.editor_property_fixed_options_required)
+                    } else {
+                        stringResource(Res.string.editor_property_no_matching_options)
                     },
                     enabled = false,
                     onClick = {},

@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,20 +58,26 @@ internal fun DatabaseSelectCell(
                 color = colors.second,
             )
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 8.dp,
         ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.database_group_empty)) },
+            TagloomMenuItem(
+                text = stringResource(Res.string.database_group_empty),
+                selected = selectedOption == null,
                 onClick = { onCommit(null); open = false },
             )
+            if (property.options.isNotEmpty()) {
+                TagloomMenuDivider()
+            }
             property.options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
+                val selected = option.id == (value as? JsonPrimitive)?.contentOrNull
+                TagloomMenuItem(
+                    text = option.label,
+                    selected = selected,
+                    trailingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
                     onClick = { onCommit(JsonPrimitive(option.id)); open = false },
                 )
             }
@@ -112,21 +116,30 @@ internal fun DatabaseMultiSelectCell(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 8.dp,
         ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.database_group_empty)) },
+            TagloomMenuItem(
+                text = stringResource(Res.string.database_group_empty),
+                selected = selectedIds.isEmpty(),
                 onClick = { onCommit(null); open = false },
             )
+            if (property.options.isNotEmpty()) {
+                TagloomMenuDivider()
+            }
             property.options.forEach { option ->
                 val selected = option.id in selectedIds
-                DropdownMenuItem(
-                    text = { Text("${if (selected) "✓ " else ""}${option.label}") },
+                TagloomMenuItem(
+                    text = option.label,
+                    selected = selected,
+                    leadingIcon = {
+                        Text(
+                            if (selected) "✓" else "",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    },
                     onClick = {
                         val nextIds = if (selected) selectedIds - option.id else selectedIds + option.id
                         val nextValue = property.options

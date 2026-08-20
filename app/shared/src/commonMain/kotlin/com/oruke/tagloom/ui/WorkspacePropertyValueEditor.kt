@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -95,12 +93,12 @@ internal fun WorkspacePropertyValueEditor(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            DropdownMenu(
+            TagloomDropdownMenu(
                 expanded = menuOpen,
                 onDismissRequest = { menuOpen = false },
             ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.editor_property_edit_definition)) },
+                TagloomMenuItem(
+                    text = stringResource(Res.string.editor_property_edit_definition),
                     onClick = {
                         menuOpen = false
                         onEditDefinition(definition)
@@ -108,15 +106,11 @@ internal fun WorkspacePropertyValueEditor(
                 )
                 property.sourceTagId?.let { sourceTagId ->
                     state.tagDefinitions.firstOrNull { tag -> tag.id == sourceTagId }?.let { sourceTag ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(
-                                        Res.string.editor_property_edit_source_type,
-                                        sourceTag.name,
-                                    ),
-                                )
-                            },
+                        TagloomMenuItem(
+                            text = stringResource(
+                                Res.string.editor_property_edit_source_type,
+                                sourceTag.name,
+                            ),
                             onClick = {
                                 menuOpen = false
                                 onEditSourceTag(sourceTag)
@@ -125,8 +119,10 @@ internal fun WorkspacePropertyValueEditor(
                     }
                 }
                 if (manuallyAttached) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.editor_property_remove_from_note)) },
+                    TagloomMenuDivider()
+                    TagloomMenuItem(
+                        text = stringResource(Res.string.editor_property_remove_from_note),
+                        destructive = true,
                         onClick = {
                             menuOpen = false
                             state.setPropertyAttached(definition.id, attached = false)

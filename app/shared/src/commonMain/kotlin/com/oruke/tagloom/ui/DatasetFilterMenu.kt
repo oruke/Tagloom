@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -68,13 +66,10 @@ internal fun DatasetFilterButton(
             onClick = { open = true },
         )
         if (!compact) {
-            DropdownMenu(
+            TagloomDropdownMenu(
                 expanded = open,
                 onDismissRequest = { open = false },
                 modifier = Modifier.widthIn(min = 360.dp, max = 420.dp),
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp,
             ) {
                 DatasetFilterEditor(controller, view) { open = false }
             }
@@ -250,10 +245,10 @@ private fun <T> DatasetChoiceButton(
             Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             TagloomChevronDown(Modifier.size(12.dp))
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        TagloomDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             choices.forEach { (value, choiceLabel) ->
-                DropdownMenuItem(
-                    text = { Text(choiceLabel) },
+                TagloomMenuItem(
+                    text = choiceLabel,
                     onClick = {
                         onSelect(value)
                         open = false

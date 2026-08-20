@@ -12,8 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -170,22 +168,14 @@ internal fun TagDefinitionDialog(
                             ) {
                                 Text(stringResource(Res.string.editor_tag_add_workspace_property))
                             }
-                            DropdownMenu(
+                            TagloomDropdownMenu(
                                 expanded = propertyMenuOpen,
                                 onDismissRequest = { propertyMenuOpen = false },
                             ) {
                                 availableProperties.forEach { definition ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Column {
-                                                Text(definition.name)
-                                                Text(
-                                                    definition.type.localizedDisplayName(),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        },
+                                    TagloomMenuItem(
+                                        text = definition.name,
+                                        description = definition.type.localizedDisplayName(),
                                         onClick = {
                                             bindingDrafts += TagPropertyBinding(
                                                 propertyId = definition.id,
@@ -295,15 +285,18 @@ private fun TagParentEditor(
                 TextButton(onClick = { onMenuOpenChange(true) }) {
                     Text(stringResource(Res.string.editor_tag_add_parent))
                 }
-                DropdownMenu(
+                TagloomDropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
                 ) {
                     candidates.forEach { definition ->
                         val selected = definition.id in parentTagIds
-                        DropdownMenuItem(
-                            text = { Text(definition.name) },
-                            leadingIcon = { Text(if (selected) "✓" else "") },
+                        TagloomMenuItem(
+                            text = definition.name,
+                            leadingIcon = if (selected) {
+                                { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                            } else null,
+                            selected = selected,
                             onClick = { onToggle(definition.id) },
                         )
                     }

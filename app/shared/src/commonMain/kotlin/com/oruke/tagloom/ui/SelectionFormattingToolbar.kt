@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -140,20 +137,16 @@ private fun SelectionUtilityAction(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.inverseOnSurface,
         )
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = { onExpandedChange(false) },
         ) {
-            Column(Modifier.width(300.dp).padding(10.dp)) {
-                Text(
-                    mode.localizedTitle(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+            Column(Modifier.width(300.dp).padding(6.dp)) {
+                TagloomMenuSectionHeader(title = mode.localizedTitle())
                 OutlinedTextField(
                     value = mode.value(state),
                     onValueChange = { value -> mode.update(state, value) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     placeholder = { Text(mode.localizedPlaceholder()) },
                     minLines = if (mode == SelectionUtilityMode.ANNOTATION) 3 else 1,
                     singleLine = mode == SelectionUtilityMode.LINK,
@@ -306,32 +299,34 @@ private fun InlineColorMenuAction(
             },
             fontWeight = FontWeight.Bold,
         )
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = { onExpandedChange(false) },
             properties = PopupProperties(focusable = false),
         ) {
-            Text(
-                mode.localizedLabel(),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.editor_color_default)) },
+            TagloomMenuSectionHeader(title = mode.localizedLabel())
+            TagloomMenuItem(
+                text = stringResource(Res.string.editor_color_default),
                 leadingIcon = { ColorSwatch(mode, null) },
-                trailingIcon = { if (selectedToken == null) Text("✓") },
+                trailingIcon = if (selectedToken == null) {
+                    { Text("✓", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                } else null,
+                selected = selectedToken == null,
                 onClick = {
                     state.clearSelectionMark(mode.markType)
                     onExpandedChange(false)
                 },
             )
-            HorizontalDivider()
+            TagloomMenuDivider()
             InlineColorPalette.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.localizedLabel()) },
+                val selected = selectedToken == option.token
+                TagloomMenuItem(
+                    text = option.localizedLabel(),
                     leadingIcon = { ColorSwatch(mode, option) },
-                    trailingIcon = { if (selectedToken == option.token) Text("✓") },
+                    trailingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    selected = selected,
                     onClick = {
                         state.setSelectionMark(
                             markType = mode.markType,

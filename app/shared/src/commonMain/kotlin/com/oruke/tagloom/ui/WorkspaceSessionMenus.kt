@@ -9,9 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,12 +47,11 @@ internal fun WorkspaceSearchPopover(
     modifier: Modifier,
 ) {
     Box(modifier) {
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = onDismiss,
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
-            Column(Modifier.width(360.dp).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.width(360.dp).padding(4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     shape = MaterialTheme.shapes.small,
@@ -97,30 +93,16 @@ internal fun WorkspaceSearchPopover(
                     )
                 }
                 controller.searchHits.take(8).forEach { hit ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(hit.title, style = MaterialTheme.typography.titleSmall)
-                                    Text(
-                                        hit.snippet,
-                                        maxLines = 2,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            },
-                            onClick = {
-                                onDismiss()
-                                if (controller.editorState.documents.any { document -> document.id == hit.noteId }) {
-                                    controller.editorState.selectDocument(hit.noteId)
-                                }
-                            },
-                        )
-                    }
+                    TagloomMenuItem(
+                        text = hit.title,
+                        description = hit.snippet,
+                        onClick = {
+                            onDismiss()
+                            if (controller.editorState.documents.any { document -> document.id == hit.noteId }) {
+                                controller.editorState.selectDocument(hit.noteId)
+                            }
+                        },
+                    )
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -173,54 +155,54 @@ internal fun WorkspaceMaintenanceMenu(
     }
 
     Box(modifier) {
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = onDismiss,
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
-            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_save_now)) }, onClick = {
-                invokeAndDismiss(actions.onSave)
-            })
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.workspace_menu_save_current_search)) },
+            TagloomMenuItem(
+                text = stringResource(Res.string.workspace_menu_save_now),
+                onClick = { invokeAndDismiss(actions.onSave) },
+            )
+            TagloomMenuItem(
+                text = stringResource(Res.string.workspace_menu_save_current_search),
                 enabled = controller.searchText.isNotBlank(),
                 onClick = { invokeAndDismiss(actions.onSaveQuery) },
             )
             controller.savedQueries.take(6).forEach { saved ->
-                DropdownMenuItem(text = {
-                    Text(stringResource(Res.string.workspace_menu_run_query, saved.query.name))
-                }, onClick = {
-                    invokeAndDismiss { actions.onRunSavedQuery(saved.id) }
-                })
+                TagloomMenuItem(
+                    text = stringResource(Res.string.workspace_menu_run_query, saved.query.name),
+                    onClick = { invokeAndDismiss { actions.onRunSavedQuery(saved.id) } },
+                )
             }
-            HorizontalDivider()
-            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_backup)) }, onClick = {
-                invokeAndDismiss(actions.onBackup)
-            })
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (controller.recentWorkspace?.requiresPin == true) {
-                                Res.string.workspace_menu_change_pin
-                            } else {
-                                Res.string.workspace_menu_enable_pin
-                            },
-                        ),
-                    )
-                },
+            TagloomMenuDivider()
+            TagloomMenuItem(
+                text = stringResource(Res.string.workspace_menu_backup),
+                onClick = { invokeAndDismiss(actions.onBackup) },
+            )
+            TagloomMenuItem(
+                text = stringResource(
+                    if (controller.recentWorkspace?.requiresPin == true) {
+                        Res.string.workspace_menu_change_pin
+                    } else {
+                        Res.string.workspace_menu_enable_pin
+                    },
+                ),
                 onClick = { invokeAndDismiss(actions.onChangePin) },
             )
-            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_rotate_master_key)) }, onClick = {
-                invokeAndDismiss(actions.onRotateMasterKey)
-            })
-            HorizontalDivider()
-            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_delete_note)) }, onClick = {
-                invokeAndDismiss(actions.onDelete)
-            })
-            DropdownMenuItem(text = { Text(stringResource(Res.string.workspace_menu_lock)) }, onClick = {
-                invokeAndDismiss(actions.onLock)
-            })
+            TagloomMenuItem(
+                text = stringResource(Res.string.workspace_menu_rotate_master_key),
+                onClick = { invokeAndDismiss(actions.onRotateMasterKey) },
+            )
+            TagloomMenuDivider()
+            TagloomMenuItem(
+                text = stringResource(Res.string.workspace_menu_delete_note),
+                destructive = true,
+                onClick = { invokeAndDismiss(actions.onDelete) },
+            )
+            TagloomMenuItem(
+                text = stringResource(Res.string.workspace_menu_lock),
+                onClick = { invokeAndDismiss(actions.onLock) },
+            )
         }
     }
 }

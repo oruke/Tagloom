@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -202,12 +201,9 @@ private fun DatasetToolbar(
                 compact = compact,
                 onClick = { fieldMenuOpen = true },
             )
-            DropdownMenu(
+            TagloomDropdownMenu(
                 expanded = fieldMenuOpen && !compact,
                 onDismissRequest = { fieldMenuOpen = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp,
             ) {
                 DatasetFieldMenuContent(controller, view, onToggleField, onMoveField)
             }
@@ -275,13 +271,9 @@ private fun DatasetFieldMenuContent(
     val orderedFields = visibleFields + propertyFields
         .map { propertyField -> propertyField.first }
         .filterNot(visibleFields::contains)
-    Column(Modifier.widthIn(min = 320.dp).padding(vertical = 6.dp)) {
-        Text(
-            stringResource(Res.string.database_fields),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.titleSmall,
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Column(Modifier.widthIn(min = 280.dp).padding(vertical = 4.dp)) {
+        TagloomMenuSectionHeader(title = stringResource(Res.string.database_fields))
+        TagloomMenuDivider()
         orderedFields.forEach { field ->
             val visibleIndex = visibleFields.indexOf(field)
             DatasetFieldMenuRow(
@@ -318,32 +310,38 @@ private fun DatasetFieldMenuRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            modifier = Modifier.weight(1f).clickable(onClick = onToggle)
-                .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    TagloomMenuItem(
+        onClick = onToggle,
+        selected = visible,
+        leadingIcon = {
             Text(
                 if (visible) "✓" else "",
-                modifier = Modifier.width(20.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                color = if (visible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             )
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        }
-        DatasetFieldMoveAction(
-            label = stringResource(Res.string.editor_block_action_move_up),
-            enabled = visible && canMoveUp,
-            onClick = onMoveUp,
-        )
-        DatasetFieldMoveAction(
-            label = stringResource(Res.string.editor_block_action_move_down),
-            enabled = visible && canMoveDown,
-            onClick = onMoveDown,
+        },
+        trailingIcon = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DatasetFieldMoveAction(
+                    label = stringResource(Res.string.editor_block_action_move_up),
+                    enabled = visible && canMoveUp,
+                    onClick = onMoveUp,
+                )
+                DatasetFieldMoveAction(
+                    label = stringResource(Res.string.editor_block_action_move_down),
+                    enabled = visible && canMoveDown,
+                    onClick = onMoveDown,
+                )
+            }
+        },
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -362,9 +360,9 @@ private fun DatasetFieldMoveAction(
     onClick: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.widthIn(min = 52.dp).heightIn(min = 40.dp)
+        modifier = Modifier.heightIn(min = 28.dp)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(

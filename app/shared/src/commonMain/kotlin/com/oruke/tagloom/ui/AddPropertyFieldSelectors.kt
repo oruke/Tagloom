@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,15 +42,18 @@ internal fun PropertyTypeSelector(
     var expanded by remember { mutableStateOf(false) }
     Box {
         PopoverSelectValue(value.localizedDisplayName()) { expanded = true }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
             CREATE_PROPERTY_TYPES.forEach { type ->
-                DropdownMenuItem(
-                    text = { Text(type.localizedDisplayName()) },
-                    leadingIcon = { Text(if (type == value) "✓" else "") },
+                val selected = type == value
+                TagloomMenuItem(
+                    text = type.localizedDisplayName(),
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    selected = selected,
                     onClick = {
                         expanded = false
                         onValueChange(type)
@@ -77,15 +78,18 @@ internal fun OptionModeSelector(
     var expanded by remember { mutableStateOf(false) }
     Box {
         PopoverSelectValue(value.localizedDisplayName()) { expanded = true }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
             PropertyOptionInputMode.entries.forEach { mode ->
-                DropdownMenuItem(
-                    text = { Text(mode.localizedDisplayName()) },
-                    leadingIcon = { Text(if (mode == value) "✓" else "") },
+                val selected = mode == value
+                TagloomMenuItem(
+                    text = mode.localizedDisplayName(),
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    selected = selected,
                     onClick = {
                         expanded = false
                         onValueChange(mode)
@@ -130,15 +134,18 @@ internal fun PropertyDestinationSelector(
         ?: currentNoteLabel
     Box {
         PopoverSelectValue(label) { expanded = true }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
             destinations.forEach { (destination, destinationLabel) ->
-                DropdownMenuItem(
-                    text = { Text(destinationLabel) },
-                    leadingIcon = { Text(if (destination == value) "✓" else "") },
+                val selected = destination == value
+                TagloomMenuItem(
+                    text = destinationLabel,
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    selected = selected,
                     onClick = {
                         expanded = false
                         onValueChange(destination)

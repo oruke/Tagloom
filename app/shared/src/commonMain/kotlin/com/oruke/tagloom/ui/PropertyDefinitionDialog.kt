@@ -10,8 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -280,11 +278,15 @@ private fun PropertyDestinationPicker(
                 OutlinedButton(onClick = { tagMenuOpen = true }) {
                     Text(selectedName ?: stringResource(Res.string.editor_property_choose_type))
                 }
-                DropdownMenu(expanded = tagMenuOpen, onDismissRequest = { tagMenuOpen = false }) {
+                TagloomDropdownMenu(expanded = tagMenuOpen, onDismissRequest = { tagMenuOpen = false }) {
                     tagDefinitions.forEach { definition ->
-                        DropdownMenuItem(
-                            text = { Text(definition.name) },
-                            leadingIcon = { Text(if (definition.id == selectedTagId) "✓" else "") },
+                        val selected = definition.id == selectedTagId
+                        TagloomMenuItem(
+                            text = definition.name,
+                            leadingIcon = if (selected) {
+                                { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                            } else null,
+                            selected = selected,
                             onClick = {
                                 onTagChange(definition.id)
                                 tagMenuOpen = false
@@ -364,10 +366,8 @@ private fun PropertyDefinitionDestination?.confirmLabel(
 private enum class PropertyCreationScope {
     /** 只绑定当前笔记。 */
     CURRENT_NOTE,
-
     /** 绑定一个对象类型。 */
     TAG,
-
     /** 仅进入工作区属性目录。 */
     WORKSPACE,
 }
@@ -396,13 +396,18 @@ private fun PropertyTypePicker(
         ) {
             Text(stringResource(Res.string.editor_property_type_prefix, type.localizedDisplayName()))
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = { onExpandedChange(false) },
         ) {
             EDITABLE_PROPERTY_TYPES.forEach { candidate ->
-                DropdownMenuItem(
-                    text = { Text(candidate.localizedDisplayName()) },
+                val selected = candidate == type
+                TagloomMenuItem(
+                    text = candidate.localizedDisplayName(),
+                    leadingIcon = if (selected) {
+                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    selected = selected,
                     onClick = {
                         onTypeSelected(candidate)
                         onExpandedChange(false)

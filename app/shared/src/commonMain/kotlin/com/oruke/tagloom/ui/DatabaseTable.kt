@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -298,17 +296,26 @@ private fun DatabaseColumnMenu(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        TagloomDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+            TagloomMenuSectionHeader(title = "预设列宽")
             listOf(96 to "窄列", 180 to "标准列", 300 to "宽列").forEach { (targetWidth, name) ->
-                DropdownMenuItem(text = { Text(name) }, onClick = {
-                    onSetWidth(targetWidth)
-                    onDismiss()
-                })
+                TagloomMenuItem(
+                    text = name,
+                    onClick = {
+                        onSetWidth(targetWidth)
+                        onDismiss()
+                    },
+                )
             }
-            DropdownMenuItem(text = { Text("隐藏字段") }, enabled = canHide, onClick = {
-                onHide()
-                onDismiss()
-            })
+            TagloomMenuDivider()
+            TagloomMenuItem(
+                text = "隐藏字段",
+                enabled = canHide,
+                onClick = {
+                    onHide()
+                    onDismiss()
+                },
+            )
         }
     }
 }

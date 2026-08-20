@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -100,10 +97,9 @@ internal fun AddPropertyPopover(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = expanded,
             onDismissRequest = ::dismiss,
-            containerColor = MaterialTheme.colorScheme.surface,
         ) {
             when (step) {
                 AddPropertyStep.SEARCH -> AddPropertySearchStep(
@@ -215,33 +211,21 @@ private fun AddPropertySearchStep(
         }
         .filter { definition -> query.isBlank() || definition.name.contains(query, ignoreCase = true) }
     candidates.take(8).forEach { definition ->
-        DropdownMenuItem(
-            text = {
-                Row(Modifier.width(320.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(definition.name, modifier = Modifier.weight(1f))
-                    Text(
-                        definition.type.localizedDisplayName(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-            leadingIcon = { Text("+") },
+        TagloomMenuItem(
+            text = definition.name,
+            trailingText = definition.type.localizedDisplayName(),
+            leadingIcon = { Text("+", style = MaterialTheme.typography.bodyMedium) },
             onClick = { onSelectExisting(definition) },
         )
     }
-    HorizontalDivider()
-    DropdownMenuItem(
-        text = {
-            Text(
-                if (query.isBlank()) {
-                    stringResource(Res.string.editor_property_new)
-                } else {
-                    stringResource(Res.string.editor_property_create_named, query.trim())
-                },
-            )
+    TagloomMenuDivider()
+    TagloomMenuItem(
+        text = if (query.isBlank()) {
+            stringResource(Res.string.editor_property_new)
+        } else {
+            stringResource(Res.string.editor_property_create_named, query.trim())
         },
-        leadingIcon = { Text("+") },
+        leadingIcon = { Text("+", style = MaterialTheme.typography.bodyMedium) },
         onClick = onCreate,
     )
 }
