@@ -240,28 +240,18 @@ internal fun EditorBlockCommandItem(
     selected: Boolean = false,
     onClick: () -> Unit,
 ) {
-    DropdownMenuItem(
-        modifier = Modifier.background(
-            if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-        ),
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                Text(command.localizedLabel(), fontWeight = FontWeight.Medium)
-                Text(
-                    command.localizedDescription(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        onClick = onClick,
+    TagloomMenuItem(
+        text = command.localizedLabel(),
+        description = command.localizedDescription(),
+        selected = selected,
         leadingIcon = {
             Text(
-                command.symbol,
-                modifier = Modifier.padding(end = 4.dp),
+                text = command.symbol,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
             )
         },
+        onClick = onClick,
     )
 }

@@ -2,6 +2,8 @@ package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
@@ -286,9 +288,10 @@ internal fun EditorRichTextField(
                 }
             },
         )
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = showCommandMenu && !tablePickerOpen,
             properties = PopupProperties(focusable = false),
+            modifier = Modifier.widthIn(min = 260.dp),
             onDismissRequest = {
                 dismissedSlashText = fieldValue.text
                 onCommandMenuDismiss()
@@ -297,7 +300,7 @@ internal fun EditorRichTextField(
             if (commands.isEmpty()) {
                 Text(
                     stringResource(Res.string.editor_block_no_matching_commands),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -321,25 +324,22 @@ internal fun EditorRichTextField(
                 }
             }
         }
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = tablePickerOpen,
             onDismissRequest = { tablePickerOpen = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 8.dp,
         ) {
             BaseTableInsertPicker(
                 onCreate = { rows, columns ->
-                applyBaseTableCommand(
-                    state = state,
-                    block = block,
-                    slashTrigger = slashTrigger,
-                    rows = rows,
-                    columns = columns,
-                    onCursorRequest = onCursorRequest,
-                )
-                tablePickerOpen = false
-                onCommandMenuDismiss()
+                    applyBaseTableCommand(
+                        state = state,
+                        block = block,
+                        slashTrigger = slashTrigger,
+                        rows = rows,
+                        columns = columns,
+                        onCursorRequest = onCursorRequest,
+                    )
+                    tablePickerOpen = false
+                    onCommandMenuDismiss()
                 },
                 onCancel = { tablePickerOpen = false },
             )

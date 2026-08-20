@@ -67,35 +67,55 @@ internal fun BlockActionMenus(
     onTypeMenuChange: (Boolean) -> Unit,
     onCursorRequest: (EditorCursorTarget) -> Unit,
 ) {
-    DropdownMenu(expanded = actionMenuOpen, onDismissRequest = { onActionMenuChange(false) }) {
+    TagloomDropdownMenu(expanded = actionMenuOpen, onDismissRequest = { onActionMenuChange(false) }) {
         if (block.editableRichText() != null || block.content == DividerBlockContent) {
-            DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_convert)) }, onClick = {
-                onActionMenuChange(false)
-                onTypeMenuChange(true)
-            })
+            TagloomMenuItem(
+                text = stringResource(Res.string.editor_block_action_convert),
+                onClick = {
+                    onActionMenuChange(false)
+                    onTypeMenuChange(true)
+                },
+            )
         }
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_move_up)) }, onClick = {
-            state.moveBlock(block.id, BlockMoveDirection.UP)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_move_down)) }, onClick = {
-            state.moveBlock(block.id, BlockMoveDirection.DOWN)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_indent)) }, onClick = {
-            state.indentBlock(block.id)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_outdent)) }, onClick = {
-            state.outdentBlock(block.id)
-            onActionMenuChange(false)
-        })
-        DropdownMenuItem(text = { Text(stringResource(Res.string.editor_block_action_delete)) }, onClick = {
-            state.deleteBlockAndFocus(block.id)?.let(onCursorRequest)
-            onActionMenuChange(false)
-        })
+        TagloomMenuItem(
+            text = stringResource(Res.string.editor_block_action_move_up),
+            onClick = {
+                state.moveBlock(block.id, BlockMoveDirection.UP)
+                onActionMenuChange(false)
+            },
+        )
+        TagloomMenuItem(
+            text = stringResource(Res.string.editor_block_action_move_down),
+            onClick = {
+                state.moveBlock(block.id, BlockMoveDirection.DOWN)
+                onActionMenuChange(false)
+            },
+        )
+        TagloomMenuItem(
+            text = stringResource(Res.string.editor_block_action_indent),
+            onClick = {
+                state.indentBlock(block.id)
+                onActionMenuChange(false)
+            },
+        )
+        TagloomMenuItem(
+            text = stringResource(Res.string.editor_block_action_outdent),
+            onClick = {
+                state.outdentBlock(block.id)
+                onActionMenuChange(false)
+            },
+        )
+        TagloomMenuDivider()
+        TagloomMenuItem(
+            text = stringResource(Res.string.editor_block_action_delete),
+            destructive = true,
+            onClick = {
+                state.deleteBlockAndFocus(block.id)?.let(onCursorRequest)
+                onActionMenuChange(false)
+            },
+        )
     }
-    DropdownMenu(expanded = typeMenuOpen, onDismissRequest = { onTypeMenuChange(false) }) {
+    TagloomDropdownMenu(expanded = typeMenuOpen, onDismissRequest = { onTypeMenuChange(false) }) {
         EditorBlockCommands.filter(EditorBlockCommand::convertible).forEach { command ->
             EditorBlockCommandItem(command) {
                 state.turnBlockInto(block.id, command.type)?.let(onCursorRequest)

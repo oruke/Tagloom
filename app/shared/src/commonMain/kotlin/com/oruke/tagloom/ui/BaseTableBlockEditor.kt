@@ -216,47 +216,66 @@ private fun BaseTableColumnHeader(
                     TagloomChevronDown(Modifier.size(12.dp))
                 }
             }
-            DropdownMenu(
+            TagloomDropdownMenu(
                 expanded = menuOpen,
                 onDismissRequest = { menuOpen = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp,
+                modifier = Modifier.widthIn(min = 160.dp),
             ) {
-                Column(Modifier.widthIn(min = 154.dp)) {
-                    BaseTableColumnTypes.EDITABLE.forEach { type ->
-                        BaseTableMenuItem("${if (column.type == type) "✓  " else ""}${baseTableTypeLabel(type)}") {
+                TagloomMenuSectionHeader("列类型")
+                BaseTableColumnTypes.EDITABLE.forEach { type ->
+                    TagloomMenuItem(
+                        text = baseTableTypeLabel(type),
+                        selected = column.type == type,
+                        leadingIcon = if (column.type == type) {
+                            { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                        } else null,
+                        onClick = {
                             state.changeBaseTableColumnType(block.id, column.columnId, type)
                             menuOpen = false
-                        }
-                    }
-                    HorizontalDivider()
-                    BaseTableMenuItem("在左侧插入") {
+                        },
+                    )
+                }
+                TagloomMenuDivider()
+                TagloomMenuSectionHeader("列操作")
+                TagloomMenuItem(
+                    text = "在左侧插入",
+                    onClick = {
                         state.insertBaseTableColumn(block.id, column.columnId, after = false)
                         menuOpen = false
-                    }
-                    BaseTableMenuItem("在右侧插入") {
+                    },
+                )
+                TagloomMenuItem(
+                    text = "在右侧插入",
+                    onClick = {
                         state.insertBaseTableColumn(block.id, column.columnId, after = true)
                         menuOpen = false
-                    }
-                    BaseTableMenuItem("复制列") {
+                    },
+                )
+                TagloomMenuItem(
+                    text = "复制列",
+                    onClick = {
                         state.duplicateBaseTableColumn(block.id, column.columnId)
                         menuOpen = false
-                    }
-                    BaseTableMenuItem("清空内容") {
+                    },
+                )
+                TagloomMenuItem(
+                    text = "清空内容",
+                    destructive = true,
+                    onClick = {
                         state.clearBaseTableColumn(block.id, column.columnId)
                         menuOpen = false
-                    }
-                    HorizontalDivider()
-                    BaseTableMenuItem(
-                        label = "删除列",
-                        color = MaterialTheme.colorScheme.error,
-                        enabled = canDelete,
-                    ) {
+                    },
+                )
+                TagloomMenuDivider()
+                TagloomMenuItem(
+                    text = "删除列",
+                    destructive = true,
+                    enabled = canDelete,
+                    onClick = {
                         state.deleteBaseTableColumn(block.id, column.columnId)
                         menuOpen = false
-                    }
-                }
+                    },
+                )
             }
         }
     }
@@ -294,40 +313,51 @@ private fun BaseTableRowMenu(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        DropdownMenu(
+        TagloomDropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 8.dp,
+            modifier = Modifier.widthIn(min = 140.dp),
         ) {
-            Column(Modifier.widthIn(min = 132.dp)) {
-                BaseTableMenuItem("在上方插入") {
+            TagloomMenuSectionHeader("行操作")
+            TagloomMenuItem(
+                text = "在上方插入",
+                onClick = {
                     state.insertBaseTableRow(block.id, row.rowId, after = false)
                     menuOpen = false
-                }
-                BaseTableMenuItem("在下方插入") {
+                },
+            )
+            TagloomMenuItem(
+                text = "在下方插入",
+                onClick = {
                     state.insertBaseTableRow(block.id, row.rowId, after = true)
                     menuOpen = false
-                }
-                BaseTableMenuItem("复制行") {
+                },
+            )
+            TagloomMenuItem(
+                text = "复制行",
+                onClick = {
                     state.duplicateBaseTableRow(block.id, row.rowId)
                     menuOpen = false
-                }
-                BaseTableMenuItem("清空内容") {
+                },
+            )
+            TagloomMenuItem(
+                text = "清空内容",
+                destructive = true,
+                onClick = {
                     state.clearBaseTableRow(block.id, row.rowId)
                     menuOpen = false
-                }
-                HorizontalDivider()
-                BaseTableMenuItem(
-                    label = "删除行",
-                    color = MaterialTheme.colorScheme.error,
-                    enabled = canDelete,
-                ) {
+                },
+            )
+            TagloomMenuDivider()
+            TagloomMenuItem(
+                text = "删除行",
+                destructive = true,
+                enabled = canDelete,
+                onClick = {
                     state.deleteBaseTableRow(block.id, row.rowId)
                     menuOpen = false
-                }
-            }
+                },
+            )
         }
     }
 }
@@ -447,33 +477,6 @@ internal fun TableIconAction(
     }
 }
 
-/**
- * 渲染 Stitch 规定的 34dp 表格结构菜单项。
- *
- * @param label 动作文本。
- * @param color 文本颜色。
- * @param enabled 是否可执行。
- * @param onClick 点击动作。
- */
-@Composable
-private fun BaseTableMenuItem(
-    label: String,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier.fillMaxWidth().height(34.dp).clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (enabled) color else MaterialTheme.colorScheme.outline,
-        )
-    }
-}
 
 /**
  * 渲染结构化表格的安全提示。

@@ -295,63 +295,54 @@ private fun TabHeader(
                     TagloomChevronDown(Modifier.size(12.dp))
                 }
             }
-            DropdownMenu(
+            TagloomDropdownMenu(
                 expanded = menuOpen,
                 onDismissRequest = { menuOpen = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp,
+                modifier = Modifier.widthIn(min = 160.dp),
             ) {
-                Column(Modifier.widthIn(min = 154.dp)) {
-                    TabMenuItem("✎", "重命名") {
+                TagloomMenuItem(
+                    text = "重命名",
+                    leadingIcon = { Text("✎", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
                         onRenameStart()
                         menuOpen = false
-                    }
-                    TabMenuItem("▣", "复制标签页") {
+                    },
+                )
+                TagloomMenuItem(
+                    text = "复制标签页",
+                    leadingIcon = { Text("▣", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
                         state.duplicateTab(tabsBlock.id, tab.id)
                         menuOpen = false
-                    }
-                    TabMenuItem("←", "向左移动") {
+                    },
+                )
+                TagloomMenuItem(
+                    text = "向左移动",
+                    leadingIcon = { Text("←", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
                         state.moveTab(tabsBlock.id, tab.id, BlockMoveDirection.UP)
                         menuOpen = false
-                    }
-                    TabMenuItem("→", "向右移动") {
+                    },
+                )
+                TagloomMenuItem(
+                    text = "向右移动",
+                    leadingIcon = { Text("→", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
                         state.moveTab(tabsBlock.id, tab.id, BlockMoveDirection.DOWN)
                         menuOpen = false
-                    }
-                    HorizontalDivider()
-                    TabMenuItem("♲", "删除标签页", color = MaterialTheme.colorScheme.error) {
+                    },
+                )
+                TagloomMenuDivider()
+                TagloomMenuItem(
+                    text = "删除标签页",
+                    leadingIcon = { Text("♲", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) },
+                    destructive = true,
+                    onClick = {
                         onDeleteRequest()
                         menuOpen = false
-                    }
-                }
+                    },
+                )
             }
-        }
-    }
-}
-
-/**
- * 渲染 34dp 高的紧凑页签菜单项。
- *
- * @param icon 左侧动作符号。
- * @param label 动作名称。
- * @param color 文本颜色。
- * @param onClick 点击动作。
- */
-@Composable
-private fun TabMenuItem(
-    icon: String,
-    label: String,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier.fillMaxWidth().height(34.dp).clickable(onClick = onClick).padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(icon, modifier = Modifier.widthIn(min = 16.dp), style = MaterialTheme.typography.bodyMedium, color = color)
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
         }
     }
 }
