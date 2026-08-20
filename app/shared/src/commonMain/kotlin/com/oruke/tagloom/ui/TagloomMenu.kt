@@ -127,11 +127,6 @@ fun TagloomMenuItem(
     val backgroundColor = when {
         !enabled -> Color.Transparent
         destructive -> if (hovered) MaterialTheme.colorScheme.error.copy(alpha = 0.08f) else Color.Transparent
-        selected -> if (hovered) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)
-        } else {
-            MaterialTheme.colorScheme.secondaryContainer
-        }
         hovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
         else -> Color.Transparent
     }
@@ -139,7 +134,6 @@ fun TagloomMenuItem(
     val contentColor = when {
         !enabled -> MaterialTheme.colorScheme.outline
         destructive -> MaterialTheme.colorScheme.error
-        selected -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> MaterialTheme.colorScheme.onSurface
     }
 
@@ -243,11 +237,6 @@ fun TagloomMenuItem(
     val backgroundColor = when {
         !enabled -> Color.Transparent
         destructive -> if (hovered) MaterialTheme.colorScheme.error.copy(alpha = 0.08f) else Color.Transparent
-        selected -> if (hovered) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)
-        } else {
-            MaterialTheme.colorScheme.secondaryContainer
-        }
         hovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
         else -> Color.Transparent
     }

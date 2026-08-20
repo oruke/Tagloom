@@ -44,83 +44,82 @@ internal fun WorkspaceSearchPopover(
     onDismiss: () -> Unit,
     onSearch: () -> Unit,
     onSaveQuery: () -> Unit,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
-    Box(modifier) {
-        TagloomDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss,
-        ) {
-            Column(Modifier.width(360.dp).padding(4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.small,
-                ) {
-                    BasicTextField(
-                        value = controller.searchText,
-                        onValueChange = { value -> controller.searchText = value },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                            .onPreviewKeyEvent { event ->
-                                if (
-                                    event.type == KeyEventType.KeyDown &&
-                                    event.key == Key.Enter &&
-                                    controller.searchText.isNotBlank()
-                                ) {
-                                    onSearch()
-                                    true
-                                } else {
-                                    false
-                                }
-                            },
-                        enabled = !controller.busy,
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        decorationBox = { innerTextField ->
-                            Box(Modifier.fillMaxWidth()) {
-                                if (controller.searchText.isBlank()) {
-                                    Text(
-                                        stringResource(Res.string.workspace_search_placeholder),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                innerTextField()
+    TagloomDropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = modifier,
+    ) {
+        Column(Modifier.width(360.dp).padding(4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.small,
+            ) {
+                BasicTextField(
+                    value = controller.searchText,
+                    onValueChange = { value -> controller.searchText = value },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                        .onPreviewKeyEvent { event ->
+                            if (
+                                event.type == KeyEventType.KeyDown &&
+                                event.key == Key.Enter &&
+                                controller.searchText.isNotBlank()
+                            ) {
+                                onSearch()
+                                true
+                            } else {
+                                false
                             }
                         },
-                    )
-                }
-                controller.searchHits.take(8).forEach { hit ->
-                    TagloomMenuItem(
-                        text = hit.title,
-                        description = hit.snippet,
-                        onClick = {
-                            onDismiss()
-                            if (controller.editorState.documents.any { document -> document.id == hit.noteId }) {
-                                controller.editorState.selectDocument(hit.noteId)
+                    enabled = !controller.busy,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { innerTextField ->
+                        Box(Modifier.fillMaxWidth()) {
+                            if (controller.searchText.isBlank()) {
+                                Text(
+                                    stringResource(Res.string.workspace_search_placeholder),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                        },
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (controller.searchHits.isEmpty()) {
-                            stringResource(Res.string.workspace_search_confirmed_only)
-                        } else {
-                            stringResource(
-                                Res.string.workspace_search_result_count,
-                                controller.searchHits.size,
-                            )
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onSaveQuery, enabled = controller.searchText.isNotBlank()) {
-                        Text(stringResource(Res.string.workspace_search_save_query))
-                    }
+                            innerTextField()
+                        }
+                    },
+                )
+            }
+            controller.searchHits.take(8).forEach { hit ->
+                TagloomMenuItem(
+                    text = hit.title,
+                    description = hit.snippet,
+                    onClick = {
+                        onDismiss()
+                        if (controller.editorState.documents.any { document -> document.id == hit.noteId }) {
+                            controller.editorState.selectDocument(hit.noteId)
+                        }
+                    },
+                )
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (controller.searchHits.isEmpty()) {
+                        stringResource(Res.string.workspace_search_confirmed_only)
+                    } else {
+                        stringResource(
+                            Res.string.workspace_search_result_count,
+                            controller.searchHits.size,
+                        )
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onSaveQuery, enabled = controller.searchText.isNotBlank()) {
+                    Text(stringResource(Res.string.workspace_search_save_query))
                 }
             }
         }
@@ -142,7 +141,7 @@ internal fun WorkspaceMaintenanceMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     actions: WorkspaceMaintenanceActions,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
     /**
      * 关闭菜单后执行动作，避免状态切换期间残留浮层。
@@ -154,11 +153,11 @@ internal fun WorkspaceMaintenanceMenu(
         action()
     }
 
-    Box(modifier) {
-        TagloomDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss,
-        ) {
+    TagloomDropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = modifier,
+    ) {
             TagloomMenuItem(
                 text = stringResource(Res.string.workspace_menu_save_now),
                 onClick = { invokeAndDismiss(actions.onSave) },
@@ -204,7 +203,6 @@ internal fun WorkspaceMaintenanceMenu(
                 onClick = { invokeAndDismiss(actions.onLock) },
             )
         }
-    }
 }
 
 /**

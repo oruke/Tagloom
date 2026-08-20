@@ -170,15 +170,6 @@ internal fun EditorBlockRow(
                     ReadOnlyBlockPlaceholder(block)
                 }
             }
-            BlockActionMenus(
-                state = state,
-                block = block,
-                actionMenuOpen = actionMenuOpen,
-                typeMenuOpen = typeMenuOpen,
-                onActionMenuChange = { open -> actionMenuOpen = open },
-                onTypeMenuChange = { open -> typeMenuOpen = open },
-                onCursorRequest = onCursorRequest,
-            )
         }
         Box(
             modifier = Modifier.align(Alignment.TopStart).offset(x = -BLOCK_GUTTER_WIDTH),
@@ -193,6 +184,17 @@ internal fun EditorBlockRow(
                 },
                 onMove = { direction -> state.moveBlock(block.id, direction) },
                 onOpenActions = { actionMenuOpen = true },
+                menu = {
+                    BlockActionMenus(
+                        state = state,
+                        block = block,
+                        actionMenuOpen = actionMenuOpen,
+                        typeMenuOpen = typeMenuOpen,
+                        onActionMenuChange = { open -> actionMenuOpen = open },
+                        onTypeMenuChange = { open -> typeMenuOpen = open },
+                        onCursorRequest = onCursorRequest,
+                    )
+                },
             )
         }
     }

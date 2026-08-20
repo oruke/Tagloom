@@ -88,6 +88,8 @@ internal fun TagloomWorkspaceScreen(
     onCreatePropertyOption: ((PropertyId, String) -> Unit)? = null,
     saving: Boolean = false,
     modifier: Modifier = Modifier,
+    searchMenu: (@Composable () -> Unit)? = null,
+    workspaceMenu: (@Composable () -> Unit)? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -230,6 +232,8 @@ internal fun TagloomWorkspaceScreen(
                         onCreatePropertyOption = createPropertyOption,
                         saving = saving,
                         modifier = Modifier.weight(1f),
+                        searchMenu = searchMenu,
+                        workspaceMenu = workspaceMenu,
                     )
                 }
             }

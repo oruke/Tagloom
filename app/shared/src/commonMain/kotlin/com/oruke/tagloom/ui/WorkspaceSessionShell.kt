@@ -126,6 +126,35 @@ internal fun WorkspaceSessionShell(
                 searchPaletteOpen = false
                 workspaceMenuOpen = true
             },
+            searchMenu = {
+                WorkspaceSearchPopover(
+                    controller = controller,
+                    expanded = searchPaletteOpen,
+                    onDismiss = { searchPaletteOpen = false },
+                    onSearch = onSearch,
+                    onSaveQuery = { saveQueryDialog = true },
+                )
+            },
+            workspaceMenu = {
+                WorkspaceMaintenanceMenu(
+                    controller = controller,
+                    expanded = workspaceMenuOpen,
+                    onDismiss = { workspaceMenuOpen = false },
+                    actions = WorkspaceMaintenanceActions(
+                        onSave = onSave,
+                        onSaveQuery = { saveQueryDialog = true },
+                        onRunSavedQuery = { queryId ->
+                            onRunSavedQuery(queryId)
+                            searchPaletteOpen = true
+                        },
+                        onBackup = onBackup,
+                        onChangePin = { managePin = true },
+                        onRotateMasterKey = { rotateMasterKey = true },
+                        onDelete = { confirmDelete = true },
+                        onLock = onLock,
+                    ),
+                )
+            },
             onSaveTagDefinition = { definition, attach ->
                 coroutineScope.launch { controller.saveTagDefinition(definition, attach) }
             },
@@ -137,33 +166,6 @@ internal fun WorkspaceSessionShell(
             },
             saving = controller.busy && selectedDocument?.dirty == true,
             modifier = Modifier.fillMaxSize(),
-        )
-        WorkspaceSearchPopover(
-            controller = controller,
-            expanded = searchPaletteOpen,
-            onDismiss = { searchPaletteOpen = false },
-            onSearch = onSearch,
-            onSaveQuery = { saveQueryDialog = true },
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 48.dp),
-        )
-        WorkspaceMaintenanceMenu(
-            controller = controller,
-            expanded = workspaceMenuOpen,
-            onDismiss = { workspaceMenuOpen = false },
-            actions = WorkspaceMaintenanceActions(
-                onSave = onSave,
-                onSaveQuery = { saveQueryDialog = true },
-                onRunSavedQuery = { queryId ->
-                    onRunSavedQuery(queryId)
-                    searchPaletteOpen = true
-                },
-                onBackup = onBackup,
-                onChangePin = { managePin = true },
-                onRotateMasterKey = { rotateMasterKey = true },
-                onDelete = { confirmDelete = true },
-                onLock = onLock,
-            ),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 24.dp),
         )
         controller.errorMessage?.let { message ->
             Surface(

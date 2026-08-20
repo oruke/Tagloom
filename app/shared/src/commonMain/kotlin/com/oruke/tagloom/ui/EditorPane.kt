@@ -66,6 +66,8 @@ internal fun EditorPane(
     onCreatePropertyOption: (PropertyId, String) -> Unit,
     saving: Boolean = false,
     modifier: Modifier = Modifier,
+    searchMenu: (@Composable () -> Unit)? = null,
+    workspaceMenu: (@Composable () -> Unit)? = null,
 ) {
     var cursorRequest by remember(document.id) { mutableStateOf<EditorCursorTarget?>(null) }
     var commandMenuBlockId by remember(document.id) {
@@ -98,6 +100,8 @@ internal fun EditorPane(
                             onSaveTagDefinition = onSaveTagDefinition,
                             onSavePropertyDefinition = onSavePropertyDefinition,
                             onCreatePropertyOption = onCreatePropertyOption,
+                            searchMenu = searchMenu,
+                            workspaceMenu = workspaceMenu,
                         )
                     }
                 }

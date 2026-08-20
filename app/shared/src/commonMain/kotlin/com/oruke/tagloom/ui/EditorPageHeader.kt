@@ -71,6 +71,8 @@ internal fun PageHeader(
     onSaveTagDefinition: (TagDefinition, Boolean) -> Unit,
     onSavePropertyDefinition: (PropertyDefinition, PropertyDefinitionDestination) -> Unit,
     onCreatePropertyOption: (PropertyId, String) -> Unit,
+    searchMenu: (@Composable () -> Unit)? = null,
+    workspaceMenu: (@Composable () -> Unit)? = null,
 ) {
     var exportMenuOpen by remember(document.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
@@ -135,8 +137,22 @@ internal fun PageHeader(
                     }
                 }
             }
-            onSearchRequest?.let { action -> PageIconAction("⌕", action) }
-            onWorkspaceMenuRequest?.let { action -> PageIconAction("⋯", action) }
+            if (onSearchRequest != null || searchMenu != null) {
+                Box {
+                    if (onSearchRequest != null) {
+                        PageIconAction("⌕", onSearchRequest)
+                    }
+                    searchMenu?.invoke()
+                }
+            }
+            if (onWorkspaceMenuRequest != null || workspaceMenu != null) {
+                Box {
+                    if (onWorkspaceMenuRequest != null) {
+                        PageIconAction("⋯", onWorkspaceMenuRequest)
+                    }
+                    workspaceMenu?.invoke()
+                }
+            }
         }
         Spacer(Modifier.height(24.dp))
         BasicTextField(

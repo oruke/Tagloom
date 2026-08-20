@@ -139,6 +139,7 @@ internal fun BlockGutter(
     onAdd: () -> Unit,
     onMove: (BlockMoveDirection) -> Unit,
     onOpenActions: () -> Unit,
+    menu: @Composable () -> Unit = {},
 ) {
     var dragDistance by remember { mutableFloatStateOf(0f) }
     Row(
@@ -152,32 +153,35 @@ internal fun BlockGutter(
                 description = stringResource(Res.string.editor_block_add_description),
                 onClick = onAdd,
             )
-            GutterButton(
-                label = "⠿",
-                description = stringResource(Res.string.editor_block_actions_description),
-                onClick = onOpenActions,
-                modifier = Modifier.pointerInput(Unit) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = { dragDistance = 0f },
-                        onDragEnd = { dragDistance = 0f },
-                        onDragCancel = { dragDistance = 0f },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            dragDistance += dragAmount.y
-                            when {
-                                dragDistance <= -DRAG_MOVE_THRESHOLD.toPx() -> {
-                                    onMove(BlockMoveDirection.UP)
-                                    dragDistance = 0f
+            Box {
+                GutterButton(
+                    label = "⠿",
+                    description = stringResource(Res.string.editor_block_actions_description),
+                    onClick = onOpenActions,
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { dragDistance = 0f },
+                            onDragEnd = { dragDistance = 0f },
+                            onDragCancel = { dragDistance = 0f },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragDistance += dragAmount.y
+                                when {
+                                    dragDistance <= -DRAG_MOVE_THRESHOLD.toPx() -> {
+                                        onMove(BlockMoveDirection.UP)
+                                        dragDistance = 0f
+                                    }
+                                    dragDistance >= DRAG_MOVE_THRESHOLD.toPx() -> {
+                                        onMove(BlockMoveDirection.DOWN)
+                                        dragDistance = 0f
+                                    }
                                 }
-                                dragDistance >= DRAG_MOVE_THRESHOLD.toPx() -> {
-                                    onMove(BlockMoveDirection.DOWN)
-                                    dragDistance = 0f
-                                }
-                            }
-                        },
-                    )
-                },
-            )
+                            },
+                        )
+                    },
+                )
+                menu()
+            }
         }
     }
 }
