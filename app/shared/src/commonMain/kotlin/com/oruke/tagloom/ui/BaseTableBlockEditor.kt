@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -97,71 +98,80 @@ internal fun BaseTableBlockEditor(
             TableNotice(stringResource(Res.string.editor_base_table_read_only))
         }
         state.structuredEditError?.let { message -> TableNotice(message) }
-        Column(Modifier.horizontalScroll(rememberScrollState())) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column {
-                    Box(Modifier.width(ROW_GUTTER_WIDTH).height(TABLE_ROW_HEIGHT))
-                    activeRows.forEachIndexed { index, row ->
-                        BaseTableRowMenu(
-                            state = state,
-                            block = block,
-                            row = row,
-                            ordinal = index + 1,
-                            enabled = knownSchema,
-                            canDelete = activeRows.size > 1,
-                        )
-                    }
-                }
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        activeColumns.forEach { column ->
-                            BaseTableColumnHeader(
-                                state = state,
-                                block = block,
-                                column = column,
-                                enabled = knownSchema,
-                                canDelete = activeColumns.size > 1,
-                            )
-                        }
-                    }
-                    activeRows.forEach { row ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            activeColumns.forEach { column ->
-                                BaseTableCellEditor(
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val compact = maxWidth < EMBEDDED_BLOCK_COMPACT_BREAKPOINT
+            val horizontalScrollState = rememberScrollState()
+            BoundedBlockViewport(
+                compact = compact,
+                horizontalScrollState = horizontalScrollState,
+            ) {
+                Column(Modifier.horizontalScroll(horizontalScrollState)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Column {
+                            Box(Modifier.width(ROW_GUTTER_WIDTH).height(TABLE_ROW_HEIGHT))
+                            activeRows.forEachIndexed { index, row ->
+                                BaseTableRowMenu(
                                     state = state,
                                     block = block,
                                     row = row,
-                                    column = column,
-                                    cell = row.cells[column.columnId],
-                                    enabled = knownSchema && column.type in BaseTableColumnTypes.EDITABLE,
+                                    ordinal = index + 1,
+                                    enabled = knownSchema,
+                                    canDelete = activeRows.size > 1,
                                 )
                             }
                         }
+                        Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                activeColumns.forEach { column ->
+                                    BaseTableColumnHeader(
+                                        state = state,
+                                        block = block,
+                                        column = column,
+                                        enabled = knownSchema,
+                                        canDelete = activeColumns.size > 1,
+                                    )
+                                }
+                            }
+                            activeRows.forEach { row ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    activeColumns.forEach { column ->
+                                        BaseTableCellEditor(
+                                            state = state,
+                                            block = block,
+                                            row = row,
+                                            column = column,
+                                            cell = row.cells[column.columnId],
+                                            enabled = knownSchema && column.type in BaseTableColumnTypes.EDITABLE,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        TableIconAction(
+                            label = "+",
+                            description = stringResource(Res.string.editor_base_table_add_column),
+                            onClick = { state.addBaseTableColumn(block.id) },
+                            enabled = knownSchema,
+                        )
+                    }
+                    Row(modifier = Modifier.width(tableChromeWidth), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.width(ROW_GUTTER_WIDTH))
+                        Text(
+                            text = "+ ${stringResource(Res.string.editor_base_table_add_row)}",
+                            modifier = Modifier.padding(top = 7.dp, bottom = 4.dp).clickable(enabled = knownSchema) {
+                                state.addBaseTableRow(block.id)
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Box(Modifier.weight(1f))
+                        BaseTableResizeMenu(state, block, activeRows.size, activeColumns.size, knownSchema)
                     }
                 }
-                TableIconAction(
-                    label = "+",
-                    description = stringResource(Res.string.editor_base_table_add_column),
-                    onClick = { state.addBaseTableColumn(block.id) },
-                    enabled = knownSchema,
-                )
-            }
-            Row(modifier = Modifier.width(tableChromeWidth), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.width(ROW_GUTTER_WIDTH))
-                Text(
-                    text = "+ ${stringResource(Res.string.editor_base_table_add_row)}",
-                    modifier = Modifier.padding(top = 7.dp, bottom = 4.dp).clickable(enabled = knownSchema) {
-                        state.addBaseTableRow(block.id)
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Box(Modifier.weight(1f))
-                BaseTableResizeMenu(state, block, activeRows.size, activeColumns.size, knownSchema)
             }
         }
     }

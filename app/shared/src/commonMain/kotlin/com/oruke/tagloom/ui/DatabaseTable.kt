@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -63,6 +63,7 @@ import kotlin.math.roundToInt
  * @param controller Database 控制器。
  * @param projection 当前投影。
  * @param compact 是否使用触控优先尺寸。
+ * @param horizontalScrollState 与数据集视口底部轨道共享的横向滚动状态。
  * @param onOpenNote 打开原始 Note。
  * @param modifier 外部布局。
  */
@@ -71,6 +72,7 @@ internal fun DatabaseTable(
     controller: DatabaseEditorController,
     projection: DatasetProjection,
     compact: Boolean,
+    horizontalScrollState: ScrollState,
     onOpenNote: (ObjectId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -81,7 +83,7 @@ internal fun DatabaseTable(
         }
     }
     val rowHeight = DATABASE_CELL_HEIGHT
-    Column(modifier.horizontalScroll(rememberScrollState())) {
+    Column(modifier.horizontalScroll(horizontalScrollState)) {
         Row {
             DatabaseIndexCell(label = "#", height = rowHeight)
             projection.columns.forEach { column ->

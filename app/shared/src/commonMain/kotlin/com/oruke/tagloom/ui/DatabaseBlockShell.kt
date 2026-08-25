@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -81,7 +82,7 @@ internal fun DatabaseViewPane(
         ?: database.sourceTypeId.value
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val compact = maxWidth < DATASET_COMPACT_BREAKPOINT
+        val compact = maxWidth < EMBEDDED_BLOCK_COMPACT_BREAKPOINT
         Column(
             Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(6.dp))
@@ -141,26 +142,37 @@ internal fun DatabaseViewPane(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            when (view.presentation.kind) {
-                ViewPresentationKinds.TABLE -> DatabaseTable(
-                    controller = controller,
-                    projection = projection,
-                    compact = compact,
-                    onOpenNote = onOpenNote,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                ViewPresentationKinds.KANBAN -> DatabaseKanban(
-                    controller,
-                    projection,
-                    onOpenNote,
-                    Modifier.fillMaxWidth().padding(12.dp),
-                )
-                ViewPresentationKinds.GALLERY -> DatabaseGallery(
-                    projection,
-                    onOpenNote,
-                    Modifier.fillMaxWidth().padding(12.dp),
-                )
-                else -> Text(stringResource(Res.string.database_unknown_view), modifier = Modifier.padding(12.dp))
+            val tableHorizontalScrollState = remember(view.id) { ScrollState(0) }
+            BoundedBlockViewport(
+                compact = compact,
+                horizontalScrollState = if (view.presentation.kind == ViewPresentationKinds.TABLE) {
+                    tableHorizontalScrollState
+                } else {
+                    null
+                },
+            ) {
+                when (view.presentation.kind) {
+                    ViewPresentationKinds.TABLE -> DatabaseTable(
+                        controller = controller,
+                        projection = projection,
+                        compact = compact,
+                        horizontalScrollState = tableHorizontalScrollState,
+                        onOpenNote = onOpenNote,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    ViewPresentationKinds.KANBAN -> DatabaseKanban(
+                        controller,
+                        projection,
+                        onOpenNote,
+                        Modifier.fillMaxWidth().padding(12.dp),
+                    )
+                    ViewPresentationKinds.GALLERY -> DatabaseGallery(
+                        projection,
+                        onOpenNote,
+                        Modifier.fillMaxWidth().padding(12.dp),
+                    )
+                    else -> Text(stringResource(Res.string.database_unknown_view), modifier = Modifier.padding(12.dp))
+                }
             }
         }
     }
@@ -374,4 +386,3 @@ private fun DatasetFieldMoveAction(
 }
 
 /** 数据集切换为触控优先布局的宽度阈值。 */
-private val DATASET_COMPACT_BREAKPOINT = 680.dp
