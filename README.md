@@ -2,7 +2,7 @@
 
 Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加密对象快照保存权威状态，用 Change DAG 承载恢复、历史和多设备同步，并通过对象类型（超级标签）、普通标签、属性继承、稳定 Block、双向链接与受控 Agent 接口组织知识。
 
-> 当前状态：v0.2 Windows MVP 已接通桌面工作区创建/解锁、加密快照、事务恢复、加密索引、Block/RichText 编辑、Markdown、备份恢复与密钥维护，并通过桌面集成测试。其后的首版增量已加入 Tabs、Note 内 BaseTable，以及通过 `/database` 原位创建的 Database Block、独立 Database / View 加密快照、Table / Kanban / Gallery 受限展示与 Note revision 写回。Windows 分发包已构建并完成真实 EXE 启动和锁定欢迎页渲染检查。签名盲同步、CLI/MCP、AI 与向量能力目前停留在服务、适配器或共享契约层，没有在桌面 UI 中伪装成可用功能。
+> 当前状态：`core` 和 `app/shared` 保留跨平台领域模型、编辑器与 UI；文件系统、索引/搜索、同步三项能力已经分别抽成 `app:file-system`、`app:index`、`app:sync` 契约模块，各平台 `expect/actual` 工厂暂时直接 `TODO`。`app/desktopApp` 只保留窗口入口，不再包含 JVM 工作区、文件、SQLite 或 HTTP 实现；服务端盲同步实现独立留在 `server`。
 
 完整产品与技术基线见 [Tagloom 产品与技术设计草案](./Tagloom_产品与技术设计草案.md)，参与开发前请先阅读 [AGENTS.md](./AGENTS.md)。
 
@@ -14,7 +14,7 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 - 规范化 `RichText.runs`，支持单词或短语级粗体、斜体、删除线、链接、`code`、语义文字色、语义高亮色与独立加注锚点。
 - 多父标签解析、稳定拓扑顺序、循环检测、属性继承和显式冲突。
 - 对象级 Change DAG、多个 heads、确定性 LWW、三方合并与 Base/Local/Remote 冲突保留。
-- 标准 Markdown 与 Tagloom 扩展 Markdown 导入导出，以及有损能力清单；桌面端另支持 HTML、PDF 和 Word 文档导出。
+- 标准 Markdown 与 Tagloom 扩展 Markdown 导入导出，以及有损能力清单。
 
 ### 连续 Block 编辑器
 
@@ -31,14 +31,11 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 
 ### 加密、存储与恢复
 
-- Argon2id 密码派生、HKDF 用途隔离、Workspace Master Key、Wrapping Key 与随机 DEK 层级。
-- XChaCha20-Poly1305 版本化信封、认证公开头、对象身份/revision 绑定和篡改拒绝。
-- 加密 Manifest、Recovery Key、密码轮换、工作区创建/解锁/锁定领域服务。
-- Recovery Key 只用于解锁仍然存在的 `manifest.enc` 与密文对象，不包含笔记数据；原工作区丢失时必须先从 `.tagloom-backup.zip` 恢复，不能仅凭恢复码重建内容。
-- JVM 文件存储、原子事务协调、启动恢复、损坏文件隔离和加密备份协议。
-- 加密 SQLite 派生索引，支持全文、标签、属性、双链查询及从权威快照重建。
-- Workspace Master Key 全量轮换：重写权威密文、签发新 Recovery Key，并使旧密码和旧 Recovery Key 失效。
-- 安全 Change Log checkpoint：验证快照、保留期、设备确认和冲突引用后，在同一事务中提交加密审计点并压缩旧 Change。
+- Argon2id 密码派生、HKDF 用途隔离、Workspace Master Key、Wrapping Key 与随机 DEK 的跨平台领域协议。
+- XChaCha20-Poly1305 版本化信封、认证公开头、对象身份/revision 绑定和篡改拒绝规则。
+- `app:file-system` 文件系统能力契约：逻辑路径、原子写入、目录落盘、加密读写、启动恢复和单写入者租约。
+- `app:index` 索引与搜索能力契约：派生索引维护、全文/标签/属性/双链查询和从快照重建。
+- `app:sync` 同步会话能力契约：密文变更交换、checkpoint 边界和冲突统计。
 
 ### 同步与外部入口边界
 
@@ -52,16 +49,15 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 
 代码“已实现”不等于入口“已可用”。当前边界如下：
 
-| 能力 | 核心/适配器 | 当前 UI 或运行入口 |
+| 能力 | 当前代码状态 | 当前 UI 或运行入口 |
 | --- | --- | --- |
-| Block/RichText/Markdown | 已实现 | 桌面端为连续 Block 编辑器；支持不抢焦点的 Slash 菜单、行首/行内 Markdown、编辑器内直接粘贴、跨块键盘操作、嵌套/移动、行内颜色与加注、对象类型/普通标签/可复用属性、自动保存，以及 Markdown/HTML/PDF/Word 导出 |
-| 加密工作区与事务恢复 | 已实现并集成测试 | 桌面 UI 已支持创建、Recovery Key 确认、密码/Recovery Key 解锁、锁定、保存和 tombstone 删除 |
-| SQLite 搜索与双链 | 已实现并集成测试 | 桌面 UI 已支持已确认全文搜索与 SavedQuery；标签、属性和双链查询由同一索引提供 |
-| 备份与密钥维护 | 已实现并集成测试 | 桌面 UI 已支持密文备份/恢复、修改密码和 Workspace Master Key 全量轮换 |
-| Change Log 压缩 | 已实现并集成测试 | 当前为会话维护服务，尚未提供普通用户按钮 |
-| 签名 E2EE 同步 | 客户端传输、文件副本和服务端已实现 | 尚未接入桌面 UI；服务端可独立启动 |
-| Android | 共享编辑器与领域模型可编译/测试 | 内存示例；无工作区、文件、索引和同步适配器 |
-| iOS | `core` 可交叉编译 | 内存示例；需 macOS/Xcode 完成宿主编译和运行测试 |
+| Block/RichText/Markdown | `core` 与 `app/shared` 已实现 | 共享 Compose UI 可运行内存示例；不承诺桌面持久化入口 |
+| 文件系统与加密读写 | `app:file-system` 仅契约 | JVM/Android/iOS 工厂均为 `TODO` |
+| 索引与搜索 | `app:index` 仅契约 | JVM/Android/iOS 工厂均为 `TODO` |
+| 同步 | `app:sync` 仅契约 | JVM/Android/iOS 工厂均为 `TODO` |
+| 服务端盲同步 | `server` 独立 JVM 实现 | 可单独启动，客户端同步能力尚未接入 |
+| Android | 共享 UI 与三项能力契约可编译 | 平台能力工厂为 `TODO` |
+| iOS | 共享 UI 与三项能力契约可交叉编译 | 平台能力工厂为 `TODO`，需 macOS/Xcode 验证 |
 | CLI/MCP | 命令、资源 URI、工具目录与权限契约已实现 | 未提供可执行 CLI/MCP Server |
 | AI/向量 | 上下文、权限、端口与混合排序契约已实现 | 未接模型或向量数据库，不在 MVP UI 展示 |
 
@@ -90,16 +86,14 @@ flowchart LR
 ```text
 Tagloom/
 ├── app/
-│   ├── shared/                 # commonMain Compose UI、编辑器状态与工作区平台契约
-│   ├── desktopApp/             # JVM Desktop 工作区装配、文件网关与发行配置
+│   ├── shared/                 # commonMain Compose UI、编辑器状态与能力聚合
+│   ├── file-system/            # 文件读写、加密、恢复和写租约能力契约
+│   ├── index/                  # 索引与搜索能力契约
+│   ├── sync/                   # 同步会话能力契约
+│   ├── desktopApp/             # 仅 JVM Desktop 窗口入口与发行配置
 │   ├── androidApp/             # Android 宿主
 │   └── iosApp/                 # SwiftUI/iOS 宿主工程
 ├── core/                       # KMP 领域模型、协议、用例与 Port
-├── adapters/
-│   ├── crypto-libsodium/       # libsodium 加密、Argon2id、HKDF、Ed25519
-│   ├── file-store-jvm/         # Manifest、快照、事务、恢复与文件副本
-│   ├── index-sqlite-jvm/       # 加密 SQLite 派生索引
-│   └── sync-http-jvm/          # Ktor HTTP 同步客户端与本地密文副本
 ├── server/                     # Ktor 盲同步服务
 ├── AGENTS.md                   # 仓库开发约束
 └── Tagloom_产品与技术设计草案.md
@@ -110,12 +104,11 @@ Gradle 模块以 [`settings.gradle.kts`](./settings.gradle.kts) 为准：
 ```text
 :app:androidApp
 :app:desktopApp
+:app:file-system
+:app:index
 :app:shared
+:app:sync
 :core
-:adapters:crypto-libsodium
-:adapters:file-store-jvm
-:adapters:index-sqlite-jvm
-:adapters:sync-http-jvm
 :server
 ```
 
@@ -131,7 +124,7 @@ Gradle 模块以 [`settings.gradle.kts`](./settings.gradle.kts) 为准：
 Windows PowerShell：
 
 ```powershell
-# 运行已接通加密工作区的桌面应用
+# 运行桌面窗口入口（能力工厂当前为 TODO）
 .\gradlew.bat :app:desktopApp:run
 
 # Android Debug 包
@@ -178,15 +171,14 @@ Windows PowerShell：
 # KMP 核心与共享编辑器
 .\gradlew.bat :core:jvmTest :app:shared:jvmTest :app:shared:testAndroidHostTest
 
-# 加密、文件事务、索引、同步客户端和服务端
-.\gradlew.bat :adapters:crypto-libsodium:jvmTest `
-  :adapters:file-store-jvm:test `
-  :adapters:index-sqlite-jvm:test `
-  :adapters:sync-http-jvm:test `
+# 三项能力契约与服务端协议
+.\gradlew.bat :app:file-system:jvmTest `
+  :app:index:jvmTest `
+  :app:sync:jvmTest `
   :server:test
 
-# 桌面工作区、Android 宿主与 Windows 分发包
-.\gradlew.bat :app:desktopApp:test :app:androidApp:testDebugUnitTest
+# 桌面入口与 Android 宿主
+.\gradlew.bat :app:desktopApp:compileKotlin :app:androidApp:testDebugUnitTest
 .\gradlew.bat :app:androidApp:assembleDebug :app:desktopApp:createDistributable
 ```
 
@@ -198,32 +190,15 @@ macOS 还应运行：
 
 涉及加密、文件系统、恢复或发行包的改动不能只以编译成功作为完成依据；需要执行真实目录恢复、进程重启或打包应用启动验证。
 
-本次 v0.2 验证还包括：
-
-- 桌面集成链路覆盖“创建 → 确认 Recovery Key → 保存 → 锁定 → 密码/Recovery Key 解锁 → 搜索 → 备份 → 恢复”，并检查工作区与备份没有业务明文泄漏。
-- 故障注入覆盖事务各阶段、损坏对象隔离、损坏加密 SQLite 自动重建、主密钥轮换中断和 Change checkpoint 压缩后重建。
-- 当前 Windows 机器上的 10,000 Note / 100,000 Block 等价索引基准结果为：全量重建 2,458 ms，40 次查询 p95 为 4 ms。它是回归测试证据，不是对其他硬件的性能承诺。
-- Windows `createDistributable` 成功，真实 EXE 已启动并确认 `Tagloom` 窗口可交互、未离屏，锁定欢迎页的创建、打开、备份恢复和 Recovery Key 入口均正常渲染。
-- 内存工作区预览已在真实 Windows 窗口中验证连续输入：`Enter` 新建 Block、`# ` 转一级标题、标题后继续输入正文均落入独立 Block；IME 组合态下的 Enter 保留给输入法提交候选。
-
-Compose Desktop 当前只向 Windows UI Automation 暴露绘制节点，因此上述真实包检查是启动与画面验收；完整业务序列由桌面应用服务集成测试覆盖，不把进程启动冒充黑盒按钮自动化。
+本次重构验证重点是模块边界：三个能力模块的公共契约位于各自 `commonMain`，JVM/Android/iOS 工厂均为显式 `TODO`，桌面源码目录除 `main.kt` 外为空。服务端同步实现和协议测试继续独立于客户端能力模块。
 
 ## v0.2 / MVP 验收状态
 
-首个 MVP 以 Windows 桌面发行包为验收对象，当前完成情况如下：
-
-1. 工作区创建、一次性 Recovery Key 确认、密码/Recovery Key 解锁和锁定已接入桌面 UI。
-2. 编辑器保存、删除和 SavedQuery 已统一接入加密快照、Change DAG 与 `TransactionCoordinator`。
-3. 加密 SQLite 已支持全文、标签、属性、双链和删除后全量重建；桌面 UI 暴露全文与保存查询入口。
-4. Block 移动/嵌套、tombstone、单词级样式、文字/高亮语义颜色、加注编辑/移除、只读 Note 根类型、普通标签、固定/自由选项、可复用属性 schema 和未知扩展保留已完成。
-5. 编辑器内 Markdown 直接粘贴、Markdown/HTML/PDF/Word 导出、密文备份恢复、密码变更、主密钥轮换和 Change Log 安全压缩已完成。
-6. 自动化故障恢复、明文泄漏扫描、索引规模基准、Windows 分发包构建和真实启动渲染检查已通过。
-
-同步桌面入口、Android/iOS 功能对等、AI Provider、可执行 MCP 写入、向量数据库和完整样式系统不属于首个 MVP。当前编辑器已包含 Tabs、Note 内 BaseTable 和受限数据库视图，但仍未具备 Notion/Anytype 的列布局、多 Block 框选、拖动嵌套预览、复杂数据库能力与实时协作；这里的“连续 Block 编辑器”和“首版数据库视图”都不宣称完整产品对等。iOS 的 `core` KLIB 已在 Windows 交叉编译；共享 iOS 宿主仍需在 macOS/Xcode 环境完成最终编译和运行验证。
+当前切片不再宣称 Windows 桌面 MVP 已接通持久化。已确认的是 `core` 的跨平台领域协议、`app/shared` 的共享编辑器/UI，以及三个能力模块的契约；文件系统、索引/搜索、同步的实际平台实现留待后续按契约装配。Android/iOS/JVM 均通过同一组能力接口进入共享 App，不在 `shared` 中复制平台实现。
 
 ## 开发原则
 
-- 公共领域逻辑优先进入 `core/commonMain`，平台能力通过 Port 与 Adapter 隔离。
+- 公共领域逻辑优先进入 `core/commonMain`，平台能力通过三个 KMP 能力模块的契约隔离。
 - Compose UI 不直接读写加密文件、SQLite 或同步协议。
 - 所有工作区写入统一经过 `TransactionCoordinator`。
 - 所有业务类、业务函数、关键属性和复杂流程按照 [AGENTS.md](./AGENTS.md) 编写中文 KDoc/Doc 注释。

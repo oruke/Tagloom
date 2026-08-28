@@ -1596,22 +1596,16 @@ Tabs 独立路线（不依赖 Database 与 BaseTable）：
 ```text
 app/
 ├── shared/
+├── file-system/          # 文件读写、原子替换、目录落盘、加密、恢复和写租约能力契约
+├── index/                # 索引与搜索能力契约
+├── sync/                 # 同步会话能力契约
 ├── desktopApp/
 ├── androidApp/
 └── iosApp/
 
 core/
 └── src/
-    ├── commonMain/
-    │   ├── domain/
-    │   ├── application/
-    │   └── ports/
-    ├── jvmMain/
-    │   └── adapters/
-    ├── androidMain/
-    │   └── adapters/
-    └── iosMain/
-        └── adapters/
+    └── commonMain/        # 领域模型、协议、用例与可复用 Port
 
 server/
 
@@ -1620,7 +1614,7 @@ tools/                 # 后续按需增加
 └── mcp-server/
 ```
 
-项目早期采用模块化单体。`tag-engine`、`property-engine`、`block-engine`、`file-store`、`crypto` 等先作为 `core` 内职责清晰的 package 和接口存在，不立即拆成十多个 Gradle 模块。
+项目采用模块化单体。领域规则继续放在 `core`；文件系统、索引/搜索、同步分别作为三个 KMP 能力模块，只在 `commonMain` 定义稳定契约，并由各平台 `expect/actual` 工厂提供后续装配点。`desktopApp` 只保留 JVM 窗口入口，不承载能力实现。
 
 只有满足以下任一条件时才拆分独立模块：
 
@@ -1640,7 +1634,7 @@ Domain
 ↓
 Ports
 ↓
-File Store / Crypto / Index / Network Adapters
+app:file-system / app:index / app:sync
 ```
 
 Domain 层不能直接依赖 Compose、SQLite、Ktor 或具体 AI SDK。
@@ -1887,15 +1881,15 @@ Note、Tag、PropertyDef、SavedQuery 等对象采用共同信封内的逻辑头
 
 **权衡**：数据恢复边界清晰，但首次重建和大工作区启动需要进度、取消和降级体验。
 
-## ADR-006：桌面优先的模块化单体
+## ADR-006：三个跨平台能力模块
 
 **状态**：Accepted
 
-**背景**：当前项目和团队规模尚不需要十多个 Gradle 模块，但领域逻辑必须保持 KMP 可复用并隔离平台能力。
+**背景**：文件读写/加密恢复、索引/搜索、同步都有独立替换边界；把它们放进 `shared` 或旧的集中式适配器目录会让平台实现和 UI 依赖互相渗透。
 
-**决定**：首期维持 `app/shared`、`core`、`server` 等少量模块，在 `core` 内按 domain、application、ports、adapters 分包。Windows 桌面端先形成完整垂直切片，Android 和 iOS 后续复用公共核心。
+**决定**：建立 `app:file-system`、`app:index`、`app:sync` 三个 KMP 模块。每个模块只在 `commonMain` 暴露跨平台能力契约，并在 JVM、Android、iOS 源集提供 `expect/actual` 工厂；当前工厂直接 `TODO`，不提前放入单平台实现。`app/shared` 只消费这些接口并编排 UI，`app/desktopApp` 只保留窗口入口，服务端实现留在 `server`。
 
-**权衡**：构建和重构成本较低，边界主要依靠代码规范和测试维护；当平台依赖或复用边界稳定后再拆模块。
+**权衡**：模块数量增加，但能力可独立替换并可由 Android/iOS/JVM 共用同一契约；当前没有实现落地，短期内各平台只能展示未装配状态。
 
 ## ADR-007：所有外部入口复用应用服务和权限层
 

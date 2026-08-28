@@ -3,11 +3,11 @@
     <string name="workspace_loading">正在准备工作区…</string>
     <string name="workspace_access_continue_to">继续进入 %1$s</string>
     <string name="workspace_access_open">打开工作区</string>
-    <string name="workspace_access_auto_open_description">此设备未启用 PIN 码。Tagloom 会使用当前 Windows 帐户保护本机解锁材料。</string>
+    <string name="workspace_access_auto_open_description">此设备未启用 PIN 码。Tagloom 会使用设备安全存储保护本机解锁材料。</string>
     <string name="workspace_access_pin_label">PIN 码</string>
     <string name="workspace_access_pin_confirm_label">确认 PIN 码</string>
     <string name="workspace_access_pin_optional_label">使用 PIN 码保护此设备</string>
-    <string name="workspace_access_pin_optional_description">可选。不设置 PIN 码时，当前 Windows 帐户可以自动打开工作区。</string>
+    <string name="workspace_access_pin_optional_description">可选。不设置 PIN 码时，设备安全存储可以自动打开工作区。</string>
     <string name="workspace_access_unlock">解锁</string>
     <string name="workspace_access_use_another">使用其他工作区</string>
     <string name="workspace_access_create">创建工作区</string>
@@ -19,7 +19,7 @@
     <string name="workspace_access_recover_description">使用 Recovery Key 将已有加密工作区连接到这台设备，再按需设置新的本机 PIN 码。</string>
     <string name="workspace_access_recovery_key_label">Recovery Key</string>
     <string name="workspace_access_pin_security_note">PIN 码只保护这台设备上的本机解锁材料。请将 Recovery Key 保存在独立离线位置。</string>
-    <string name="workspace_access_windows_security_note">当前 Windows 帐户会保护这台设备上的本机解锁材料。请将 Recovery Key 保存在独立离线位置。</string>
+    <string name="workspace_access_device_security_note">设备安全存储会保护本机解锁材料。请将 Recovery Key 保存在独立离线位置。</string>
     <string name="workspace_access_back">返回</string>
     <string name="workspace_access_busy">正在打开并验证工作区…</string>
     <string name="workspace_recovery_save_title">保存 Recovery Key</string>
@@ -53,7 +53,7 @@
     <string name="workspace_status_backup_created">密文备份已创建</string>
     <string name="workspace_status_pin_changed">本机 PIN 码已更换</string>
     <string name="workspace_status_pin_enabled">此设备现已启用 PIN 码</string>
-    <string name="workspace_status_pin_disabled">此设备将通过当前 Windows 帐户自动打开</string>
+    <string name="workspace_status_pin_disabled">此设备将通过安全存储自动打开</string>
     <string name="workspace_status_master_key_rotated">主密钥和权威密文已轮换；请立即离线保存新的 Recovery Key。</string>
     <string name="workspace_status_query_saved">查询已保存</string>
     <string name="workspace_status_tag_created_and_attached">对象类型已创建并关联</string>
@@ -79,13 +79,13 @@
     <string name="workspace_pin_confirm_label">确认新 PIN 码</string>
     <string name="workspace_pin_change_confirm">确认更换</string>
     <string name="workspace_pin_enable_title">设置本机 PIN 码</string>
-    <string name="workspace_pin_enable_description">PIN 码是可选的。启用后，当前 Windows 帐户打开工作区前还需要进行一次 PIN 验证。</string>
+    <string name="workspace_pin_enable_description">PIN 码是可选的。启用后，设备安全存储打开工作区前还需要进行一次 PIN 验证。</string>
     <string name="workspace_pin_enable_confirm">设置 PIN 码</string>
     <string name="workspace_pin_disable_confirm">停用 PIN 码</string>
     <string name="workspace_master_rotation_title">轮换工作区主密钥</string>
     <string name="workspace_master_rotation_description">这会重写全部权威密文，并使旧 Recovery Key 失效。完成后必须保存新的 Recovery Key。</string>
     <string name="workspace_master_rotation_confirm">确认轮换</string>
-    <string name="workspace_master_rotation_windows_account_note">此设备未启用 PIN 码，当前 Windows 帐户将认证本机解锁材料。</string>
+    <string name="workspace_master_rotation_device_account_note">此设备未启用 PIN 码，设备安全存储将认证本机解锁材料。</string>
     <string name="workspace_recovery_rotated_title">保存新的 Recovery Key</string>
     <string name="workspace_recovery_rotated_description">旧 Recovery Key 已失效。请把下面的新密钥保存到工作区之外的离线位置。</string>
     <string name="workspace_recovery_rotated_confirm_saved">我已将新的 Recovery Key 离线保存</string>

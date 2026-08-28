@@ -34,10 +34,9 @@ plugins {
 
 include(":app:androidApp")
 include(":app:desktopApp")
+include(":app:file-system")
+include(":app:index")
 include(":app:shared")
+include(":app:sync")
 include(":core")
-include(":adapters:crypto-libsodium")
-include(":adapters:file-store-jvm")
-include(":adapters:index-sqlite-jvm")
-include(":adapters:sync-http-jvm")
 include(":server")

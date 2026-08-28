@@ -3,6 +3,8 @@ package com.oruke.tagloom.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.oruke.tagloom.core.index.PropertyIndexFilter
+import com.oruke.tagloom.core.index.SearchIndexQuery
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.PropertyId
 import com.oruke.tagloom.core.model.SavedQuery
@@ -19,6 +21,7 @@ import com.oruke.tagloom.editor.setPropertyAttached
 import com.oruke.tagloom.editor.upsertPropertyDefinition
 import com.oruke.tagloom.editor.upsertTagDefinition
 import com.oruke.tagloom.editor.validateTagDefinition
+import com.oruke.tagloom.index.SearchEngine
 import com.oruke.tagloom.platform.WorkspaceGateway
 import com.oruke.tagloom.platform.WorkspaceOpenResult
 import com.oruke.tagloom.platform.WorkspaceRecentWorkspace
@@ -49,11 +52,13 @@ internal enum class WorkspaceUiPhase {
 /**
  * 统一管理共享 UI 的异步工作区生命周期和编辑器明文清理。
  *
- * @param gateway 当前平台真实工作区能力。
+ * @param gateway 当前工作区生命周期和权威写入能力。
+ * @param searchEngine 当前已打开工作区的查询能力。
  * @param editorState 仅在解锁会话内持有 Note 明文的编辑器状态。
  */
 internal class WorkspaceUiController(
     private val gateway: WorkspaceGateway,
+    private val searchEngine: SearchEngine,
     val editorState: TagloomEditorState,
 ) {
     /** 当前工作区 UI 阶段。 */
@@ -108,7 +113,7 @@ internal class WorkspaceUiController(
     /**
      * 读取本机最近登记工作区，决定自动打开、PIN 解锁还是首次连接入口。
      *
-     * 未启用 PIN 的 Windows 本机登记会在此处直接认证，避免每次启动反复选择目录或输入
+     * 未启用 PIN 的本机登记会在此处直接认证，避免每次启动反复选择位置或输入
      * Recovery Key；本机登记不可用时不会猜测目录或自动恢复，用户必须显式选择新建或
      * 用 Recovery Key 连接既有工作区。
      */
@@ -165,7 +170,7 @@ internal class WorkspaceUiController(
     }
 
     /**
-     * 使用当前 Windows 帐户保护的材料重新打开最近登记工作区。
+     * 使用当前设备系统保护的材料重新打开最近登记工作区。
      */
     suspend fun openRecentWorkspace() = runOperation {
         open(gateway.openRecentWorkspace())
@@ -218,7 +223,7 @@ internal class WorkspaceUiController(
     }
 
     /**
-     * 为当前 Windows 帐户保护的本机材料启用 PIN。
+     * 为当前设备系统保护的本机材料启用 PIN。
      *
      * @param pin 用户设置的 6 至 12 位数字 PIN。
      */
@@ -256,7 +261,7 @@ internal class WorkspaceUiController(
     }
 
     /**
-     * 认证当前 PIN 后停用 PIN，改回当前 Windows 用户自动打开模式。
+     * 认证当前 PIN 后停用 PIN，改回当前设备系统保护的自动打开模式。
      *
      * @param currentPin 当前设备 PIN。
      */
@@ -305,7 +310,9 @@ internal class WorkspaceUiController(
      * 查询已确认快照索引，不把未保存草稿混入结果。
      */
     suspend fun search() = runOperation {
-        searchHits = gateway.search(searchText)
+        searchHits = searchEngine.search(SearchIndexQuery(text = searchText)).map { hit ->
+            WorkspaceSearchHit(hit.noteId, hit.title, hit.snippet)
+        }
     }
 
     /**
@@ -408,7 +415,17 @@ internal class WorkspaceUiController(
      * @param objectId 保存查询对象 ID。
      */
     suspend fun runSavedQuery(objectId: com.oruke.tagloom.core.model.ObjectId) = runOperation {
-        searchHits = gateway.runSavedQuery(objectId)
+        val saved = savedQueries.singleOrNull { query -> query.id == objectId }
+            ?: return@runOperation
+        searchHits = searchEngine.search(
+            SearchIndexQuery(
+                text = saved.query.text,
+                tagIds = saved.query.tagIds.toSet(),
+                propertyFilters = saved.query.propertyFilters.map { filter ->
+                    PropertyIndexFilter(filter.propertyId, filter.canonicalValue)
+                },
+            ),
+        ).map { hit -> WorkspaceSearchHit(hit.noteId, hit.title, hit.snippet) }
     }
 
     /**

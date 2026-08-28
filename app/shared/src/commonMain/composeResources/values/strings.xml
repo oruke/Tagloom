@@ -3,11 +3,11 @@
     <string name="workspace_loading">Preparing your workspace…</string>
     <string name="workspace_access_continue_to">Continue to %1$s</string>
     <string name="workspace_access_open">Open workspace</string>
-    <string name="workspace_access_auto_open_description">This device does not require a PIN. Tagloom uses your Windows account to protect the local unlock material.</string>
+    <string name="workspace_access_auto_open_description">This device does not require a PIN. Tagloom uses the device security store to protect the local unlock material.</string>
     <string name="workspace_access_pin_label">PIN</string>
     <string name="workspace_access_pin_confirm_label">Confirm PIN</string>
     <string name="workspace_access_pin_optional_label">Protect this device with a PIN</string>
-    <string name="workspace_access_pin_optional_description">Optional. Without a PIN, this Windows account can open the workspace automatically.</string>
+    <string name="workspace_access_pin_optional_description">Optional. Without a PIN, the device security store can open the workspace automatically.</string>
     <string name="workspace_access_unlock">Unlock</string>
     <string name="workspace_access_use_another">Use another workspace</string>
     <string name="workspace_access_create">Create workspace</string>
@@ -19,7 +19,7 @@
     <string name="workspace_access_recover_description">Use the Recovery Key to connect an existing encrypted workspace to this device, then optionally add a local PIN.</string>
     <string name="workspace_access_recovery_key_label">Recovery Key</string>
     <string name="workspace_access_pin_security_note">Your PIN protects this device’s local unlock material. Keep the Recovery Key in a separate offline location.</string>
-    <string name="workspace_access_windows_security_note">Windows protects this device’s local unlock material. Keep the Recovery Key in a separate offline location.</string>
+    <string name="workspace_access_device_security_note">The device security store protects local unlock material. Keep the Recovery Key in a separate offline location.</string>
     <string name="workspace_access_back">Back</string>
     <string name="workspace_access_busy">Opening and verifying your workspace…</string>
     <string name="workspace_recovery_save_title">Save your Recovery Key</string>
@@ -53,7 +53,7 @@
     <string name="workspace_status_backup_created">Encrypted backup created</string>
     <string name="workspace_status_pin_changed">This device PIN was changed</string>
     <string name="workspace_status_pin_enabled">This device now requires a PIN</string>
-    <string name="workspace_status_pin_disabled">This device will open with the current Windows account</string>
+    <string name="workspace_status_pin_disabled">This device will open with its security store</string>
     <string name="workspace_status_master_key_rotated">The master key and encrypted authoritative data were rotated. Save the new Recovery Key now.</string>
     <string name="workspace_status_query_saved">Query saved</string>
     <string name="workspace_status_tag_created_and_attached">Object type created and attached</string>
@@ -79,13 +79,13 @@
     <string name="workspace_pin_confirm_label">Confirm new PIN</string>
     <string name="workspace_pin_change_confirm">Change PIN</string>
     <string name="workspace_pin_enable_title">Set device PIN</string>
-    <string name="workspace_pin_enable_description">A PIN is optional. It adds a separate check before this Windows account can open the workspace.</string>
+    <string name="workspace_pin_enable_description">A PIN is optional. It adds a separate check before the device security store can open the workspace.</string>
     <string name="workspace_pin_enable_confirm">Set PIN</string>
     <string name="workspace_pin_disable_confirm">Turn off PIN</string>
     <string name="workspace_master_rotation_title">Rotate workspace master key</string>
     <string name="workspace_master_rotation_description">This rewrites encrypted authoritative data and invalidates the previous Recovery Key. You will need to save a new Recovery Key afterwards.</string>
     <string name="workspace_master_rotation_confirm">Rotate key</string>
-    <string name="workspace_master_rotation_windows_account_note">This device has no PIN, so the current Windows account will authorize the local unlock material.</string>
+    <string name="workspace_master_rotation_device_account_note">This device has no PIN, so its security store will authorize the local unlock material.</string>
     <string name="workspace_recovery_rotated_title">Save the new Recovery Key</string>
     <string name="workspace_recovery_rotated_description">The previous Recovery Key no longer works. Store this new key offline outside the workspace.</string>
     <string name="workspace_recovery_rotated_confirm_saved">I saved the new Recovery Key offline</string>

@@ -28,9 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.oruke.tagloom.capability.TagloomCapabilities
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.platform.DocumentFileGateway
-import com.oruke.tagloom.platform.WorkspaceGateway
 import com.oruke.tagloom.platform.WorkspaceRecentWorkspace
 import com.oruke.tagloom.platform.WorkspaceRecoveryMessage
 import kotlinx.coroutines.launch
@@ -40,21 +40,23 @@ import tagloom.app.shared.generated.resources.*
 /**
  * 根据工作区锁定状态渲染最近工作区 PIN、Recovery Key、恢复或编辑界面。
  *
- * @param workspaceGateway 当前平台真实工作区能力。
+ * @param capabilities 当前宿主提供的跨平台能力集合。
  * @param documentFileGateway 可选文档导出能力。
  */
 @Composable
 fun WorkspaceLifecycleScreen(
-    workspaceGateway: WorkspaceGateway,
+    capabilities: TagloomCapabilities,
     documentFileGateway: DocumentFileGateway? = null,
 ) {
-    val editorState = remember(workspaceGateway) {
+    val editorState = remember(capabilities.workspace) {
         TagloomEditorState(
-            idFactory = workspaceGateway::createOpaqueId,
-            timestampProvider = workspaceGateway::currentUtcTimestamp,
+            idFactory = capabilities.workspace::createOpaqueId,
+            timestampProvider = capabilities.workspace::currentUtcTimestamp,
         )
     }
-    val controller = remember(workspaceGateway) { WorkspaceUiController(workspaceGateway, editorState) }
+    val controller = remember(capabilities) {
+        WorkspaceUiController(capabilities.workspace, capabilities.searchEngine, editorState)
+    }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(controller) {
@@ -141,7 +143,7 @@ private enum class WorkspaceAccessMode {
  * @param recentWorkspace 本机最近登记工作区；为空时显示首次使用入口。
  * @param busy 是否正在执行本机访问或工作区认证。
  * @param errorMessage 当前可安全展示的本地化错误。
- * @param onOpenRecent 使用 Windows 帐户保护材料重新打开最近工作区。
+ * @param onOpenRecent 使用当前设备系统保护材料重新打开最近工作区。
  * @param onUnlock 使用 PIN 解锁最近登记工作区。
  * @param onCreate 使用可选 PIN 准备新工作区创建。
  * @param onRecover 使用 Recovery Key 和可选 PIN 连接既有工作区。
@@ -334,7 +336,7 @@ private fun WorkspaceWelcomePane(
                 if (pinProtectionActive) {
                     Res.string.workspace_access_pin_security_note
                 } else {
-                    Res.string.workspace_access_windows_security_note
+                    Res.string.workspace_access_device_security_note
                 },
             ),
             style = MaterialTheme.typography.bodySmall,

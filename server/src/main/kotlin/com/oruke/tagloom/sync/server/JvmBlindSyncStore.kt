@@ -6,8 +6,6 @@ import com.oruke.tagloom.core.protocol.CanonicalJson
 import com.oruke.tagloom.core.sync.BlindSyncArtifact
 import com.oruke.tagloom.core.sync.ObjectChangeHeads
 import com.oruke.tagloom.core.sync.SyncArtifactKind
-import com.oruke.tagloom.filestore.jvm.JvmDirectoryDurability
-import com.oruke.tagloom.filestore.jvm.JvmDirectoryDurabilityFactory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -28,14 +26,14 @@ import java.util.stream.Collectors
  * 文件只包含随机公开标识、DAG 父边和完整加密信封；不会保存标题、标签、属性名或原始文件名。
  *
  * @param rootDirectory 同步服务数据根目录。
- * @param directoryDurability 跨平台目录元数据刷新能力。
+ * @param directoryDurability 服务端目录元数据刷新能力。
  * @param dispatcher 执行阻塞文件操作的协程调度器。
  */
 class JvmBlindSyncStore(
     /** 同步服务数据根目录。 */
     private val rootDirectory: Path,
     /** 跨平台目录元数据刷新能力。 */
-    private val directoryDurability: JvmDirectoryDurability = JvmDirectoryDurabilityFactory.create(),
+    private val directoryDurability: ServerDirectoryDurability = ServerDirectoryDurabilityFactory.create(),
     /** 执行阻塞文件操作的协程调度器。 */
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : BlindSyncStore {

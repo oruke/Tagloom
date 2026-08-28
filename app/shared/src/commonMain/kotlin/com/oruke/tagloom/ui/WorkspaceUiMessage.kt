@@ -58,7 +58,7 @@ internal sealed interface WorkspaceUiMessage {
     /** 当前设备已开始要求 PIN。 */
     data object PinEnabled : WorkspaceUiMessage
 
-    /** 当前设备已改回 Windows 帐户自动打开。 */
+    /** 当前设备已改回系统安全存储自动打开。 */
     data object PinDisabled : WorkspaceUiMessage
 
     /** 主密钥轮换及新的 Recovery Key 已准备完成。 */

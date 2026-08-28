@@ -26,8 +26,8 @@ application {
 
 dependencies {
     api(projects.core)
-    implementation(projects.adapters.cryptoLibsodium)
-    implementation(projects.adapters.fileStoreJvm)
+    implementation(libs.libsodium.bindings)
+    implementation(libs.jna.platform)
     implementation(libs.logback)
     implementation(libs.ktor.serverCore)
     implementation(libs.ktor.serverNetty)

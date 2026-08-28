@@ -47,6 +47,9 @@ kotlin {
         }
         commonMain.dependencies {
             api(projects.core)
+            api(projects.app.fileSystem)
+            api(projects.app.index)
+            api(projects.app.sync)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)

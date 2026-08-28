@@ -21,7 +21,7 @@ import tagloom.app.shared.generated.resources.*
 /**
  * 渲染可选 PIN 的开关、说明和二次确认输入。
  *
- * 未启用 PIN 时，平台使用当前 Windows 用户的系统保护材料自动打开工作区；因此该组件不能
+ * 未启用 PIN 时，平台使用当前设备的系统保护材料自动打开工作区；因此该组件不能
  * 通过隐藏输入框的方式暗示 PIN 是必填步骤。
  *
  * @param pinEnabled 是否启用 PIN 保护。

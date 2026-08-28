@@ -183,9 +183,9 @@ data class WorkspaceSearchHit(
 )
 
 /**
- * 抽象共享 UI 所需的工作区创建、解锁、事务写入、搜索和锁定能力。
+ * 抽象共享 UI 所需的工作区创建、解锁、事务写入和锁定能力。
  *
- * 平台实现负责目录选择和真实适配器组装；无实现的平台不得在 UI 中展示这些能力。
+ * 平台实现负责位置选择和真实能力组装；无实现的平台不得在 UI 中展示这些能力。
  */
 interface WorkspaceGateway {
     /**
@@ -211,7 +211,7 @@ interface WorkspaceGateway {
     suspend fun recentWorkspaceOrNull(): WorkspaceRecentWorkspace?
 
     /**
-     * 使用当前 Windows 帐户保护的本机材料打开最近登记工作区。
+     * 使用当前设备的系统保护材料打开最近登记工作区。
      *
      * 该入口只适用于未启用 PIN 的本机登记；平台必须拒绝把它用于 PIN 模式，避免 UI
      * 误把“自动打开”降级为绕过本机访问保护。
@@ -231,7 +231,7 @@ interface WorkspaceGateway {
     /**
      * 选择空目录并准备新工作区，确认前不得写入文件。
      *
-     * 平台会生成不会展示给用户的高熵解锁材料；用户可选择用 PIN 或当前 Windows 帐户
+     * 平台会生成不会展示给用户的高熵解锁材料；用户可选择用 PIN 或设备系统保护机制
      * 保护其本机副本。
      *
      * @param pin 用户为本机访问记录设置的可选 PIN；为空时不启用 PIN。
@@ -281,7 +281,7 @@ interface WorkspaceGateway {
     ): WorkspaceOpenResult?
 
     /**
-     * 为当前 Windows 帐户保护的本机解锁材料启用 PIN。
+     * 为当前设备系统保护的本机解锁材料启用 PIN。
      *
      * @param pin 用户设置的 6 至 12 位数字 PIN。
      */
@@ -299,7 +299,7 @@ interface WorkspaceGateway {
     )
 
     /**
-     * 认证当前 PIN 后停用 PIN，改回当前 Windows 帐户保护的自动打开模式。
+     * 认证当前 PIN 后停用 PIN，改回当前设备系统保护的自动打开模式。
      *
      * @param currentPin 当前本机 PIN。
      */
@@ -335,14 +335,6 @@ interface WorkspaceGateway {
      * @param objectId 待删除 Note ID。
      */
     suspend fun deleteNote(objectId: ObjectId)
-
-    /**
-     * 查询已确认快照的派生索引。
-     *
-     * @param text 用户全文输入。
-     * @return 稳定排序的命中。
-     */
-    suspend fun search(text: String): List<WorkspaceSearchHit>
 
     /**
      * 保存一个当前工作区查询。
@@ -403,14 +395,6 @@ interface WorkspaceGateway {
      * @return 新确认 View。
      */
     suspend fun saveViewDefinition(definition: ViewDefinition): WorkspaceViewDefinition
-
-    /**
-     * 运行一个已确认保存查询。
-     *
-     * @param objectId 保存查询对象 ID。
-     * @return 稳定排序的命中。
-     */
-    suspend fun runSavedQuery(objectId: ObjectId): List<WorkspaceSearchHit>
 
     /** 关闭索引、销毁会话密钥并立即使全部旧调用失效。 */
     suspend fun lock()

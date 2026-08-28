@@ -38,7 +38,7 @@ import tagloom.app.shared.generated.resources.workspace_action_save
 import tagloom.app.shared.generated.resources.workspace_master_rotation_confirm
 import tagloom.app.shared.generated.resources.workspace_master_rotation_description
 import tagloom.app.shared.generated.resources.workspace_master_rotation_title
-import tagloom.app.shared.generated.resources.workspace_master_rotation_windows_account_note
+import tagloom.app.shared.generated.resources.workspace_master_rotation_device_account_note
 import tagloom.app.shared.generated.resources.workspace_note_delete_confirm
 import tagloom.app.shared.generated.resources.workspace_note_delete_description
 import tagloom.app.shared.generated.resources.workspace_note_delete_title
@@ -427,7 +427,7 @@ private fun MasterKeyRotationDialog(
                     )
                 } else {
                     Text(
-                        stringResource(Res.string.workspace_master_rotation_windows_account_note),
+                        stringResource(Res.string.workspace_master_rotation_device_account_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
