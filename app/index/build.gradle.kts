@@ -30,8 +30,15 @@ kotlin {
         commonMain.dependencies {
             api(projects.core)
         }
+        jvmMain.dependencies {
+            implementation(libs.sqlite.jdbc.crypt)
+            implementation(libs.kotlinx.coroutinesCore)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.testJunit)
         }
     }
 }

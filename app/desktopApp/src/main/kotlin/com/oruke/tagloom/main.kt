@@ -9,7 +9,7 @@ import com.oruke.tagloom.capability.createTagloomCapabilities
 /**
  * 启动桌面宿主并把能力装配交给共享 App。
  *
- * 当前能力工厂仍是 TODO；桌面入口只保留窗口生命周期，不再承载文件、索引、搜索或同步实现。
+ * JVM 能力由共享层 actual 工厂装配；桌面入口只保留窗口生命周期，不承载文件、索引、搜索或同步实现。
  */
 fun main() = application {
     Window(

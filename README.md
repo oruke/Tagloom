@@ -2,7 +2,7 @@
 
 Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加密对象快照保存权威状态，用 Change DAG 承载恢复、历史和多设备同步，并通过对象类型（超级标签）、普通标签、属性继承、稳定 Block、双向链接与受控 Agent 接口组织知识。
 
-> 当前状态：`core` 和 `app/shared` 保留跨平台领域模型、编辑器与 UI；文件系统、索引/搜索、同步三项能力已经分别抽成 `app:file-system`、`app:index`、`app:sync` 契约模块，各平台 `expect/actual` 工厂暂时直接 `TODO`。`app/desktopApp` 只保留窗口入口，不再包含 JVM 工作区、文件、SQLite 或 HTTP 实现；服务端盲同步实现独立留在 `server`。
+> 当前状态：`core` 和 `app/shared` 保留跨平台领域模型、编辑器与 UI；文件系统、索引/搜索、同步三项能力已经分别抽成 `app:file-system`、`app:index`、`app:sync` 模块。JVM 实现位于三个模块各自的 `jvmMain`，共享层 JVM actual 工厂负责装配；Android/iOS 工厂仍为 `TODO`。`app/desktopApp` 只保留窗口入口，不再包含 JVM 工作区、文件、SQLite 或 HTTP 实现；服务端盲同步实现独立留在 `server`。
 
 完整产品与技术基线见 [Tagloom 产品与技术设计草案](./Tagloom_产品与技术设计草案.md)，参与开发前请先阅读 [AGENTS.md](./AGENTS.md)。
 
@@ -51,10 +51,10 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 
 | 能力 | 当前代码状态 | 当前 UI 或运行入口 |
 | --- | --- | --- |
-| Block/RichText/Markdown | `core` 与 `app/shared` 已实现 | 共享 Compose UI 可运行内存示例；不承诺桌面持久化入口 |
-| 文件系统与加密读写 | `app:file-system` 仅契约 | JVM/Android/iOS 工厂均为 `TODO` |
-| 索引与搜索 | `app:index` 仅契约 | JVM/Android/iOS 工厂均为 `TODO` |
-| 同步 | `app:sync` 仅契约 | JVM/Android/iOS 工厂均为 `TODO` |
+| Block/RichText/Markdown | `core` 与 `app/shared` 已实现 | JVM Desktop 通过共享能力工厂进入工作区持久化；文档导出能力尚未接入桌面入口 |
+| 文件系统与加密读写 | `app:file-system` 的 `commonMain` 契约与 JVM 实现 | JVM 已由共享 actual 工厂装配；Android/iOS 工厂为 `TODO` |
+| 索引与搜索 | `app:index` 的 `commonMain` 契约与 JVM 加密 SQLite 实现 | JVM 已由共享 actual 工厂装配；Android/iOS 工厂为 `TODO` |
+| 同步 | `app:sync` 的 `commonMain` 契约与 JVM HTTP/本地副本实现 | JVM 实现可显式配置；默认工厂不猜测密钥、Token 或服务端地址 |
 | 服务端盲同步 | `server` 独立 JVM 实现 | 可单独启动，客户端同步能力尚未接入 |
 | Android | 共享 UI 与三项能力契约可编译 | 平台能力工厂为 `TODO` |
 | iOS | 共享 UI 与三项能力契约可交叉编译 | 平台能力工厂为 `TODO`，需 macOS/Xcode 验证 |
@@ -124,7 +124,7 @@ Gradle 模块以 [`settings.gradle.kts`](./settings.gradle.kts) 为准：
 Windows PowerShell：
 
 ```powershell
-# 运行桌面窗口入口（能力工厂当前为 TODO）
+# 运行桌面窗口入口（JVM 三项能力由共享 actual 工厂装配）
 .\gradlew.bat :app:desktopApp:run
 
 # Android Debug 包
@@ -190,11 +190,11 @@ macOS 还应运行：
 
 涉及加密、文件系统、恢复或发行包的改动不能只以编译成功作为完成依据；需要执行真实目录恢复、进程重启或打包应用启动验证。
 
-本次重构验证重点是模块边界：三个能力模块的公共契约位于各自 `commonMain`，JVM/Android/iOS 工厂均为显式 `TODO`，桌面源码目录除 `main.kt` 外为空。服务端同步实现和协议测试继续独立于客户端能力模块。
+本次重构验证重点是模块边界和 JVM 装配：三个能力模块的公共契约位于各自 `commonMain`，JVM 实现位于各自 `jvmMain`，共享层 JVM actual 工厂负责组装工作区、文件系统、索引/搜索和同步能力；Android/iOS 工厂仍为显式 `TODO`。桌面源码目录除 `main.kt` 外为空，服务端同步实现和协议测试继续独立于客户端能力模块。
 
 ## v0.2 / MVP 验收状态
 
-当前切片不再宣称 Windows 桌面 MVP 已接通持久化。已确认的是 `core` 的跨平台领域协议、`app/shared` 的共享编辑器/UI，以及三个能力模块的契约；文件系统、索引/搜索、同步的实际平台实现留待后续按契约装配。Android/iOS/JVM 均通过同一组能力接口进入共享 App，不在 `shared` 中复制平台实现。
+当前切片已完成 JVM 能力的代码接入：`app:file-system` 提供原子落盘、目录持久化、加密工作区事务与恢复，`app:index` 提供加密 SQLite 索引与搜索，`app:sync` 提供显式配置的 HTTP/本地密文副本同步；`app/shared` 的 JVM actual 工厂把它们交给共享 UI。Android/iOS 仍只保留同一组能力接口和 `TODO` 工厂，尚未实现平台能力。桌面发行包的真实启动和端到端交互仍需按验收标准执行。
 
 ## 开发原则
 

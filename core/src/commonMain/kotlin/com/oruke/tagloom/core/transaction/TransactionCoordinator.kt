@@ -2,6 +2,7 @@ package com.oruke.tagloom.core.transaction
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * 作为单个工作区唯一写入者，编排密文 staging、权威 manifest 确认和启动恢复。
@@ -34,9 +35,14 @@ class TransactionCoordinator(
         storage.markCommitted(plan.transactionId)
 
         // 步骤 3：索引是派生状态，失败只标记落后，不能破坏 manifest 已确认的业务状态。
-        val derivedStateUpdated = runCatching {
+        val derivedStateUpdated = try {
             derivedStateUpdater.update(plan.transactionId)
-        }.isSuccess
+            true
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            false
+        }
 
         // 步骤 4：只有 manifest 已确认且派生更新已尝试后才清理恢复材料。
         storage.cleanupAfterCommit(plan.transactionId)
@@ -53,15 +59,28 @@ class TransactionCoordinator(
      */
     suspend fun recoverOnStartup(): TransactionRecoveryReport = writeMutex.withLock {
         storage.cleanupOrphanStaging()
-        val entries = mutableListOf<TransactionRecoveryEntry>()
-        var requiresReadOnlyMode = false
+        val loaded = storage.loadPendingPrepared()
+        val entries = loaded.quarantinedTransactionIds
+            .map { transactionId ->
+                TransactionRecoveryEntry(transactionId, TransactionRecoveryAction.QUARANTINED)
+            }
+            .toMutableList()
+        var requiresReadOnlyMode = loaded.quarantinedTransactionIds.isNotEmpty()
 
-        storage.loadPendingPrepared().forEach { record ->
+        loaded.records.forEach { record ->
             val action = try {
                 recoverPrepared(record)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (_: Throwable) {
                 // 恢复阶段的再次失败意味着无法证明新旧状态完整，必须保留证据并停止后续写入。
-                runCatching { storage.quarantine(record) }
+                try {
+                    storage.quarantine(record)
+                } catch (quarantineFailure: CancellationException) {
+                    throw quarantineFailure
+                } catch (_: Throwable) {
+                    // 隔离失败仍保持只读结果；下一次启动会再次发现原始 staging。
+                }
                 TransactionRecoveryAction.QUARANTINED
             }
             entries += TransactionRecoveryEntry(record.transactionId, action)
@@ -94,7 +113,13 @@ class TransactionCoordinator(
                 storage.publishArtifacts(record)
                 storage.confirmManifest(record)
                 storage.markCommitted(record.transactionId)
-                runCatching { derivedStateUpdater.update(record.transactionId) }
+                try {
+                    derivedStateUpdater.update(record.transactionId)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Throwable) {
+                    // 派生索引可从权威快照重建，失败不影响 manifest 已确认状态。
+                }
                 storage.cleanupAfterCommit(record.transactionId)
                 TransactionRecoveryAction.COMPLETED
             }

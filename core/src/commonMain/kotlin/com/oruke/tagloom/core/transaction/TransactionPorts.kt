@@ -66,9 +66,9 @@ interface TransactionStoragePort {
     /**
      * 枚举全部已持久化 prepared 且尚未清理的事务。
      *
-     * @return 按目标 manifest revision 升序排列的记录。
+     * @return 按目标 manifest revision 升序排列的记录，以及已经隔离的损坏记录 ID。
      */
-    suspend fun loadPendingPrepared(): List<PreparedTransactionRecord>
+    suspend fun loadPendingPrepared(): PendingPreparedTransactions
 
     /**
      * 判断 manifest 的确认历史是否已经包含指定事务。

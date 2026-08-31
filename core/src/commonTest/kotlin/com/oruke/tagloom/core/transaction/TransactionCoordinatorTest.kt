@@ -331,8 +331,10 @@ private class InMemoryTransactionStorage : TransactionStoragePort {
      *
      * @return 按目标 revision 排列的 prepared 记录。
      */
-    override suspend fun loadPendingPrepared(): List<PreparedTransactionRecord> =
-        preparedRecords.values.sortedBy(PreparedTransactionRecord::targetManifestRevision)
+    override suspend fun loadPendingPrepared(): PendingPreparedTransactions =
+        PendingPreparedTransactions(
+            records = preparedRecords.values.sortedBy(PreparedTransactionRecord::targetManifestRevision),
+        )
 
     /**
      * 查询 manifest 确认历史。

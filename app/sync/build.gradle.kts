@@ -30,8 +30,17 @@ kotlin {
         commonMain.dependencies {
             api(projects.core)
         }
+        jvmMain.dependencies {
+            implementation(projects.app.fileSystem)
+            implementation(libs.kotlinx.coroutinesCore)
+            implementation(libs.kotlinx.serializationJson)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        jvmTest.dependencies {
+            implementation(projects.app.fileSystem)
+            implementation(libs.kotlin.testJunit)
         }
     }
 }

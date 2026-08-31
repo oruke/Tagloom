@@ -1614,7 +1614,9 @@ tools/                 # 后续按需增加
 └── mcp-server/
 ```
 
-项目采用模块化单体。领域规则继续放在 `core`；文件系统、索引/搜索、同步分别作为三个 KMP 能力模块，只在 `commonMain` 定义稳定契约，并由各平台 `expect/actual` 工厂提供后续装配点。`desktopApp` 只保留 JVM 窗口入口，不承载能力实现。
+项目采用模块化单体。领域规则继续放在 `core`；文件系统、索引/搜索、同步分别作为三个 KMP 能力模块，在 `commonMain` 定义稳定契约，在 `jvmMain` 提供 JVM 实现，在 Android/iOS 源集保留后续 `expect/actual` 装配点。共享层的 JVM actual 工厂负责把三项能力和 JVM 工作区网关交给共享 UI；`desktopApp` 只保留 JVM 窗口入口，不承载能力实现。
+
+当前 JVM 切片的实现边界如下：`app:file-system` 负责加密工作区文件、事务 staging、原子替换、目录元数据持久化、崩溃恢复和写入租约；`app:index` 负责从已确认快照维护加密 SQLite 索引并提供全文、标签、属性和双链查询；`app:sync` 负责 Change DAG 与密文 artifact 的 HTTP/本地副本交换。JVM 同步工厂不读取隐式 Token、密钥或服务端地址，必须由调用方显式传入配置。工作区生命周期网关仍是共享 App 的 JVM 平台装配代码，不属于桌面入口。
 
 只有满足以下任一条件时才拆分独立模块：
 
@@ -1887,9 +1889,9 @@ Note、Tag、PropertyDef、SavedQuery 等对象采用共同信封内的逻辑头
 
 **背景**：文件读写/加密恢复、索引/搜索、同步都有独立替换边界；把它们放进 `shared` 或旧的集中式适配器目录会让平台实现和 UI 依赖互相渗透。
 
-**决定**：建立 `app:file-system`、`app:index`、`app:sync` 三个 KMP 模块。每个模块只在 `commonMain` 暴露跨平台能力契约，并在 JVM、Android、iOS 源集提供 `expect/actual` 工厂；当前工厂直接 `TODO`，不提前放入单平台实现。`app/shared` 只消费这些接口并编排 UI，`app/desktopApp` 只保留窗口入口，服务端实现留在 `server`。
+**决定**：建立 `app:file-system`、`app:index`、`app:sync` 三个 KMP 模块。每个模块只在 `commonMain` 暴露跨平台能力契约；JVM 实现分别位于对应模块的 `jvmMain`，由 `app/shared` 的 JVM actual 工厂统一装配。Android/iOS 源集继续提供 `expect/actual` 工厂，但当前直接 `TODO`，不能把未实现能力伪装成可用功能。`app/shared` 只消费能力接口并编排共享 UI；JVM 工作区生命周期网关作为 shared 的平台装配代码存在，不把实现放回 `app/desktopApp`；桌面入口只保留窗口生命周期，服务端实现留在 `server`。
 
-**权衡**：模块数量增加，但能力可独立替换并可由 Android/iOS/JVM 共用同一契约；当前没有实现落地，短期内各平台只能展示未装配状态。
+**权衡**：模块数量增加，但能力可独立替换并可由 Android/iOS/JVM 共用同一契约。JVM 可以先完成真实文件、索引和同步实现；Android/iOS 仍能编译共享契约，但在各自 actual 工厂完成前必须保持未装配状态。共享层增加少量 JVM 工作区装配代码，用于把工作区生命周期与三项能力绑定，不扩大桌面入口职责。
 
 ## ADR-007：所有外部入口复用应用服务和权限层
 

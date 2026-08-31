@@ -167,6 +167,19 @@ data class PreparedTransactionRecord(
 }
 
 /**
+ * 描述启动扫描 prepared staging 后得到的可恢复记录和已隔离记录。
+ *
+ * 损坏控制记录无法安全构造成 [PreparedTransactionRecord]，存储实现必须先将其移动到隔离区，
+ * 再通过 [quarantinedTransactionIds] 把只读要求交给事务协调器。
+ */
+data class PendingPreparedTransactions(
+    /** 已通过控制记录解密、结构和事务 ID 校验的恢复候选。 */
+    val records: List<PreparedTransactionRecord>,
+    /** 已被存储实现移动到隔离区的诊断事务 ID。 */
+    val quarantinedTransactionIds: List<TransactionId> = emptyList(),
+)
+
+/**
  * 描述 prepared staging 是否足以安全完成事务。
  */
 enum class PreparedValidationResult {

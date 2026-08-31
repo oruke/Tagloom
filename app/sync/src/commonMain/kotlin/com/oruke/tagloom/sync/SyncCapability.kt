@@ -25,14 +25,19 @@ interface SyncEngine {
 }
 
 /**
- * 描述一次同步会话的身份和可选增量边界。
+ * 描述一次同步会话的身份和预留的增量边界。
  */
 data class SyncRequest(
     /** 待同步的随机工作区 ID。 */
     val workspaceId: WorkspaceId,
     /** 当前认证设备的 Actor ID。 */
     val actorId: ActorId,
-    /** 已确认的本地同步边界；为空表示由实现自行读取当前边界。 */
+    /**
+     * 预留的同步 checkpoint 标识。
+     *
+     * 当前 core 同步服务和 JVM 实现始终从服务端 heads/内容清单读取边界，尚未消费该字段；
+     * 在 checkpoint 正式成为协议边界前，传入它不会改变同步范围。
+     */
     val checkpoint: String? = null,
 )
 
