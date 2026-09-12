@@ -27,15 +27,24 @@ kotlin {
         withHostTest { }
     }
 
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.libsodium.bindings)
+                implementation(libs.kotlinx.coroutinesCore)
+                implementation(libs.kotlinx.serializationJson)
+            }
+        }
+        jvmMain.get().dependsOn(jvmAndroidMain)
+        androidMain.get().dependsOn(jvmAndroidMain)
         commonMain.dependencies {
             api(projects.core)
         }
         jvmMain.dependencies {
-            implementation(libs.libsodium.bindings)
             implementation(libs.jna.platform)
-            implementation(libs.kotlinx.coroutinesCore)
-            implementation(libs.kotlinx.serializationJson)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

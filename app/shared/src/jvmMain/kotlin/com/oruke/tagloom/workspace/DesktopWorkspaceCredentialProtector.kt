@@ -5,36 +5,11 @@ import com.sun.jna.platform.win32.Crypt32Util
 import com.sun.jna.platform.win32.WinCrypt
 
 /**
- * 保护未启用 PIN 时保存在本机的高熵工作区解锁材料。
- *
- * 该能力只适用于当前 Windows MVP：材料仍保存在应用配置目录的登记文件中，但必须先由
- * Windows DPAPI 绑定到当前用户帐户，不能因“无需输入 PIN”而退化为明文保存。
+ * 获取 Windows 本机材料保护器。
+ * @return 使用当前用户 DPAPI 的实现。
  */
-internal interface DesktopWorkspaceCredentialProtector {
-    /**
-     * 将本机高熵解锁材料保护为只可由当前 Windows 用户解开的二进制数据。
-     *
-     * @param plaintext 待保护的随机本机解锁材料。
-     * @param associatedData 与工作区记录绑定的认证上下文。
-     * @return 可安全写入本机访问登记的 Windows 保护数据。
-     */
-    fun protect(
-        plaintext: ByteArray,
-        associatedData: ByteArray,
-    ): ByteArray
+internal actual fun platformWorkspaceCredentialProtector(): DesktopWorkspaceCredentialProtector = WindowsWorkspaceCredentialProtector()
 
-    /**
-     * 解开当前 Windows 用户保护的本机高熵解锁材料。
-     *
-     * @param protectedData 访问登记保存的 Windows 保护数据。
-     * @param associatedData 与保护时完全一致的认证上下文。
-     * @return 仅供当前调用短暂使用的随机本机解锁材料。
-     */
-    fun unprotect(
-        protectedData: ByteArray,
-        associatedData: ByteArray,
-    ): ByteArray
-}
 /**
  * 使用 Windows DPAPI 保护未设置 PIN 的本机工作区解锁材料。
  *
@@ -43,6 +18,9 @@ internal interface DesktopWorkspaceCredentialProtector {
  * 流程被隐式交互阻塞。
  */
 internal class WindowsWorkspaceCredentialProtector : DesktopWorkspaceCredentialProtector {
+    /** 兼容既有 Windows 本机登记格式。 */
+    override val protection = DesktopWorkspaceCredentialProtection.WINDOWS_ACCOUNT
+
     /**
      * 使用当前 Windows 用户的 DPAPI 主密钥保护高熵材料。
      *

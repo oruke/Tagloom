@@ -12,12 +12,19 @@ kotlin {
     }
 }
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk)
     implementation(projects.app.shared)
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.compose.foundation)
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+    androidTestImplementation(libs.androidx.testExt.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.kotlin.testJunit)
+    androidTestImplementation(libs.kotlinx.coroutinesCore)
+    androidTestImplementation(libs.kotlinx.serializationJson)
 }
 
 android {
@@ -30,6 +37,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     packaging {
         resources {
@@ -42,6 +50,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }

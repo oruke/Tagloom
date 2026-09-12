@@ -2,7 +2,7 @@
 
 Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加密对象快照保存权威状态，用 Change DAG 承载恢复、历史和多设备同步，并通过对象类型（超级标签）、普通标签、属性继承、稳定 Block、双向链接与受控 Agent 接口组织知识。
 
-> 当前状态：`core` 和 `app/shared` 保留跨平台领域模型、编辑器与 UI；文件系统、索引/搜索、同步三项能力已经分别抽成 `app:file-system`、`app:index`、`app:sync` 模块。JVM 实现位于三个模块各自的 `jvmMain`，共享层 JVM actual 工厂负责装配；Android/iOS 工厂仍为 `TODO`。`app/desktopApp` 只保留窗口入口，不再包含 JVM 工作区、文件、SQLite 或 HTTP 实现；服务端盲同步实现独立留在 `server`。
+> 当前状态：文件系统、索引/搜索、同步分别位于 `app:file-system`、`app:index`、`app:sync` 三个 KMP 能力模块，JVM 和 Android 均已接入。SQL 与 HTTP 协议放在 `commonMain`，文件事务和工作区流程通过 `jvmAndroidMain` 复用，平台差异由 `expect/actual` 装配。共享 App 只调用能力接口；`app/desktopApp` 保留窗口入口，Android 宿主管理 Activity、ViewModel 和系统文档选择器。iOS 工厂仍为 `TODO`，服务端盲同步实现独立留在 `server`。
 
 完整产品与技术基线见 [Tagloom 产品与技术设计草案](./Tagloom_产品与技术设计草案.md)，参与开发前请先阅读 [AGENTS.md](./AGENTS.md)。
 
@@ -51,12 +51,12 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 
 | 能力 | 当前代码状态 | 当前 UI 或运行入口 |
 | --- | --- | --- |
-| Block/RichText/Markdown | `core` 与 `app/shared` 已实现 | JVM Desktop 通过共享能力工厂进入工作区持久化；文档导出能力尚未接入桌面入口 |
-| 文件系统与加密读写 | `app:file-system` 的 `commonMain` 契约与 JVM 实现 | JVM 已由共享 actual 工厂装配；Android/iOS 工厂为 `TODO` |
-| 索引与搜索 | `app:index` 的 `commonMain` 契约与 JVM 加密 SQLite 实现 | JVM 已由共享 actual 工厂装配；Android/iOS 工厂为 `TODO` |
-| 同步 | `app:sync` 的 `commonMain` 契约与 JVM HTTP/本地副本实现 | JVM 实现可显式配置；默认工厂不猜测密钥、Token 或服务端地址 |
-| 服务端盲同步 | `server` 独立 JVM 实现 | 可单独启动，客户端同步能力尚未接入 |
-| Android | 共享 UI 与三项能力契约可编译 | 平台能力工厂为 `TODO` |
+| Block/RichText/Markdown | `core` 与 `app/shared` 已实现 | JVM Desktop 与 Android 共用编辑和持久化入口；单篇文档文件导出仍未接入 |
+| 文件系统与加密读写 | 共用加密信封、NIO 原子写入、事务恢复和写入租约 | JVM 与 Android actual 已装配；Android 使用私有目录和 `Os.fsync` |
+| 索引与搜索 | 共用 SQL/schema、全文、标签、属性和双链查询 | JVM 使用加密 JDBC；Android 使用 SQLCipher，索引均可从快照重建 |
+| 同步 | 共用 Ktor HTTP、Change DAG 和本地密文副本 | JVM/Android 可用 `createSyncEngine(LocalSyncEngineConfiguration(...))` 显式装配；同步账号、设备登记和合并入口尚未接入 UI |
+| 服务端盲同步 | `server` 独立 JVM 实现 | 可单独启动，只接受已登记设备的密文请求 |
+| Android | 私有工作区、Keystore、SQLCipher、Ktor 与共享 App | 支持创建、锁定/解锁、PIN、索引重建、密文备份恢复与主密钥轮换 |
 | iOS | 共享 UI 与三项能力契约可交叉编译 | 平台能力工厂为 `TODO`，需 macOS/Xcode 验证 |
 | CLI/MCP | 命令、资源 URI、工具目录与权限契约已实现 | 未提供可执行 CLI/MCP Server |
 | AI/向量 | 上下文、权限、端口与混合排序契约已实现 | 未接模型或向量数据库，不在 MVP UI 展示 |
@@ -138,6 +138,8 @@ Windows PowerShell：
 
 macOS/Linux 使用 `./gradlew`。iOS 应用需在 macOS 上打开 `app/iosApp/iosApp.xcodeproj`。
 
+Android APK 位于 `app/androidApp/build/outputs/apk/debug/androidApp-debug.apk`。工作区与本机解锁登记保存在不参与系统自动备份的应用私有目录；外部 URI 仅用于通过系统文档选择器导入/导出密文 ZIP。卸载应用会删除私有数据与 Keystore 密钥，跨设备恢复需要密文备份和 Recovery Key。旋转屏幕时保留内存草稿与 Recovery Key 确认状态，进程重启后从已确认快照重新认证恢复。
+
 ## 启动盲同步服务
 
 服务端必须显式读取设备凭据文件，避免开放注册或默认口令启动。文件是 JSON 数组，每条记录包含随机工作区 ID、随机 Actor ID、Bearer Token 的 SHA-256 和设备 Ed25519 公钥：
@@ -180,6 +182,9 @@ Windows PowerShell：
 # 桌面入口与 Android 宿主
 .\gradlew.bat :app:desktopApp:compileKotlin :app:androidApp:testDebugUnitTest
 .\gradlew.bat :app:androidApp:assembleDebug :app:desktopApp:createDistributable
+
+# 已连接 Android 真机或模拟器：真实文件、Keystore、SQLCipher 与回环 HTTP 闭环
+.\gradlew.bat :app:androidApp:connectedDebugAndroidTest :app:androidApp:lintDebug
 ```
 
 macOS 还应运行：
@@ -190,11 +195,13 @@ macOS 还应运行：
 
 涉及加密、文件系统、恢复或发行包的改动不能只以编译成功作为完成依据；需要执行真实目录恢复、进程重启或打包应用启动验证。
 
-本次重构验证重点是模块边界和 JVM 装配：三个能力模块的公共契约位于各自 `commonMain`，JVM 实现位于各自 `jvmMain`，共享层 JVM actual 工厂负责组装工作区、文件系统、索引/搜索和同步能力；Android/iOS 工厂仍为显式 `TODO`。桌面源码目录除 `main.kt` 外为空，服务端同步实现和协议测试继续独立于客户端能力模块。
+三个能力模块的公共契约位于各自 `commonMain`；`jvmAndroidMain` 复用文件事务、密码学与工作区流程，平台源集只承载目录持久化、设备保护、SQLite 驱动和宿主交互。Android 设备测试使用真实原生库、Keystore、SQLCipher 与回环 TCP，不以 Host Test 或编译替代运行验证。桌面源码目录除 `main.kt` 外为空，服务端同步实现和协议测试继续独立于客户端能力模块。
 
 ## v0.2 / MVP 验收状态
 
-当前切片已完成 JVM 能力的代码接入：`app:file-system` 提供原子落盘、目录持久化、加密工作区事务与恢复，`app:index` 提供加密 SQLite 索引与搜索，`app:sync` 提供显式配置的 HTTP/本地密文副本同步；`app/shared` 的 JVM actual 工厂把它们交给共享 UI。Android/iOS 仍只保留同一组能力接口和 `TODO` 工厂，尚未实现平台能力。桌面发行包的真实启动和端到端交互仍需按验收标准执行。
+JVM 与 Android 已共用三项能力和工作区业务流程。Android 派生数据库采用 SQLCipher，JVM 保持现有加密 SQLite 格式；数据库文件不跨设备复制，通过相同的权威加密快照重建。Android 验收需执行设备测试、实际编辑/重启以及密文备份的系统文档交互；iOS actual、同步账号配置 UI、远端变更自动合并仍未实现。
+
+Android 已在 API 37、x86_64、16 KB 页大小的模拟器完成三个设备集成用例，覆盖加密持久化、Keystore/PIN、索引损坏重建、备份恢复、主密钥轮换、损坏事务隔离及真实回环 HTTP 同步。实际 App 已验证编辑、自动保存、全文搜索、横竖屏切换、系统文档备份和进程重启。APK 的 arm64/x86_64 原生库及 ZIP 对齐检查通过；API 24 与 ARM 真机运行仍未验证。
 
 ## 开发原则
 

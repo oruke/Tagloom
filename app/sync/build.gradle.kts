@@ -26,14 +26,23 @@ kotlin {
         withHostTest { }
     }
 
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(projects.app.fileSystem)
+                implementation(libs.kotlinx.coroutinesCore)
+                implementation(libs.kotlinx.serializationJson)
+                implementation(libs.ktor.clientCio)
+            }
+        }
+        jvmMain.get().dependsOn(jvmAndroidMain)
+        androidMain.get().dependsOn(jvmAndroidMain)
         commonMain.dependencies {
             api(projects.core)
-        }
-        jvmMain.dependencies {
-            implementation(projects.app.fileSystem)
-            implementation(libs.kotlinx.coroutinesCore)
-            implementation(libs.kotlinx.serializationJson)
+            implementation(libs.ktor.clientCore)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

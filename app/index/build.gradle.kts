@@ -26,13 +26,24 @@ kotlin {
         withHostTest { }
     }
 
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain.get())
+            dependencies { implementation(libs.kotlinx.coroutinesCore) }
+        }
+        jvmMain.get().dependsOn(jvmAndroidMain)
+        androidMain.get().dependsOn(jvmAndroidMain)
+        androidMain.dependencies {
+            implementation(libs.sqlcipher.android)
+            implementation(libs.androidx.sqlite)
+        }
         commonMain.dependencies {
             api(projects.core)
         }
         jvmMain.dependencies {
             implementation(libs.sqlite.jdbc.crypt)
-            implementation(libs.kotlinx.coroutinesCore)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

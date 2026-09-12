@@ -29,7 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.capability.TagloomCapabilities
-import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.TagloomAppState
 import com.oruke.tagloom.platform.DocumentFileGateway
 import com.oruke.tagloom.platform.WorkspaceRecentWorkspace
 import com.oruke.tagloom.platform.WorkspaceRecoveryMessage
@@ -42,25 +42,23 @@ import tagloom.app.shared.generated.resources.*
  *
  * @param capabilities 当前宿主提供的跨平台能力集合。
  * @param documentFileGateway 可选文档导出能力。
+ * @param appState 宿主可跨配置变更保留的共享内存状态。
  */
 @Composable
 fun WorkspaceLifecycleScreen(
     capabilities: TagloomCapabilities,
     documentFileGateway: DocumentFileGateway? = null,
+    appState: TagloomAppState? = null,
 ) {
-    val editorState = remember(capabilities.workspace) {
-        TagloomEditorState(
-            idFactory = capabilities.workspace::createOpaqueId,
-            timestampProvider = capabilities.workspace::currentUtcTimestamp,
-        )
+    val compositionScope = rememberCoroutineScope()
+    val currentState = appState ?: remember(capabilities) {
+        TagloomAppState(capabilities, compositionScope)
     }
-    val controller = remember(capabilities) {
-        WorkspaceUiController(capabilities.workspace, capabilities.searchEngine, editorState)
-    }
-    val coroutineScope = rememberCoroutineScope()
+    val controller = currentState.controller
+    val coroutineScope = currentState.operationScope
 
     LaunchedEffect(controller) {
-        controller.initialize()
+        coroutineScope.launch { controller.initialize() }
     }
 
     when (controller.phase) {
@@ -88,6 +86,7 @@ fun WorkspaceLifecycleScreen(
         )
         WorkspaceUiPhase.OPEN -> WorkspaceSessionShell(
             controller = controller,
+            coroutineScope = coroutineScope,
             documentFileGateway = documentFileGateway,
             onSave = { coroutineScope.launch { controller.saveSelected() } },
             onDelete = { coroutineScope.launch { controller.deleteSelected() } },

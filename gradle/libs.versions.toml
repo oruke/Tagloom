@@ -1,6 +1,6 @@
 [versions]
-agp = "9.0.1"
-android-compileSdk = "36"
+agp = "9.1.1"
+android-compileSdk = "37"
 android-minSdk = "24"
 android-targetSdk = "36"
 androidx-activity = "1.13.0"
@@ -17,6 +17,10 @@ kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.11.0"
 libsodium-bindings = "0.9.5"
 sqlite-jdbc-crypt = "3.53.2.0"
+sqlcipher-android = "4.19.0"
+androidx-sqlite = "2.7.0"
+desugar-jdk = "2.1.5"
+androidx-test-runner = "1.7.0"
 ktor = "3.5.0"
 logback = "1.5.34"
 material3 = "1.12.0-alpha03"
@@ -45,6 +49,12 @@ kotlinx-coroutinesCore = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-co
 kotlinx-serializationJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 libsodium-bindings = { module = "com.ionspin.kotlin:multiplatform-crypto-libsodium-bindings", version.ref = "libsodium-bindings" }
 sqlite-jdbc-crypt = { module = "io.github.willena:sqlite-jdbc", version.ref = "sqlite-jdbc-crypt" }
+sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher-android" }
+androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-sqlite" }
+desugar-jdk = { module = "com.android.tools:desugar_jdk_libs_nio", version.ref = "desugar-jdk" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
+ktor-clientCore = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-clientCio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 ktor-serverCore = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-serverNetty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }

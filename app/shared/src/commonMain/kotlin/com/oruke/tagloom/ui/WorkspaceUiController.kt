@@ -118,7 +118,7 @@ internal class WorkspaceUiController(
      * 用 Recovery Key 连接既有工作区。
      */
     suspend fun initialize() {
-        if (busy) {
+        if (busy || phase != WorkspaceUiPhase.INITIALIZING) {
             return
         }
         busy = true

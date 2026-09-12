@@ -4,6 +4,7 @@ import com.oruke.tagloom.core.crypto.EnvelopeIdentity
 import com.oruke.tagloom.core.crypto.SecretKeyMaterial
 import com.oruke.tagloom.core.crypto.WrappingKeyPurpose
 import com.oruke.tagloom.core.model.KeyId
+import kotlin.jvm.JvmInline
 
 /**
  * 定义工作区需要的跨平台文件能力。

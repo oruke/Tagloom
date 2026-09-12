@@ -16,12 +16,14 @@ import com.oruke.tagloom.ui.WorkspaceLifecycleScreen
  *
  * @param documentFileGateway 平台文档导出能力；预览环境可以为 null。
  * @param capabilities 当前宿主提供的跨平台能力；预览环境可以为 null。
+ * @param appState 宿主保留的内存会话状态；为空时跟随当前 Compose 界面生命周期。
  */
 @Composable
 @Preview
 fun App(
     documentFileGateway: DocumentFileGateway? = null,
     capabilities: TagloomCapabilities? = null,
+    appState: TagloomAppState? = null,
 ) {
     TagloomTheme {
         if (capabilities == null) {
@@ -33,7 +35,7 @@ fun App(
                 documentFileGateway = documentFileGateway,
             )
         } else {
-            WorkspaceLifecycleScreen(capabilities, documentFileGateway)
+            WorkspaceLifecycleScreen(capabilities, documentFileGateway, appState)
         }
     }
 }

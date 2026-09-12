@@ -21,13 +21,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.platform.DocumentFileGateway
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -64,6 +64,7 @@ import tagloom.app.shared.generated.resources.workspace_search_save_title
  * 安全、备份和查询能力保留为按需浮层，不再额外占据一整条常驻工具栏。
  *
  * @param controller 工作区 UI 控制器。
+ * @param coroutineScope 宿主操作作用域，避免配置变更取消正在提交的业务操作。
  * @param documentFileGateway 可选文档导出网关。
  * @param onSave 保存当前 Note。
  * @param onDelete 删除当前 Note。
@@ -80,6 +81,7 @@ import tagloom.app.shared.generated.resources.workspace_search_save_title
 @Composable
 internal fun WorkspaceSessionShell(
     controller: WorkspaceUiController,
+    coroutineScope: CoroutineScope,
     documentFileGateway: DocumentFileGateway?,
     onSave: () -> Unit,
     onDelete: () -> Unit,
@@ -93,7 +95,6 @@ internal fun WorkspaceSessionShell(
     onRotateMasterKey: (String?) -> Unit,
     onLock: () -> Unit,
 ) {
-    val coroutineScope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
     var managePin by remember { mutableStateOf(false) }
     var rotateMasterKey by remember { mutableStateOf(false) }

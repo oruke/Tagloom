@@ -1,9 +1,9 @@
 package com.oruke.tagloom.filesystem
 
 /**
- * Android 文件能力装配占位。
+ * 创建 Android 应用私有目录中的文件、加密与事务能力。
  *
- * @return 当前阶段不返回文件系统实现。
+ * @return 与 JVM 共用事务协议的 Android 文件能力。
  */
 actual fun createWorkspaceFileSystem(): WorkspaceFileSystem =
-    TODO("Android 工作区文件系统尚未装配")
+    createJvmWorkspaceFileSystem(AndroidFileSystemEnvironment.workspaceDirectory().resolve("default"))
