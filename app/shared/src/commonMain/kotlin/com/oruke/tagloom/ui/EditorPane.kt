@@ -2,6 +2,12 @@ package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import com.oruke.tagloom.editor.search.NoteSearchState
+import com.oruke.tagloom.ui.search.LocalNoteSearch
+import com.oruke.tagloom.ui.search.NoteSearchOverlay
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.CodeBlockContent
@@ -32,6 +39,7 @@ import com.oruke.tagloom.editor.editableRichText
 import com.oruke.tagloom.editor.visibleBlockDepth
 import com.oruke.tagloom.editor.visibleEditorBlocks
 import com.oruke.tagloom.editor.visibleRootEditorBlocks
+import com.oruke.tagloom.editor.selectTab
 import com.oruke.tagloom.platform.DocumentExportFormat
 
 /**
@@ -39,27 +47,31 @@ import com.oruke.tagloom.platform.DocumentExportFormat
  *
  * @param state 编辑器状态。
  * @param document 当前选中文档。
+ * @param search 当前笔记的临时查找会话。
+ * @param onCloseSearch 关闭查找并恢复宿主键盘焦点。
  * @param databaseController Database Block 使用的目录和写入控制器。
  * @param onCreateDatabaseBlock 通过指定文本 Block 创建并绑定 Database 的动作。
  * @param onExport 请求按目标格式导出当前页面。
  * @param onSaveRequest 请求立即保存当前页面。
- * @param onSearchRequest 可选工作区搜索入口。
  * @param onWorkspaceMenuRequest 可选工作区维护菜单入口。
  * @param onSaveTagDefinition 持久化工作区标签定义。
  * @param onSavePropertyDefinition 持久化工作区属性定义。
  * @param onCreatePropertyOption 持久化并选择一个自由属性选项。
  * @param saving 当前是否正在写入加密快照。
  * @param modifier 外部布局修饰符。
+ * @param searchMenu 搜索入口关联的浮层。
+ * @param workspaceMenu 工作区操作入口关联的浮层。
  */
 @Composable
 internal fun EditorPane(
     state: TagloomEditorState,
     document: EditorDocument,
+    search: NoteSearchState,
+    onCloseSearch: () -> Unit,
     databaseController: DatabaseEditorController? = null,
     onCreateDatabaseBlock: (BlockId) -> Unit = {},
     onExport: (DocumentExportFormat) -> Unit,
     onSaveRequest: () -> Unit,
-    onSearchRequest: (() -> Unit)? = null,
     onWorkspaceMenuRequest: (() -> Unit)? = null,
     onSaveTagDefinition: (TagDefinition, Boolean) -> Unit,
     onSavePropertyDefinition: (PropertyDefinition, PropertyDefinitionDestination) -> Unit,
@@ -78,86 +90,108 @@ internal fun EditorPane(
     val firstBlock = allVisibleBlocks.firstOrNull { block ->
         block.editableRichText() != null || block.content is CodeBlockContent
     }
+    val listState = rememberLazyListState()
+    LaunchedEffect(search.active, search.navigationVersion) {
+        val text = search.activeText ?: return@LaunchedEffect
+        search.revealTabs()
+        val position = if (text.rootBlockId == null) 0 else state.visibleRootEditorBlocks(document.note)
+            .indexOfFirst { it.id == text.rootBlockId }.takeIf { it >= 0 }?.plus(1) ?: return@LaunchedEffect
+        listState.scrollToItem(position)
+        search.revealedVersion = search.navigationVersion
+    }
+    LaunchedEffect(search.focusReturnVersion) {
+        if (search.isOpen || search.focusReturnVersion == 0) return@LaunchedEffect
+        val text = search.returnText ?: return@LaunchedEffect
+        // 原输入框可能已被 LazyColumn 回收或藏在其他页签，先重新创建它，再恢复真实输入焦点。
+        text.tabs.forEach { state.selectTab(it.containerId, it.tabId) }
+        search.restoreReturnSelection()
+        val position = if (text.rootBlockId == null) 0 else state.visibleRootEditorBlocks(document.note)
+            .indexOfFirst { it.id == text.rootBlockId }.takeIf { it >= 0 }?.plus(1) ?: return@LaunchedEffect
+        listState.scrollToItem(position)
+        search.revealedFocusVersion = search.focusReturnVersion
+    }
 
-    Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        Box(Modifier.fillMaxSize()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
-            ) {
-                item(key = "page-header") {
-                    AnchoredEditorContent {
-                        PageHeader(
-                            state = state,
-                            document = document,
-                            saving = saving,
-                            firstBlock = firstBlock,
-                            onCursorRequest = { target -> cursorRequest = target },
-                            onExport = onExport,
-                            onSaveRequest = onSaveRequest,
-                            onSearchRequest = onSearchRequest,
-                            onWorkspaceMenuRequest = onWorkspaceMenuRequest,
-                            onSaveTagDefinition = onSaveTagDefinition,
-                            onSavePropertyDefinition = onSavePropertyDefinition,
-                            onCreatePropertyOption = onCreatePropertyOption,
-                            searchMenu = searchMenu,
-                            workspaceMenu = workspaceMenu,
-                        )
+    CompositionLocalProvider(LocalNoteSearch provides search) {
+        Surface(modifier.fillMaxSize().testTag("editor-pane"), color = MaterialTheme.colorScheme.surface) {
+            NoteSearchOverlay(search, onCloseSearch) { searchEntryModifier ->
+                Box(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
+                    ) {
+                        item(key = "page-header") {
+                            CenteredEditorContent {
+                                PageHeader(
+                                    state = state,
+                                    document = document,
+                                    saving = saving,
+                                    firstBlock = firstBlock,
+                                    onCursorRequest = { target -> cursorRequest = target },
+                                    onExport = onExport,
+                                    onSaveRequest = onSaveRequest,
+                                    onWorkspaceMenuRequest = onWorkspaceMenuRequest,
+                                    onSaveTagDefinition = onSaveTagDefinition,
+                                    onSavePropertyDefinition = onSavePropertyDefinition,
+                                    onCreatePropertyOption = onCreatePropertyOption,
+                                    searchMenu = searchMenu,
+                                    workspaceMenu = workspaceMenu,
+                                    searchEntryModifier = searchEntryModifier,
+                                )
+                            }
+                        }
+                        itemsIndexed(
+                            items = rootBlocks,
+                            key = { _, block -> block.id.value },
+                        ) { _, block ->
+                            CenteredEditorContent {
+                                EditorBlockRow(
+                                    state = state,
+                                    databaseController = databaseController,
+                                    block = block,
+                                    depth = state.visibleBlockDepth(block, document.note),
+                                    cursorRequest = cursorRequest,
+                                    commandMenuBlockId = commandMenuBlockId,
+                                    onCursorRequest = { target -> cursorRequest = target },
+                                    onCursorConsumed = { cursorRequest = null },
+                                    onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
+                                    onCommandMenuDismiss = { commandMenuBlockId = null },
+                                    onCreateDatabaseBlock = onCreateDatabaseBlock,
+                                    onOpenNote = state::selectDocument,
+                                    onSaveRequest = onSaveRequest,
+                                )
+                            }
+                        }
                     }
-                }
-                itemsIndexed(
-                    items = rootBlocks,
-                    key = { _, block -> block.id.value },
-                ) { _, block ->
-                    AnchoredEditorContent {
-                        EditorBlockRow(
-                            state = state,
-                            databaseController = databaseController,
-                            block = block,
-                            depth = state.visibleBlockDepth(block, document.note),
-                            cursorRequest = cursorRequest,
-                            commandMenuBlockId = commandMenuBlockId,
-                            onCursorRequest = { target -> cursorRequest = target },
-                            onCursorConsumed = { cursorRequest = null },
-                            onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
-                            onCommandMenuDismiss = { commandMenuBlockId = null },
-                            onCreateDatabaseBlock = onCreateDatabaseBlock,
-                            onOpenNote = state::selectDocument,
-                            onSaveRequest = onSaveRequest,
-                        )
+                    if (state.selection.isNotEmpty && !search.isOpen) {
+                        SelectionFormattingToolbar(state = state)
                     }
+                    DocumentTimestamps(
+                        document = document,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
+                    )
                 }
             }
-            if (state.selection.isNotEmpty) {
-                SelectionFormattingToolbar(state = state)
-            }
-            DocumentTimestamps(
-                document = document,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
-            )
         }
     }
 }
 
 /**
- * 把页面标题和正文左锚到编辑区，并为结构化 Block 保留足够宽度。
+ * 将标题、属性和正文放入同一居中阅读栏，并为 Block 操作保留对称边距。
  *
- * @param content 左锚的编辑内容。
+ * @param content 阅读栏内的编辑内容，文本本身保持正常阅读方向。
  */
 @Composable
-private fun AnchoredEditorContent(content: @Composable () -> Unit) {
+private fun CenteredEditorContent(content: @Composable () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val startPadding = when {
-            maxWidth < 600.dp -> 16.dp
-            maxWidth < 900.dp -> 40.dp
-            else -> EDITOR_START_PADDING
-        }
+        val horizontalPadding = if (maxWidth < 600.dp) 24.dp else 48.dp
         Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .align(Alignment.TopCenter)
+                .padding(horizontal = horizontalPadding)
                 .widthIn(max = EDITOR_CONTENT_WIDTH)
                 .fillMaxWidth()
-                .padding(start = startPadding, end = if (maxWidth < 600.dp) 16.dp else 24.dp),
+                .testTag("editor-reading-column"),
         ) {
             content()
         }
@@ -165,7 +199,4 @@ private fun AnchoredEditorContent(content: @Composable () -> Unit) {
 }
 
 /** 编辑正文的最大舒适宽度。 */
-private val EDITOR_CONTENT_WIDTH = 860.dp
-
-/** 页面相对内容区左边缘的固定锚点间距。 */
-private val EDITOR_START_PADDING = 104.dp
+private val EDITOR_CONTENT_WIDTH = 760.dp

@@ -1,0 +1,4 @@
+<!-- 工作区设置的齿轮图标，颜色由当前主题提供。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M9.5,3 L14.5,3 L15,6 L17.3,7.3 L20,6.3 L22,10 L19.5,12 L22,14 L20,17.7 L17.3,16.7 L15,18 L14.5,21 L9.5,21 L9,18 L6.7,16.7 L4,17.7 L2,14 L4.5,12 L2,10 L4,6.3 L6.7,7.3 L9,6 Z M15,12 A3,3 0,1 1,9,12 A3,3 0,1 1,15,12 Z" android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="1.75" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

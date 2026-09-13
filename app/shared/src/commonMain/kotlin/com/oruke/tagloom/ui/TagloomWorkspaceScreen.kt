@@ -1,5 +1,10 @@
 package com.oruke.tagloom.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
+import com.oruke.tagloom.editor.search.NoteSearchState
+import com.oruke.tagloom.ui.search.handleNoteSearchKeyEvent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -12,10 +17,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -67,13 +77,15 @@ import tagloom.app.shared.generated.resources.editor_export_word_name
  * @param databaseController Database Block 使用的目录与写入控制器。
  * @param documentFileGateway 平台文件选择与文档编码能力。
  * @param onSaveRequest 可选立即保存动作；内存演示环境为空操作。
- * @param onSearchRequest 可选已确认内容搜索入口。
- * @param onWorkspaceMenuRequest 可选工作区安全与维护菜单入口。
+ * @param onWorkspaceMenuRequest 可选笔记操作菜单入口。
  * @param onSaveTagDefinition 可选工作区标签 schema 持久化动作；为空时只更新内存演示。
  * @param onSavePropertyDefinition 可选工作区属性 schema 持久化动作；为空时只更新内存演示。
  * @param onCreatePropertyOption 可选自由选项持久化动作；为空时只更新内存演示。
  * @param saving 当前是否正在写入加密快照。
  * @param modifier 外部布局修饰符。
+ * @param searchMenu 页头搜索浮层内容。
+ * @param workspaceMenu 页头笔记操作菜单内容。
+ * @param settingsContent 独立设置页内容；接收返回当前笔记的动作，预览时为空。
  */
 @Composable
 internal fun TagloomWorkspaceScreen(
@@ -81,7 +93,6 @@ internal fun TagloomWorkspaceScreen(
     databaseController: DatabaseEditorController? = null,
     documentFileGateway: DocumentFileGateway? = null,
     onSaveRequest: () -> Unit = {},
-    onSearchRequest: (() -> Unit)? = null,
     onWorkspaceMenuRequest: (() -> Unit)? = null,
     onSaveTagDefinition: ((TagDefinition, Boolean) -> Unit)? = null,
     onSavePropertyDefinition: ((PropertyDefinition, PropertyDefinitionDestination) -> Unit)? = null,
@@ -90,10 +101,13 @@ internal fun TagloomWorkspaceScreen(
     modifier: Modifier = Modifier,
     searchMenu: (@Composable () -> Unit)? = null,
     workspaceMenu: (@Composable () -> Unit)? = null,
+    settingsContent: (@Composable (() -> Unit) -> Unit)? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val searchFocusRequester = remember { FocusRequester() }
+    // 页面选择随会话保存；编辑器对象继续保留草稿，锁定后整个会话 UI 会被销毁。
+    var settingsSelected by rememberSaveable { mutableStateOf(false) }
     val exportUnavailableMessage = stringResource(Res.string.editor_export_unavailable)
     val exportFailedMessage = stringResource(Res.string.editor_export_failed)
     val markdownName = stringResource(Res.string.editor_export_markdown_name)
@@ -121,30 +135,40 @@ internal fun TagloomWorkspaceScreen(
         ),
     )
     val document = state.selectedDocument
+    val noteSearch = remember(document?.id) { NoteSearchState(state) }
+    val workspaceFocus = remember { FocusRequester() }
+    val closeNoteSearch = { noteSearch.close(); workspaceFocus.requestFocus(); Unit }
     val saveTagDefinition = onSaveTagDefinition ?: { definition: TagDefinition, attach: Boolean ->
         state.upsertTagDefinition(definition)
         if (attach) state.setAppliedObjectType(definition.id)
     }
-    val savePropertyDefinition = onSavePropertyDefinition ?: { definition: PropertyDefinition, destination: PropertyDefinitionDestination ->
-        state.upsertPropertyDefinition(definition)
-        when (destination) {
-            PropertyDefinitionDestination.CurrentNote -> state.setPropertyAttached(definition.id, attached = true)
-            PropertyDefinitionDestination.Workspace -> Unit
-            is PropertyDefinitionDestination.Tag -> {
-                state.upsertTagDefinition(state.bindPropertyToTag(destination.tagId, definition.id))
+    val savePropertyDefinition =
+        onSavePropertyDefinition ?: { definition: PropertyDefinition, destination: PropertyDefinitionDestination ->
+            state.upsertPropertyDefinition(definition)
+            when (destination) {
+                PropertyDefinitionDestination.CurrentNote -> state.setPropertyAttached(definition.id, attached = true)
+                PropertyDefinitionDestination.Workspace -> Unit
+                is PropertyDefinitionDestination.Tag -> {
+                    state.upsertTagDefinition(state.bindPropertyToTag(destination.tagId, definition.id))
+                }
             }
         }
-    }
     val createPropertyOption = onCreatePropertyOption ?: { propertyId: PropertyId, label: String ->
         val plan = state.planFreePropertyOption(propertyId, label)
         state.applyFreePropertyOption(plan.definition, plan.optionId)
     }
-    val createDocument = state::createDocument
+    val createDocument = {
+        settingsSelected = false
+        state.createDocument()
+    }
 
-    Box(
-        modifier
-            .fillMaxSize()
-            .onPreviewKeyEvent { event ->
+    Box(modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val showNavigation = maxWidth >= 720.dp
+            val navigationModifier = Modifier.fillMaxSize().focusRequester(workspaceFocus).focusable().onPreviewKeyEvent { event ->
+                if (handleNoteSearchKeyEvent(event, noteSearch, document != null && !settingsSelected, closeNoteSearch)) {
+                    return@onPreviewKeyEvent true
+                }
                 if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
                     return@onPreviewKeyEvent false
                 }
@@ -153,88 +177,111 @@ internal fun TagloomWorkspaceScreen(
                         createDocument()
                         true
                     }
+
                     Key.K -> {
-                        searchFocusRequester.requestFocus()
-                        true
+                        if (showNavigation) {
+                            searchFocusRequester.requestFocus()
+                            true
+                        } else {
+                            false
+                        }
                     }
+
                     else -> false
                 }
-            },
-    ) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val showNavigation = maxWidth >= 720.dp
-            Row(Modifier.fillMaxSize()) {
+            }
+            Row(navigationModifier) {
                 if (showNavigation) {
                     WorkspaceSidebar(
                         state = state,
                         searchFocusRequester = searchFocusRequester,
                         onCreateDocument = createDocument,
+                        onSelectDocument = { documentId ->
+                            state.selectDocument(documentId)
+                            settingsSelected = false
+                        },
+                        onOpenSettings = settingsContent?.let { { settingsSelected = true } },
+                        settingsSelected = settingsSelected,
                         modifier = Modifier.width(232.dp),
                     )
                     VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
-                if (document == null) {
-                    EmptyWorkspace(
-                        onCreate = createDocument,
-                        modifier = Modifier.weight(1f),
-                    )
-                } else {
-                    EditorPane(
-                        state = state,
-                        document = document,
-                        databaseController = databaseController,
-                        onCreateDatabaseBlock = createDatabase@{ blockId ->
-                            val documentId = state.selectedDocumentId ?: return@createDatabase
-                            val controller = databaseController ?: return@createDatabase
-                            coroutineScope.launch {
-                                controller.createDatabaseBlock(
-                                    documentId = documentId,
-                                    blockId = blockId,
-                                    name = defaultDatabaseName,
-                                    sourceTypeId = WorkspaceDefaults.DEFAULT_NOTE_TAG_ID,
-                                )
-                                if (controller.operationFailed) {
-                                    snackbarHostState.showSnackbar(databaseOperationFailed)
-                                }
+                Column(Modifier.weight(1f).background(MaterialTheme.colorScheme.surface)) {
+                    if (!showNavigation && settingsContent != null && !settingsSelected) {
+                        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = createDocument) {
+                                Text(stringResource(Res.string.editor_action_new_note))
                             }
-                        },
-                        onExport = { format ->
-                            val gateway = documentFileGateway
-                            if (gateway == null) {
+                            Box(Modifier.weight(1f))
+                            WorkspaceSettingsEntry(selected = false, onClick = { settingsSelected = true })
+                        }
+                    }
+                    if (settingsSelected && settingsContent != null) {
+                        settingsContent { settingsSelected = false }
+                    } else if (document == null) {
+                        EmptyWorkspace(
+                            onCreate = createDocument,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        EditorPane(
+                            state = state,
+                            document = document,
+                            search = noteSearch,
+                            onCloseSearch = closeNoteSearch,
+                            databaseController = databaseController,
+                            onCreateDatabaseBlock = createDatabase@{ blockId ->
+                                val documentId = state.selectedDocumentId ?: return@createDatabase
+                                val controller = databaseController ?: return@createDatabase
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(exportUnavailableMessage)
-                                }
-                            } else {
-                                coroutineScope.launch {
-                                    val exported = runCatching {
-                                        gateway.exportDocument(
-                                            DocumentExportRequest(
-                                                suggestedBaseName = document.note.title.toSafeFileBaseName(),
-                                                note = document.note,
-                                                format = format,
-                                            ),
-                                        )
-                                    }.getOrElse {
-                                        snackbarHostState.showSnackbar(exportFailedMessage)
-                                        false
-                                    }
-                                    if (exported) {
-                                        snackbarHostState.showSnackbar(requireNotNull(exportSuccessMessages[format]))
+                                    controller.createDatabaseBlock(
+                                        documentId = documentId,
+                                        blockId = blockId,
+                                        name = defaultDatabaseName,
+                                        sourceTypeId = WorkspaceDefaults.DEFAULT_NOTE_TAG_ID,
+                                    )
+                                    if (controller.operationFailed) {
+                                        snackbarHostState.showSnackbar(databaseOperationFailed)
                                     }
                                 }
-                            }
-                        },
-                        onSaveRequest = onSaveRequest,
-                        onSearchRequest = onSearchRequest,
-                        onWorkspaceMenuRequest = onWorkspaceMenuRequest,
-                        onSaveTagDefinition = saveTagDefinition,
-                        onSavePropertyDefinition = savePropertyDefinition,
-                        onCreatePropertyOption = createPropertyOption,
-                        saving = saving,
-                        modifier = Modifier.weight(1f),
-                        searchMenu = searchMenu,
-                        workspaceMenu = workspaceMenu,
-                    )
+                            },
+                            onExport = { format ->
+                                val gateway = documentFileGateway
+                                if (gateway == null) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(exportUnavailableMessage)
+                                    }
+                                } else {
+                                    coroutineScope.launch {
+                                        val exported = runCatching {
+                                            gateway.exportDocument(
+                                                DocumentExportRequest(
+                                                    suggestedBaseName = document.note.title.toSafeFileBaseName(),
+                                                    note = document.note,
+                                                    format = format,
+                                                ),
+                                            )
+                                        }.getOrElse {
+                                            snackbarHostState.showSnackbar(exportFailedMessage)
+                                            false
+                                        }
+                                        if (exported) {
+                                            snackbarHostState.showSnackbar(requireNotNull(exportSuccessMessages[format]))
+                                        }
+                                    }
+                                }
+                            },
+                            onSaveRequest = onSaveRequest,
+                            onWorkspaceMenuRequest = onWorkspaceMenuRequest,
+                            onSaveTagDefinition = saveTagDefinition,
+                            onSavePropertyDefinition = savePropertyDefinition,
+                            onCreatePropertyOption = createPropertyOption,
+                            saving = saving,
+                            modifier = Modifier.fillMaxSize(),
+                            searchMenu = searchMenu,
+                            workspaceMenu = workspaceMenu,
+                        )
+                    }
                 }
             }
         }

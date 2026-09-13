@@ -2,6 +2,7 @@ package com.oruke.tagloom.editor
 
 import com.oruke.tagloom.core.markdown.MarkdownCodec
 import com.oruke.tagloom.core.markdown.MarkdownImportOptions
+import com.oruke.tagloom.core.model.AnnotationId
 import com.oruke.tagloom.core.model.BlockId
 
 /**
@@ -44,33 +45,43 @@ fun TagloomEditorState.pasteMarkdownAtBlock(
     if ('\n' !in markdown && '\r' !in markdown) {
         return null
     }
-    var blockCounter = 0
+    val pastedAt = currentEditorTimestamp()
     val imported = MarkdownCodec.import(
         markdown = markdown,
         options = MarkdownImportOptions(
             defaultTitle = "粘贴内容",
             firstHeadingAsTitle = false,
-            importedAt = currentEditorTimestamp(),
+            importedAt = pastedAt,
             blockIdFactory = {
-                blockCounter += 1
                 BlockId(createEditorId("block"))
             },
+            tableIdFactory = { createEditorId("table-item") },
         ),
     )
     var cursor: EditorCursorTarget? = null
     updateSelectedNote { note ->
+        // 先隔离剪贴板加注身份，避免同名定义覆盖当前笔记仍在使用的加注正文。
+        val isolated = MarkdownPasteAnnotationReducer.isolateImported(
+            imported = imported.note,
+            existing = note,
+            idFactory = { AnnotationId(createEditorId("annotation")) },
+        )
         val edit = MarkdownBlockPasteReducer.replace(
             blocks = note.blocks,
             blockId = blockId,
             selectionStart = selectionStart,
             selectionEnd = selectionEnd,
-            importedBlocks = imported.note.blocks,
+            importedBlocks = isolated.blocks,
             idFactory = ::createEditorId,
         ) ?: return@updateSelectedNote note
         cursor = edit.cursor
-        note.copy(
-            blocks = edit.blocks,
-            annotations = note.annotations + imported.note.annotations,
+        // 替换字符可能移除最后一个锚点；保留正文并标记孤立，确保快照可以通过结构校验。
+        MarkdownPasteAnnotationReducer.reconcileOrphans(
+            note = note.copy(
+                blocks = edit.blocks,
+                annotations = note.annotations + isolated.annotations,
+            ),
+            updatedAt = pastedAt,
         )
     }
     cursor?.let { target -> updateSelection(target.blockId, target.offset, target.offset) }

@@ -1,5 +1,18 @@
 <resources>
     <string name="workspace_app_name">Tagloom</string>
+    <string name="workspace_settings_title">设置</string>
+    <string name="workspace_settings_back">返回笔记</string>
+    <string name="workspace_settings_description">管理此设备的解锁方式和当前工作区的数据安全。</string>
+    <string name="workspace_settings_device_section">此设备</string>
+    <string name="workspace_settings_pin_enabled">已启用。打开工作区时需要输入 PIN 码；可更换或停用。</string>
+    <string name="workspace_settings_pin_disabled">未启用。此设备通过安全存储自动打开工作区。</string>
+    <string name="workspace_settings_manage_pin">管理 PIN 码</string>
+    <string name="workspace_settings_lock_description">结束当前解锁会话，关闭笔记与搜索。</string>
+    <string name="workspace_settings_data_section">工作区数据</string>
+    <string name="workspace_settings_backup_title">加密备份</string>
+    <string name="workspace_settings_backup_description">备份已保存的工作区内容。恢复时需要 Recovery Key。</string>
+    <string name="workspace_settings_master_key_title">主密钥与恢复密钥</string>
+    <string name="workspace_settings_master_key_description">重新加密工作区并生成新的 Recovery Key。完成后需重新离线保存恢复密钥。</string>
     <string name="workspace_loading">正在准备工作区…</string>
     <string name="workspace_access_continue_to">继续进入 %1$s</string>
     <string name="workspace_access_open">打开工作区</string>
@@ -90,6 +103,7 @@
     <string name="workspace_recovery_rotated_description">旧 Recovery Key 已失效。请把下面的新密钥保存到工作区之外的离线位置。</string>
     <string name="workspace_recovery_rotated_confirm_saved">我已将新的 Recovery Key 离线保存</string>
     <string name="workspace_action_done">完成</string>
+    <string name="workspace_menu_search_workspace">搜索整个工作区</string>
     <string name="workspace_search_placeholder">搜索已确认内容 · Enter</string>
     <string name="workspace_search_confirmed_only">仅搜索已确认快照</string>
     <string name="workspace_search_result_count">%1$d 个结果</string>
@@ -274,6 +288,13 @@
     <string name="editor_block_no_matching_commands">没有匹配的块类型</string>
     <string name="editor_code_hint">Tab 缩进 · Ctrl+S 保存</string>
     <string name="editor_code_placeholder">输入代码…</string>
+    <string name="editor_code_language">代码语言</string>
+    <string name="editor_code_plain_text">纯文本</string>
+    <string name="editor_code_language_search">搜索语言…</string>
+    <string name="editor_code_language_empty">没有匹配的语言</string>
+    <string name="editor_code_wrap">自动换行</string>
+    <string name="editor_code_copy">复制</string>
+    <string name="editor_code_copied">已复制</string>
     <string name="editor_block_command_text_label">正文</string>
     <string name="editor_block_command_text_description">普通连续文本</string>
     <string name="editor_block_command_text_keywords">text,paragraph,正文,段落</string>
@@ -408,4 +429,14 @@
     <string name="desktop_export_database_reference_prefix">Tagloom 数据集引用：</string>
     <string name="desktop_export_unknown_block_prefix">未支持的 Block：</string>
     <string name="desktop_export_annotations_title">加注</string>
+    <string name="editor_find_action">查找</string>
+    <string name="editor_find_tooltip">在笔记中查找 · Ctrl/Cmd+F</string>
+    <string name="editor_find_placeholder">在笔记中查找</string>
+    <string name="editor_find_match_case">区分大小写</string>
+    <string name="editor_find_count">%1$d / %2$d</string>
+    <string name="editor_find_count_description">第 %1$d 处，共 %2$d 处</string>
+    <string name="editor_find_empty">没有匹配结果</string>
+    <string name="editor_find_previous">上一处</string>
+    <string name="editor_find_next">下一处</string>
+    <string name="editor_find_close">关闭查找</string>
 </resources>

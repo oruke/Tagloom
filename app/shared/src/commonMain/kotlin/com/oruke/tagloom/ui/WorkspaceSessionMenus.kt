@@ -28,7 +28,7 @@ import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
 
 /**
- * 渲染页头搜索图标触发的已确认内容搜索浮层。
+ * 渲染更多菜单或保存查询触发的工作区已确认内容搜索浮层。
  *
  * @param controller 当前工作区搜索状态。
  * @param expanded 是否展开。
@@ -127,7 +127,7 @@ internal fun WorkspaceSearchPopover(
 }
 
 /**
- * 渲染页头更多图标触发的工作区维护菜单。
+ * 渲染页头更多图标触发的笔记、查询和锁定菜单；设置由独立页面承载。
  *
  * @param controller 当前工作区和保存查询状态。
  * @param expanded 是否展开。
@@ -158,51 +158,36 @@ internal fun WorkspaceMaintenanceMenu(
         onDismissRequest = onDismiss,
         modifier = modifier,
     ) {
+        TagloomMenuItem(
+            text = stringResource(Res.string.workspace_menu_save_now),
+            onClick = { invokeAndDismiss(actions.onSave) },
+        )
+        TagloomMenuItem(
+            text = stringResource(Res.string.workspace_menu_search_workspace),
+            onClick = { invokeAndDismiss(actions.onSearchWorkspace) },
+        )
+        TagloomMenuItem(
+            text = stringResource(Res.string.workspace_menu_save_current_search),
+            enabled = controller.searchText.isNotBlank(),
+            onClick = { invokeAndDismiss(actions.onSaveQuery) },
+        )
+        controller.savedQueries.take(6).forEach { saved ->
             TagloomMenuItem(
-                text = stringResource(Res.string.workspace_menu_save_now),
-                onClick = { invokeAndDismiss(actions.onSave) },
-            )
-            TagloomMenuItem(
-                text = stringResource(Res.string.workspace_menu_save_current_search),
-                enabled = controller.searchText.isNotBlank(),
-                onClick = { invokeAndDismiss(actions.onSaveQuery) },
-            )
-            controller.savedQueries.take(6).forEach { saved ->
-                TagloomMenuItem(
-                    text = stringResource(Res.string.workspace_menu_run_query, saved.query.name),
-                    onClick = { invokeAndDismiss { actions.onRunSavedQuery(saved.id) } },
-                )
-            }
-            TagloomMenuDivider()
-            TagloomMenuItem(
-                text = stringResource(Res.string.workspace_menu_backup),
-                onClick = { invokeAndDismiss(actions.onBackup) },
-            )
-            TagloomMenuItem(
-                text = stringResource(
-                    if (controller.recentWorkspace?.requiresPin == true) {
-                        Res.string.workspace_menu_change_pin
-                    } else {
-                        Res.string.workspace_menu_enable_pin
-                    },
-                ),
-                onClick = { invokeAndDismiss(actions.onChangePin) },
-            )
-            TagloomMenuItem(
-                text = stringResource(Res.string.workspace_menu_rotate_master_key),
-                onClick = { invokeAndDismiss(actions.onRotateMasterKey) },
-            )
-            TagloomMenuDivider()
-            TagloomMenuItem(
-                text = stringResource(Res.string.workspace_menu_delete_note),
-                destructive = true,
-                onClick = { invokeAndDismiss(actions.onDelete) },
-            )
-            TagloomMenuItem(
-                text = stringResource(Res.string.workspace_menu_lock),
-                onClick = { invokeAndDismiss(actions.onLock) },
+                text = stringResource(Res.string.workspace_menu_run_query, saved.query.name),
+                onClick = { invokeAndDismiss { actions.onRunSavedQuery(saved.id) } },
             )
         }
+        TagloomMenuDivider()
+        TagloomMenuItem(
+            text = stringResource(Res.string.workspace_menu_delete_note),
+            destructive = true,
+            onClick = { invokeAndDismiss(actions.onDelete) },
+        )
+        TagloomMenuItem(
+            text = stringResource(Res.string.workspace_menu_lock),
+            onClick = { invokeAndDismiss(actions.onLock) },
+        )
+    }
 }
 
 /**
@@ -211,16 +196,12 @@ internal fun WorkspaceMaintenanceMenu(
 internal data class WorkspaceMaintenanceActions(
     /** 立即确认当前笔记。 */
     val onSave: () -> Unit,
+    /** 打开搜索整个工作区已确认内容的浮层。 */
+    val onSearchWorkspace: () -> Unit,
     /** 保存当前搜索条件。 */
     val onSaveQuery: () -> Unit,
     /** 运行一个已确认保存查询。 */
     val onRunSavedQuery: (ObjectId) -> Unit,
-    /** 创建密文备份。 */
-    val onBackup: () -> Unit,
-    /** 打开更换本机 PIN 流程。 */
-    val onChangePin: () -> Unit,
-    /** 打开主密钥轮换流程。 */
-    val onRotateMasterKey: () -> Unit,
     /** 打开当前笔记删除确认。 */
     val onDelete: () -> Unit,
     /** 锁定当前工作区。 */

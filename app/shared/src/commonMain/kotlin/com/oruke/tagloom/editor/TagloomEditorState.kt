@@ -320,6 +320,7 @@ class TagloomEditorState(
                     blockCounter += 1
                     BlockId(idFactory("block"))
                 },
+                tableIdFactory = { idFactory("table-item") },
             ),
         )
         val documentId = ObjectId(idFactory("note"))

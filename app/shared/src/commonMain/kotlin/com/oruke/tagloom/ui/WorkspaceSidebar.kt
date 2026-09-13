@@ -34,11 +34,14 @@ import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
 
 /**
- * 渲染只承担搜索、新建和笔记切换的桌面左侧导航。
+ * 渲染搜索、新建、笔记切换和底部设置入口的桌面左侧导航。
  *
  * @param state 编辑器状态。
  * @param searchFocusRequester Ctrl+K 请求使用的搜索焦点入口。
  * @param onCreateDocument 创建并立即选择新笔记。
+ * @param onSelectDocument 选择笔记并返回编辑页面。
+ * @param onOpenSettings 打开当前工作区设置；预览无设置能力时为空。
+ * @param settingsSelected 当前是否显示设置页面。
  * @param modifier 外部布局修饰符。
  */
 @Composable
@@ -46,6 +49,9 @@ internal fun WorkspaceSidebar(
     state: TagloomEditorState,
     searchFocusRequester: FocusRequester,
     onCreateDocument: () -> Unit,
+    onSelectDocument: (com.oruke.tagloom.core.model.ObjectId) -> Unit = state::selectDocument,
+    onOpenSettings: (() -> Unit)? = null,
+    settingsSelected: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -85,8 +91,8 @@ internal fun WorkspaceSidebar(
                 items(state.visibleDocuments, key = { document -> document.id.value }) { document ->
                     SidebarDocumentItem(
                         document = document,
-                        selected = document.id == state.selectedDocumentId,
-                        onClick = { state.selectDocument(document.id) },
+                        selected = !settingsSelected && document.id == state.selectedDocumentId,
+                        onClick = { onSelectDocument(document.id) },
                     )
                 }
                 if (state.visibleDocuments.isEmpty()) {
@@ -103,6 +109,13 @@ internal fun WorkspaceSidebar(
                         )
                     }
                 }
+            }
+            if (onOpenSettings != null) {
+                WorkspaceSettingsEntry(
+                    selected = settingsSelected,
+                    onClick = onOpenSettings,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
             SidebarSessionStatus()
         }

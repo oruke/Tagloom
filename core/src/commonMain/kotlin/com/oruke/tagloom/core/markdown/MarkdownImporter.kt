@@ -3,6 +3,8 @@ package com.oruke.tagloom.core.markdown
 import com.oruke.tagloom.core.model.Annotation
 import com.oruke.tagloom.core.model.AnnotationId
 import com.oruke.tagloom.core.model.AnnotationKinds
+import com.oruke.tagloom.core.model.BaseTableBlockContent
+import com.oruke.tagloom.core.model.BaseTableTextCell
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockContent
 import com.oruke.tagloom.core.model.BlockId
@@ -33,8 +35,9 @@ internal object MarkdownImporter {
         require(options.defaultTitle.isNotBlank()) { "Markdown 默认标题不能为空" }
         require(options.importedAt.isNotBlank()) { "Markdown 导入时间不能为空" }
         val normalizedLines = markdown.replace("\r\n", "\n").replace('\r', '\n').split('\n')
-        val definitions = parseAnnotationDefinitions(normalizedLines)
-        val contentLines = normalizedLines.filterNot { line -> ANNOTATION_DEFINITION.matches(line) }
+        val definitionLines = annotationDefinitionLines(normalizedLines)
+        val definitions = parseAnnotationDefinitions(definitionLines.map(normalizedLines::get))
+        val contentLines = normalizedLines.filterIndexed { lineIndex, _ -> lineIndex !in definitionLines }
         val blocks = mutableListOf<Block>()
         val warnings = mutableListOf<String>()
         var title = options.defaultTitle
@@ -49,7 +52,7 @@ internal object MarkdownImporter {
                 lineIndex += 1
                 continue
             }
-            if (line.startsWith("```")) {
+            if (MarkdownCodeFence.opening(line) != null) {
                 val code = parseCodeBlock(contentLines, lineIndex, options.blockIdFactory(index), orderKey(index))
                 blocks += code.block
                 warnings += code.warnings
@@ -83,6 +86,17 @@ internal object MarkdownImporter {
                 blocks += parsed
                 index += 1
                 lineIndex += 1
+                continue
+            }
+
+            val table = MarkdownTableParser.parse(
+                contentLines, lineIndex, options.blockIdFactory(index), orderKey(index),
+                options, definitions, warnings, ::isBlockStart,
+            )
+            if (table != null) {
+                blocks += table.block
+                lineIndex = table.nextLineIndex
+                index += 1
                 continue
             }
 
@@ -135,10 +149,10 @@ internal object MarkdownImporter {
         blockId: BlockId,
         orderKey: String,
     ): ParsedCodeBlock {
-        val language = lines[startIndex].removePrefix("```").trim().ifBlank { null }
+        val fence = requireNotNull(MarkdownCodeFence.opening(lines[startIndex])) { "代码块必须从合法围栏开始" }
         val codeLines = mutableListOf<String>()
         var lineIndex = startIndex + 1
-        while (lineIndex < lines.size && !lines[lineIndex].startsWith("```")) {
+        while (lineIndex < lines.size && !fence.closes(lines[lineIndex])) {
             codeLines += lines[lineIndex]
             lineIndex += 1
         }
@@ -153,7 +167,7 @@ internal object MarkdownImporter {
                 id = blockId,
                 type = BlockTypes.CODE,
                 orderKey = orderKey,
-                content = CodeBlockContent(language = language, text = codeLines.joinToString("\n")),
+                content = CodeBlockContent(language = fence.language, text = codeLines.joinToString("\n")),
             ),
             nextLineIndex = lineIndex,
             warnings = warnings,
@@ -181,6 +195,7 @@ internal object MarkdownImporter {
             lineIndex < lines.size &&
             lines[lineIndex].isNotBlank() &&
             !isBlockStart(lines[lineIndex]) &&
+            !MarkdownTableParser.startsTable(lines, lineIndex) &&
             lines[lineIndex] != "<!-- tagloom-annotations -->"
         ) {
             paragraphLines += lines[lineIndex]
@@ -273,13 +288,32 @@ internal object MarkdownImporter {
     }
 
     /**
+     * 标识代码围栏之外的加注定义，避免提前剥离代码示例中的原始行。
+     *
+     * @param lines 完整 Markdown 物理行。
+     * @return 可以提取为加注定义的物理行索引。
+     */
+    private fun annotationDefinitionLines(lines: List<String>): Set<Int> = buildSet {
+        var fence: MarkdownCodeFence? = null
+        lines.forEachIndexed { index, line ->
+            val currentFence = fence
+            if (currentFence != null) {
+                if (currentFence.closes(line)) fence = null
+            } else {
+                fence = MarkdownCodeFence.opening(line)
+                if (fence == null && ANNOTATION_DEFINITION.matches(line)) add(index)
+            }
+        }
+    }
+
+    /**
      * 判断一行是否会启动非段落 Block。
      *
      * @param line 待检查物理行。
      * @return 标题、围栏、列表、引用或分隔线时为 `true`。
      */
     private fun isBlockStart(line: String): Boolean =
-        line.startsWith("```") ||
+        MarkdownCodeFence.opening(line) != null ||
             HEADING.matches(line) ||
             TODO.matches(line) ||
             BULLET.matches(line) ||
@@ -321,6 +355,15 @@ internal object MarkdownImporter {
         is RichTextBlockContent -> content.richText.runs.flatMap(InlineRun::annotationIds)
         is HeadingBlockContent -> content.richText.runs.flatMap(InlineRun::annotationIds)
         is TodoBlockContent -> content.richText.runs.flatMap(InlineRun::annotationIds)
+        is BaseTableBlockContent -> buildList {
+            addAll(content.title.runs.flatMap(InlineRun::annotationIds))
+            content.columns.forEach { column -> addAll(column.name.runs.flatMap(InlineRun::annotationIds)) }
+            content.rows.forEach { row ->
+                row.cells.values.filterIsInstance<BaseTableTextCell>().forEach { cell ->
+                    addAll(cell.richText.runs.flatMap(InlineRun::annotationIds))
+                }
+            }
+        }
         else -> emptyList()
     }
 

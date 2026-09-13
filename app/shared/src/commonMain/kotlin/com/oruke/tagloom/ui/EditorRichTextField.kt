@@ -16,6 +16,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.oruke.tagloom.editor.search.NoteSearchField
+import com.oruke.tagloom.editor.search.NoteSearchTarget
+import com.oruke.tagloom.ui.search.rememberNoteSearchDecoration
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -104,6 +108,13 @@ internal fun EditorRichTextField(
         )
     }
     val focusRequester = remember(block.id) { FocusRequester() }
+    val find = rememberNoteSearchDecoration(
+        NoteSearchTarget(NoteSearchField.BODY, block.id),
+        onRestoreSelection = { start, end ->
+            val restored = TextRange(start.coerceIn(0, fieldValue.text.length), end.coerceIn(0, fieldValue.text.length))
+            fieldValue = fieldValue.copy(selection = restored, composition = null)
+            state.updateSelection(block.id, restored.start, restored.end)
+        })
     var focused by remember(block.id) { mutableStateOf(false) }
     var dismissedSlashText by remember(block.id) { mutableStateOf<String?>(null) }
     var selectedCommandIndex by remember(block.id) { mutableIntStateOf(0) }
@@ -114,8 +125,8 @@ internal fun EditorRichTextField(
         databaseAvailable = databaseCreationAvailable,
     )
     val showCommandMenu = commandMenuRequested || (
-        slashTrigger != null && dismissedSlashText != fieldValue.text && focused
-        )
+            slashTrigger != null && dismissedSlashText != fieldValue.text && focused
+            )
 
     LaunchedEffect(modelText) {
         if (fieldValue.annotatedString != modelText) {
@@ -148,9 +159,11 @@ internal fun EditorRichTextField(
     Box(modifier) {
         BasicTextField(
             value = fieldValue,
+            visualTransformation = find.transformation(),
+            onTextLayout = find.onTextLayout,
             onValueChange = onValueChange@{ incoming ->
                 val previous = fieldValue
-                val delta = TextEditDelta.between(previous.text, incoming.text)
+                val delta = TextEditDelta.between(previous, incoming)
                 if (
                     incoming.composition == null &&
                     delta.insertedText.length > 1 &&
@@ -182,6 +195,8 @@ internal fun EditorRichTextField(
             },
             modifier = Modifier
                 .fillMaxWidth()
+                .testTag("text-input-${block.id.value}")
+                .then(find.modifier)
                 .focusRequester(focusRequester)
                 .onFocusChanged { focusState ->
                     focused = focusState.isFocused
@@ -198,10 +213,12 @@ internal fun EditorRichTextField(
                         commandPressed && event.isShiftPressed && event.key == Key.S -> {
                             toggleMark(state, InlineMarkTypes.STRIKETHROUGH)
                         }
+
                         commandPressed && event.key == Key.S -> {
                             onSaveRequest()
                             true
                         }
+
                         commandPressed && event.key == Key.B -> toggleMark(state, InlineMarkTypes.BOLD)
                         commandPressed && event.key == Key.I -> toggleMark(state, InlineMarkTypes.ITALIC)
                         commandPressed && event.key == Key.E -> toggleMark(state, InlineMarkTypes.CODE)
@@ -209,18 +226,22 @@ internal fun EditorRichTextField(
                             state.toggleTodo(block.id)
                             true
                         }
+
                         commandPressed && event.isShiftPressed && event.key == Key.DirectionUp -> {
                             state.moveBlock(block.id, BlockMoveDirection.UP)
                             true
                         }
+
                         commandPressed && event.isShiftPressed && event.key == Key.DirectionDown -> {
                             state.moveBlock(block.id, BlockMoveDirection.DOWN)
                             true
                         }
+
                         event.key == Key.Tab -> {
                             if (event.isShiftPressed) state.outdentBlock(block.id) else state.indentBlock(block.id)
                             true
                         }
+
                         event.key == Key.Enter && !event.isShiftPressed && showCommandMenu && commands.isNotEmpty() -> {
                             val command = commands[selectedCommandIndex]
                             if (command.type == EditorBlockType.BASE_TABLE) {
@@ -238,6 +259,7 @@ internal fun EditorRichTextField(
                             }
                             true
                         }
+
                         event.key == Key.Enter && !event.isShiftPressed -> {
                             state.splitBlock(
                                 block.id,
@@ -246,30 +268,37 @@ internal fun EditorRichTextField(
                             )?.let(onCursorRequest)
                             true
                         }
+
                         event.key == Key.Backspace && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
                             state.mergeBlockWithPrevious(block.id)?.let(onCursorRequest) != null
                         }
+
                         showCommandMenu && event.key == Key.DirectionDown && commands.isNotEmpty() -> {
                             selectedCommandIndex = (selectedCommandIndex + 1).coerceAtMost(commands.lastIndex)
                             true
                         }
+
                         showCommandMenu && event.key == Key.DirectionUp && commands.isNotEmpty() -> {
                             selectedCommandIndex = (selectedCommandIndex - 1).coerceAtLeast(0)
                             true
                         }
+
                         event.key == Key.DirectionUp && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
                             state.adjacentCursor(block.id, BlockMoveDirection.UP)?.let(onCursorRequest) != null
                         }
+
                         event.key == Key.DirectionDown && fieldValue.selection.collapsed &&
-                            fieldValue.selection.end == fieldValue.text.length -> {
+                                fieldValue.selection.end == fieldValue.text.length -> {
                             state.adjacentCursor(block.id, BlockMoveDirection.DOWN)?.let(onCursorRequest) != null
                         }
+
                         showCommandMenu && event.key == Key.Escape -> {
                             tablePickerOpen = false
                             dismissedSlashText = fieldValue.text
                             onCommandMenuDismiss()
                             true
                         }
+
                         else -> false
                     }
                 },

@@ -177,8 +177,8 @@ internal object MarkdownInlineCodec {
     /** 行内 Markdown 链接。 */
     private val LINK: Regex = Regex("\\[([^]]+)]\\(([^)]+)\\)")
 
-    /** Tagloom 扩展加注锚点。 */
-    private val ANNOTATION_ANCHOR: Regex = Regex("\\{\\{([A-Za-z0-9_-]{1,128})\\|(.+?)}}")
+    /** Tagloom 扩展加注锚点；花括号显式转义以兼容 Android ICU 正则。 */
+    private val ANNOTATION_ANCHOR: Regex = Regex("\\{\\{([A-Za-z0-9_-]{1,128})\\|(.+?)\\}\\}")
 
     /** 本编码器转义的单字符。 */
     private val ESCAPED_CHARACTER: Regex = Regex("\\\\([\\\\`*_{}\\[\\]()#+.!|~-])")

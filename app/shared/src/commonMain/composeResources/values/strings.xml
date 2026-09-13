@@ -1,5 +1,19 @@
 <resources>
     <string name="workspace_app_name">Tagloom</string>
+    <string name="workspace_menu_search_workspace">Search entire workspace</string>
+    <string name="workspace_settings_title">Settings</string>
+    <string name="workspace_settings_back">Back to notes</string>
+    <string name="workspace_settings_description">Manage how this device unlocks and protect your workspace data.</string>
+    <string name="workspace_settings_device_section">This device</string>
+    <string name="workspace_settings_pin_enabled">Enabled. Opening the workspace requires a PIN. You can change or disable it.</string>
+    <string name="workspace_settings_pin_disabled">Disabled. This device opens the workspace automatically using secure storage.</string>
+    <string name="workspace_settings_manage_pin">Manage PIN</string>
+    <string name="workspace_settings_lock_description">End this unlocked session and close notes and search.</string>
+    <string name="workspace_settings_data_section">Workspace data</string>
+    <string name="workspace_settings_backup_title">Encrypted backup</string>
+    <string name="workspace_settings_backup_description">Back up saved workspace content. Recovery requires your Recovery Key.</string>
+    <string name="workspace_settings_master_key_title">Master key and recovery key</string>
+    <string name="workspace_settings_master_key_description">Re-encrypt the workspace and generate a new Recovery Key. Save the new key offline when finished.</string>
     <string name="workspace_loading">Preparing your workspace…</string>
     <string name="workspace_access_continue_to">Continue to %1$s</string>
     <string name="workspace_access_open">Open workspace</string>
@@ -274,6 +288,13 @@
     <string name="editor_block_no_matching_commands">No matching block types</string>
     <string name="editor_code_hint">Tab to indent · Ctrl+S to save</string>
     <string name="editor_code_placeholder">Enter code…</string>
+    <string name="editor_code_language">Code language</string>
+    <string name="editor_code_plain_text">Plain text</string>
+    <string name="editor_code_language_search">Search languages…</string>
+    <string name="editor_code_language_empty">No matching languages</string>
+    <string name="editor_code_wrap">Wrap lines</string>
+    <string name="editor_code_copy">Copy</string>
+    <string name="editor_code_copied">Copied</string>
     <string name="editor_block_command_text_label">Text</string>
     <string name="editor_block_command_text_description">Continuous body text</string>
     <string name="editor_block_command_text_keywords">text,paragraph,body</string>
@@ -408,4 +429,14 @@
     <string name="desktop_export_database_reference_prefix">Tagloom database reference: </string>
     <string name="desktop_export_unknown_block_prefix">Unsupported block: </string>
     <string name="desktop_export_annotations_title">Annotations</string>
+    <string name="editor_find_action">Find</string>
+    <string name="editor_find_tooltip">Find in note · Ctrl/Cmd+F</string>
+    <string name="editor_find_placeholder">Find in note</string>
+    <string name="editor_find_match_case">Match case</string>
+    <string name="editor_find_count">%1$d / %2$d</string>
+    <string name="editor_find_count_description">Match %1$d of %2$d</string>
+    <string name="editor_find_empty">No matches</string>
+    <string name="editor_find_previous">Previous match</string>
+    <string name="editor_find_next">Next match</string>
+    <string name="editor_find_close">Close find</string>
 </resources>

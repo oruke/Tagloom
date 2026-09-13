@@ -29,6 +29,12 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.oruke.tagloom.editor.search.NoteSearchField
+import com.oruke.tagloom.editor.search.NoteSearchTarget
+import com.oruke.tagloom.ui.search.LocalNoteSearch
+import com.oruke.tagloom.ui.search.NoteSearchEntry
+import com.oruke.tagloom.ui.search.NoteSearchTextViewport
+import com.oruke.tagloom.ui.search.rememberNoteSearchDecoration
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.PropertyId
@@ -51,11 +57,13 @@ import tagloom.app.shared.generated.resources.*
  * @param onCursorRequest 正文焦点请求。
  * @param onExport 文档导出请求。
  * @param onSaveRequest 立即保存请求。
- * @param onSearchRequest 可选已确认内容搜索入口。
  * @param onWorkspaceMenuRequest 可选工作区安全与维护菜单入口。
  * @param onSaveTagDefinition 持久化工作区标签定义。
  * @param onSavePropertyDefinition 持久化工作区属性定义。
  * @param onCreatePropertyOption 持久化并选择一个自由属性选项。
+ * @param searchMenu 工作区搜索浮层。
+ * @param workspaceMenu 笔记操作浮层。
+ * @param searchEntryModifier 搜索图标用于定位查找浮层的修饰符。
  */
 @Composable
 internal fun PageHeader(
@@ -66,15 +74,16 @@ internal fun PageHeader(
     onCursorRequest: (EditorCursorTarget) -> Unit,
     onExport: (DocumentExportFormat) -> Unit,
     onSaveRequest: () -> Unit,
-    onSearchRequest: (() -> Unit)?,
     onWorkspaceMenuRequest: (() -> Unit)?,
     onSaveTagDefinition: (TagDefinition, Boolean) -> Unit,
     onSavePropertyDefinition: (PropertyDefinition, PropertyDefinitionDestination) -> Unit,
     onCreatePropertyOption: (PropertyId, String) -> Unit,
     searchMenu: (@Composable () -> Unit)? = null,
     workspaceMenu: (@Composable () -> Unit)? = null,
+    searchEntryModifier: Modifier = Modifier,
 ) {
     var exportMenuOpen by remember(document.id) { mutableStateOf(false) }
+    val find = rememberNoteSearchDecoration(NoteSearchTarget(NoteSearchField.TITLE))
     Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -137,13 +146,11 @@ internal fun PageHeader(
                     }
                 }
             }
-            if (onSearchRequest != null || searchMenu != null) {
-                Box {
-                    if (onSearchRequest != null) {
-                        PageIconAction("⌕", onSearchRequest)
-                    }
-                    searchMenu?.invoke()
+            Box {
+                LocalNoteSearch.current?.let { search ->
+                    NoteSearchEntry(active = search.isOpen, onClick = search::open, modifier = searchEntryModifier)
                 }
+                searchMenu?.invoke()
             }
             if (onWorkspaceMenuRequest != null || workspaceMenu != null) {
                 Box {
@@ -155,43 +162,49 @@ internal fun PageHeader(
             }
         }
         Spacer(Modifier.height(24.dp))
-        BasicTextField(
-            value = document.note.title,
-            onValueChange = state::updateTitle,
-            modifier = Modifier
-                .fillMaxWidth()
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) {
-                        return@onPreviewKeyEvent false
-                    }
-                    when {
-                        (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.S -> {
-                            onSaveRequest()
-                            true
+        NoteSearchTextViewport(Modifier.fillMaxWidth()) { fieldModifier ->
+            BasicTextField(
+                value = document.note.title,
+                visualTransformation = find.transformation(),
+                onTextLayout = find.onTextLayout,
+                onValueChange = state::updateTitle,
+                modifier = fieldModifier
+                    .then(find.modifier)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) {
+                            return@onPreviewKeyEvent false
                         }
-                        event.key == Key.Enter && firstBlock != null -> {
-                            onCursorRequest(EditorCursorTarget(firstBlock.id, 0))
-                            true
+                        when {
+                            (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.S -> {
+                                onSaveRequest()
+                                true
+                            }
+
+                            event.key == Key.Enter && firstBlock != null -> {
+                                onCursorRequest(EditorCursorTarget(firstBlock.id, 0))
+                                true
+                            }
+
+                            else -> false
                         }
-                        else -> false
+                    },
+                textStyle = MaterialTheme.typography.headlineLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                singleLine = true,
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { innerTextField ->
+                    Box(Modifier.fillMaxWidth()) {
+                        if (document.note.title.isBlank()) {
+                            Text(
+                                stringResource(Res.string.editor_sidebar_untitled_note),
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        innerTextField()
                     }
                 },
-            textStyle = MaterialTheme.typography.headlineLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-            singleLine = true,
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            decorationBox = { innerTextField ->
-                Box(Modifier.fillMaxWidth()) {
-                    if (document.note.title.isBlank()) {
-                        Text(
-                            stringResource(Res.string.editor_sidebar_untitled_note),
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    innerTextField()
-                }
-            },
-        )
+            )
+        }
         Spacer(Modifier.height(12.dp))
         DocumentMetadataPanel(
             state = state,

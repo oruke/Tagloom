@@ -141,6 +141,11 @@ class DesktopWorkspaceSession internal constructor(
         integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
             savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
             databaseStore.inspect(unlocked).issues).distinct()
+        if (!readOnly && integrityIssues.isEmpty()) {
+            DesktopNoteTagSchemaMigration.migrate(schemaStore, unlocked, ::nextSchemaWriteContext)?.let { manifest ->
+                refreshManifest(manifest)
+            }
+        }
         openState()
     }
 

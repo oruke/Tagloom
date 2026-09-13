@@ -52,7 +52,9 @@ internal object MarkdownBlockPasteReducer {
         val imported = importedBlocks.filterNot(Block::deleted).map { block ->
             block.copy(parentId = target.parentId)
         }
-        val replacements = buildReplacements(target, prefix, suffix, imported, idFactory)
+        val preserveTarget = imported.firstOrNull()?.type == BlockTypes.BASE_TABLE &&
+            blocks.any { block -> !block.deleted && block.parentId == target.id }
+        val replacements = buildReplacements(target, prefix, suffix, imported, preserveTarget, idFactory)
         val replaced = blocks.take(targetIndex) + replacements + blocks.drop(targetIndex + 1)
         val reindexed = reindexSiblings(replaced, target.parentId)
         val cursorBlock = replacements.lastOrNull { block -> editableLength(block) != null } ?: target
@@ -69,6 +71,7 @@ internal object MarkdownBlockPasteReducer {
      * @param prefix 粘贴点之前的富文本。
      * @param suffix 粘贴点之后的富文本。
      * @param imported 已转换为同级的 Markdown Block。
+     * @param preserveTarget 原节点仍有子内容时保留其身份，不能把它直接转换为叶子表格。
      * @param idFactory 必要时创建尾部段落的 ID 工厂。
      * @return 至少包含一个 Block 的替换序列。
      */
@@ -77,13 +80,15 @@ internal object MarkdownBlockPasteReducer {
         prefix: RichText,
         suffix: RichText,
         imported: List<Block>,
+        preserveTarget: Boolean,
         idFactory: (String) -> String,
     ): List<Block> {
         if (imported.isEmpty()) {
             return listOf(target.withEditableRichText(RichTextDocumentReducer.concat(prefix, suffix)))
         }
         val replacements = mutableListOf<Block>()
-        if (prefix.plainText.isNotEmpty()) {
+        if (prefix.plainText.isNotEmpty() || preserveTarget) {
+            // 嵌套正文仍引用原父节点；保留空前缀也能避免把它们挂到叶子表格下。
             replacements += target.withEditableRichText(prefix)
             replacements += imported
         } else {
@@ -108,6 +113,11 @@ internal object MarkdownBlockPasteReducer {
                     .copy(parentId = target.parentId)
                     .withEditableRichText(suffix)
             }
+        }
+        if (editableLength(replacements.last()) == null) {
+            // 表格等结构块不能接收文本光标；补充同级段落，避免光标落在已被替换的旧输入框。
+            replacements += EditorBlockFactory.create(BlockTypes.PARAGRAPH, replacements.size, idFactory)
+                .copy(parentId = target.parentId)
         }
         return replacements
     }

@@ -56,16 +56,19 @@ object WorkspaceDefaultSchemas {
     )
 
     /**
-     * 返回绑定全部 MVP 属性且不隐式写入默认值的根 Note 标签。
+     * 返回仅绑定描述和普通标签、不隐式写入默认值的根 Note 标签。
      *
      * @return 新工作区默认标签定义。
      */
     fun noteTagDefinition(): TagDefinition = TagDefinition(
         id = WorkspaceDefaults.DEFAULT_NOTE_TAG_ID,
         name = "Note",
-        propertyBindings = propertyDefinitions().mapIndexed { index, definition ->
+        propertyBindings = listOf(
+            WorkspaceDefaults.DEFAULT_TEXT_PROPERTY_ID,
+            WorkspaceDefaults.DEFAULT_TAGS_PROPERTY_ID,
+        ).mapIndexed { index, propertyId ->
             TagPropertyBinding(
-                propertyId = definition.id,
+                propertyId = propertyId,
                 defaultPolicy = DefaultValuePolicy.NONE,
                 order = index,
             )

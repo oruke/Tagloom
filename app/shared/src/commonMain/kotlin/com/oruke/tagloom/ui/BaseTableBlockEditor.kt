@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -34,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +48,8 @@ import com.oruke.tagloom.core.model.BaseTableTextCell
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.UnknownBaseTableCell
 import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.editor.search.NoteSearchField
+import com.oruke.tagloom.editor.search.NoteSearchTarget
 import com.oruke.tagloom.editor.addBaseTableColumn
 import com.oruke.tagloom.editor.addBaseTableRow
 import com.oruke.tagloom.editor.changeBaseTableColumnType
@@ -207,13 +207,14 @@ private fun BaseTableColumnHeader(
             .padding(start = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        InlineTableTextField(
+        BaseTableTextField(
             value = column.name.plainText,
             onValueChange = { value -> state.renameBaseTableColumn(block.id, column.columnId, value) },
             placeholder = baseTableTypeLabel(column.type),
             enabled = enabled && column.type in BaseTableColumnTypes.EDITABLE,
             modifier = Modifier.weight(1f),
             fontWeight = FontWeight.SemiBold,
+            searchTarget = NoteSearchTarget(NoteSearchField.COLUMN, block.id, column.columnId),
         )
         Box {
             if (hovered || menuOpen) {
@@ -410,56 +411,16 @@ private fun BaseTableCellEditor(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> InlineTableTextField(
+            else -> BaseTableTextField(
                 value = cell.editableText(),
                 onValueChange = { value -> state.updateBaseTableCellText(block.id, row.rowId, column.columnId, value) },
                 placeholder = "",
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
+                searchTarget = NoteSearchTarget(NoteSearchField.CELL, block.id, column.columnId, row.rowId),
             )
         }
     }
-}
-
-/**
- * 渲染无外框的紧凑表格文本输入。
- *
- * @param value 当前文本。
- * @param onValueChange 文本变化回调。
- * @param placeholder 空值提示。
- * @param enabled 是否允许输入。
- * @param modifier 外部布局修饰符。
- * @param fontWeight 可选字重。
- */
-@Composable
-private fun InlineTableTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-    fontWeight: FontWeight? = null,
-) {
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        enabled = enabled,
-        modifier = modifier,
-        textStyle = MaterialTheme.typography.bodyMedium.copy(
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = fontWeight,
-        ),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        singleLine = true,
-        decorationBox = { inner ->
-            Box {
-                if (value.isEmpty() && placeholder.isNotEmpty()) {
-                    Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
-                }
-                inner()
-            }
-        },
-    )
 }
 
 /**

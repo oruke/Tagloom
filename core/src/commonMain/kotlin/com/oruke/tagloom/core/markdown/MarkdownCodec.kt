@@ -2,6 +2,7 @@ package com.oruke.tagloom.core.markdown
 
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.Note
+import kotlin.uuid.Uuid
 
 /**
  * 区分最大兼容标准 Markdown 与保留 Tagloom 加注语义的扩展格式。
@@ -48,6 +49,8 @@ class MarkdownImportOptions(
     val importedAt: String,
     /** 根据导入顺序生成稳定且不透明 Block ID。 */
     val blockIdFactory: (Int) -> BlockId,
+    /** 为每个表格行和列分配独立的不透明 ID；不得由标题、序号或单元格文本派生。 */
+    val tableIdFactory: () -> String = { Uuid.random().toString() },
 )
 
 /**

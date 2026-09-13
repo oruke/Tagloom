@@ -10,6 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
+import com.oruke.tagloom.editor.search.NoteSearchField
+import com.oruke.tagloom.editor.search.NoteSearchTarget
+import com.oruke.tagloom.ui.search.rememberNoteSearchDecoration
+import com.oruke.tagloom.ui.search.LocalNoteSearch
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.TagloomEditorState
@@ -29,12 +33,16 @@ internal fun DocumentDescription(
 ) {
     val propertyId = WorkspaceDefaults.DEFAULT_TEXT_PROPERTY_ID
     val value = state.propertyEditor.stringValue(document.note, propertyId)
+    val find = rememberNoteSearchDecoration(NoteSearchTarget(NoteSearchField.DESCRIPTION))
+    // 查找时展开描述，由正文列表直接定位字符；平时仍保持三行上限，避免嵌套纵向滚动互相抢占。
     BasicTextField(
         value = value,
+        visualTransformation = find.transformation(),
+        onTextLayout = find.onTextLayout,
         onValueChange = { next -> state.propertyEditor.updateText(propertyId, next) },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).then(find.modifier),
         minLines = 1,
-        maxLines = 3,
+        maxLines = if (LocalNoteSearch.current?.isOpen == true) Int.MAX_VALUE else 3,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         decorationBox = { innerTextField ->

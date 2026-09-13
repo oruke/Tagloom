@@ -1,4 +1,5 @@
 package com.oruke.tagloom.ui
+
 import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.background
@@ -42,6 +43,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.AnnotatedString
+import com.oruke.tagloom.editor.search.NoteSearchField
+import com.oruke.tagloom.editor.search.NoteSearchTarget
+import com.oruke.tagloom.ui.search.rememberNoteSearchDecoration
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.BlockTypes
@@ -210,6 +215,7 @@ private fun TabHeader(
     onDeleteRequest: () -> Unit,
 ) {
     val content = tab.content as? TabBlockContent ?: return
+    val find = rememberNoteSearchDecoration(NoteSearchTarget(NoteSearchField.TAB, tab.id), editable = renaming)
     val interactionSource = remember(tab.id) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     var menuOpen by remember(tab.id) { mutableStateOf(false) }
@@ -243,46 +249,59 @@ private fun TabHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (renaming) {
-            BasicTextField(
-                value = draft,
-                onValueChange = { value -> draft = value },
-                modifier = Modifier
-                    .widthIn(min = 68.dp, max = 160.dp)
-                    .height(28.dp)
-                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp))
-                    .padding(horizontal = 8.dp)
-                    .focusRequester(focusRequester)
-                    .onPreviewKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown) {
-                            false
-                        } else when (event.key) {
-                            Key.Enter -> {
-                                state.renameTab(tab.id, draft.ifBlank { "未命名" })
-                                onRenameEnd()
-                                true
+            Box(Modifier.widthIn(min = 68.dp, max = 160.dp).horizontalScroll(rememberScrollState())) {
+                BasicTextField(
+                    value = draft,
+                    visualTransformation = find.transformation(),
+                    onTextLayout = find.onTextLayout,
+                    onValueChange = { value -> draft = value },
+                    modifier = Modifier
+                        .widthIn(min = 68.dp)
+                        .height(28.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp))
+                        .padding(horizontal = 8.dp)
+                        .focusRequester(focusRequester)
+                        .then(find.modifier)
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) {
+                                false
+                            } else when (event.key) {
+                                Key.Enter -> {
+                                    state.renameTab(tab.id, draft.ifBlank { "未命名" })
+                                    onRenameEnd()
+                                    true
+                                }
+
+                                Key.Escape -> {
+                                    onRenameEnd()
+                                    true
+                                }
+
+                                else -> false
                             }
-                            Key.Escape -> {
-                                onRenameEnd()
-                                true
-                            }
-                            else -> false
-                        }
-                    },
-                textStyle = MaterialTheme.typography.labelLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                singleLine = true,
-            )
+                        },
+                    textStyle = MaterialTheme.typography.labelLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    singleLine = true,
+                )
+            }
         } else {
-            Text(
-                text = content.title.plainText,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-            )
+            // 页签保持紧凑宽度，长标题在自身视口滚动，查找能显示末尾的匹配字符。
+            Box(Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState())) {
+                Text(
+                    text = find.highlight(AnnotatedString(content.title.plainText)),
+                    modifier = find.modifier,
+                    onTextLayout = find.onTextLayout,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         }
         Box {
             if (!renaming && (selected || menuOpen)) {
@@ -335,7 +354,13 @@ private fun TabHeader(
                 TagloomMenuDivider()
                 TagloomMenuItem(
                     text = "删除标签页",
-                    leadingIcon = { Text("♲", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) },
+                    leadingIcon = {
+                        Text(
+                            "♲",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
                     destructive = true,
                     onClick = {
                         onDeleteRequest()
@@ -390,7 +415,11 @@ private fun TabDeleteConfirmation(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("⚠  当前标签页包含 $blockCount 个 Block", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+        Text(
+            "⚠  当前标签页包含 $blockCount 个 Block",
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelMedium
+        )
         Text("取消", modifier = Modifier.clickable(onClick = onCancel), style = MaterialTheme.typography.labelMedium)
         TabDeleteAction("连同内容删除", destructive = true, filled = false, onClick = onDeleteContents)
         TabDeleteAction("移出内容后删除", destructive = false, filled = true, onClick = onMoveContents)
