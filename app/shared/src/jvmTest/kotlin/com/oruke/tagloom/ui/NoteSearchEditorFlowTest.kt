@@ -1,6 +1,7 @@
 package com.oruke.tagloom.ui
 
 import androidx.compose.ui.graphics.asSkiaBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.App
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.editor.search.*
@@ -37,10 +39,15 @@ class NoteSearchEditorFlowTest {
             waitUntil(timeoutMillis = 15_000) {
                 onAllNodesWithTag("text-input-rich").fetchSemanticsNodes().isNotEmpty()
             }
-            onNodeWithTag("text-input-rich").performClick().performTextInputSelection(TextRange(0, 6))
+            onNodeWithTag("text-input-rich").performMouseInput { click() }
+            onNodeWithTag("text-input-rich").performTextInputSelection(TextRange(0, 6))
+            val bodyBounds = onNodeWithTag("text-input-rich").fetchSemanticsNode().boundsInRoot
             onNodeWithTag("text-input-rich").performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.F) } }
             onNodeWithTag("note-search-input").assertIsFocused().assertTextContains("Needle")
             assertCount("1 / 8")
+            assertEquals(bodyBounds, onNodeWithTag("text-input-rich").fetchSemanticsNode().boundsInRoot)
+            onNodeWithTag("note-search-entry").assertWidthIsEqualTo(36.dp)
+            assertFindToolbar(compact = false)
             onNodeWithTag("note-search-input").performKeyInput { pressKey(Key.Enter) }
             assertCount("2 / 8")
             onNodeWithTag("note-search-input").performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Enter) } }
@@ -50,9 +57,14 @@ class NoteSearchEditorFlowTest {
             onNodeWithTag("note-search-input").performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.F3) } }
             assertCount("1 / 8")
             onNodeWithTag("note-search-input").performTextReplacement("needle")
-            onNodeWithContentDescription("区分大小写").performClick().assertIsOn()
+            onNodeWithTag("note-search-input").performKeyInput { pressKey(Key.Tab) }
+            onNodeWithContentDescription("区分大小写").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+            onNodeWithContentDescription("区分大小写").assertIsOn()
             assertCount("1 / 7")
+            onNodeWithContentDescription("区分大小写").performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) } }
+            onNodeWithTag("note-search-input").assertIsFocused()
             onNodeWithContentDescription("区分大小写").performClick().assertIsOff()
+            assertEquals(bodyBounds, onNodeWithTag("text-input-rich").fetchSemanticsNode().boundsInRoot, "切换输入模式不能改变正文布局")
             repeat(2) { onNodeWithContentDescription("下一处").performClick() }
             assertCount("3 / 8")
             assertActiveHighlight(NoteSearchTarget(NoteSearchField.BODY, BlockId("rich")))
@@ -133,6 +145,7 @@ class NoteSearchEditorFlowTest {
             val pane = onNodeWithTag("editor-pane").fetchSemanticsNode().boundsInRoot
             val entry = onNodeWithTag("note-search-entry").fetchSemanticsNode().boundsInRoot
             assertTrue(toolbar.top >= entry.bottom && toolbar.left >= pane.left && toolbar.right <= pane.right)
+            assertFindToolbar(compact = true)
             screenshot("find-floating-compact.png")
             onNodeWithTag("note-search-input").performTextReplacement("needle")
             assertCount("1 / 2")
@@ -248,6 +261,10 @@ class NoteSearchEditorFlowTest {
         val layout = layouts.first()
         val match = layout.layoutInput.text.getStringAnnotations("note-search", 0, layout.layoutInput.text.length)
             .first { it.item == "active" }
+        val highlight = layout.layoutInput.text.spanStyles.last { it.start == match.start && it.end == match.end }.item
+        assertEquals(Color(0xFFFCD34D), highlight.background, "当前命中应采用已确认的琥珀色")
+        assertNull(highlight.fontWeight, "查找显示不能覆盖原文字重")
+        assertEquals(androidx.compose.ui.unit.TextUnit.Unspecified, highlight.fontSize)
         waitUntil(timeoutMillis = 10_000) {
             val node = onNode(matcher, useUnmergedTree = true).fetchSemanticsNode()
             val bounds = layout.getBoundingBox(match.start).translate(node.positionInRoot)
@@ -255,6 +272,31 @@ class NoteSearchEditorFlowTest {
             val bar = onNodeWithTag("note-search-bar").fetchSemanticsNode().boundsInRoot
             bounds.top >= viewport.top - 1f && bounds.bottom <= viewport.bottom + 1f &&
                     bounds.left >= viewport.left - 1f && bounds.right <= viewport.right + 1f && !bounds.overlaps(bar)
+        }
+    }
+
+    /**
+     * 在生产页面检查输入选项分组、按钮可见范围和桌面尺寸，防止工具栏挤压正文或操作溢出。
+     * @param compact 当前是否使用窄屏的两行布局。
+     */
+    private fun ComposeUiTest.assertFindToolbar(compact: Boolean) {
+        val bar = onNodeWithTag("note-search-bar").fetchSemanticsNode().boundsInRoot
+        val entry = onNodeWithTag("note-search-entry").fetchSemanticsNode().boundsInRoot
+        val input = onNodeWithTag("note-search-input").fetchSemanticsNode().boundsInRoot
+        val case = onNodeWithContentDescription("区分大小写").fetchSemanticsNode().boundsInRoot
+        assertTrue(case.left >= input.left && case.right <= input.right, "Aa 应位于输入区域内")
+        listOf("区分大小写", "上一处", "下一处", "关闭查找").forEach { label ->
+            val bounds = onNodeWithContentDescription(label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue(bounds.left >= bar.left && bounds.right <= bar.right && bounds.top >= bar.top && bounds.bottom <= bar.bottom)
+        }
+        if (compact) {
+            val next = onNodeWithContentDescription("下一处").fetchSemanticsNode().boundsInRoot
+            assertTrue(next.top >= input.bottom, "窄屏导航应使用第二行")
+        } else {
+            onNodeWithTag("note-search-bar").assertWidthIsEqualTo(480.dp).assertHeightIsEqualTo(52.dp)
+            val density = bar.width / 480f
+            assertEquals(entry.right, bar.right, 1f)
+            assertEquals(entry.bottom + 8f * density, bar.top, 1f)
         }
     }
 

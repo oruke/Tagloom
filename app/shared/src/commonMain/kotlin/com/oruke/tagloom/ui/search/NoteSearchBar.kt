@@ -2,6 +2,7 @@ package com.oruke.tagloom.ui.search
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,6 +27,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.search.NoteSearchState
+import com.oruke.tagloom.ui.PlatformUsesTouchTargets
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
 
@@ -37,9 +40,9 @@ import tagloom.app.shared.generated.resources.*
 @Composable
 internal fun NoteSearchBar(search: NoteSearchState, onClose: () -> Unit) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         shape = MaterialTheme.shapes.small,
-        shadowElevation = 6.dp,
+        shadowElevation = 4.dp,
         modifier = Modifier.fillMaxWidth().testTag("note-search-bar")
     ) {
         BoxWithConstraints(
@@ -47,15 +50,23 @@ internal fun NoteSearchBar(search: NoteSearchState, onClose: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             val compact = maxWidth < 440.dp
-            if (compact) {
-                Column(Modifier.fillMaxWidth()) {
-                    NoteSearchQuery(search, Modifier.fillMaxWidth())
-                    NoteSearchActions(search, onClose, compact = true)
-                }
-            } else {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    NoteSearchQuery(search, Modifier.weight(1f))
-                    NoteSearchActions(search, onClose, compact = false)
+            val touchTargets = compact || PlatformUsesTouchTargets
+            // 只在桌面查找栏内覆盖 Material 的最小尺寸，窄屏与触摸输入仍保留 48dp。
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides if (touchTargets) 48.dp else 0.dp) {
+                if (compact) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        NoteSearchQuery(search, Modifier.fillMaxWidth(), touchTargets)
+                        NoteSearchActions(search, onClose, compact = true, touchTargets = touchTargets)
+                    }
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        NoteSearchQuery(search, Modifier.weight(1f), touchTargets)
+                        NoteSearchActions(search, onClose, compact = false, touchTargets = touchTargets)
+                    }
                 }
             }
         }
@@ -66,9 +77,10 @@ internal fun NoteSearchBar(search: NoteSearchState, onClose: () -> Unit) {
  * 接收字面量关键词，重复打开时全选关键词，输入焦点不随结果导航转移。
  * @param search 当前笔记的查找会话。
  * @param modifier 根据可用宽度分配的输入框布局。
+ * @param touchTargets 是否为窄屏或触摸交互保留较大的输入与切换区域。
  */
 @Composable
-private fun NoteSearchQuery(search: NoteSearchState, modifier: Modifier) {
+private fun NoteSearchQuery(search: NoteSearchState, modifier: Modifier, touchTargets: Boolean) {
     val requester = remember { FocusRequester() }
     var value by remember(search) { mutableStateOf(TextFieldValue(search.query)) }
     var focused by remember { mutableStateOf(false) }
@@ -77,32 +89,62 @@ private fun NoteSearchQuery(search: NoteSearchState, modifier: Modifier) {
         requester.requestFocus()
     }
     val placeholder = stringResource(Res.string.editor_find_placeholder)
+    val matchCase = stringResource(Res.string.editor_find_match_case)
     BasicTextField(
         value = value,
         onValueChange = { value = it; search.updateQuery(it.text) },
-        modifier = modifier.heightIn(min = 40.dp).testTag("note-search-input").focusRequester(requester)
+        modifier = modifier.heightIn(min = if (touchTargets) 48.dp else 36.dp)
+            .testTag("note-search-input").focusRequester(requester)
             .onFocusChanged { focused = it.isFocused }
+            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.extraSmall)
             .border(
                 1.dp,
-                if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                 MaterialTheme.shapes.extraSmall,
             )
             .semantics { contentDescription = placeholder }
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
+                // Aa 是输入装饰中的可聚焦按钮，只有文本输入自身获得焦点时才拦截 Enter 导航。
+                if (focused && event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
                     search.move(event.isShiftPressed)
                     true
                 } else false
             },
         decorationBox = { input ->
-            Box(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), contentAlignment = Alignment.CenterStart) {
-                if (value.text.isEmpty()) Text(
-                    placeholder,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+            Row(
+                Modifier.padding(start = 8.dp, end = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    painterResource(Res.drawable.ic_search),
+                    contentDescription = null,
+                    tint = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
                 )
-                input()
+                // 导航与 Aa 先占用固定空间，文字只使用剩余宽度，长关键词不会把按钮挤出浮层。
+                Box(Modifier.weight(1f).padding(vertical = 6.dp), contentAlignment = Alignment.CenterStart) {
+                    if (value.text.isEmpty()) Text(
+                        placeholder,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    input()
+                }
+                IconToggleButton(
+                    checked = search.matchCase,
+                    onCheckedChange = { search.toggleCase() },
+                    modifier = Modifier.size(if (touchTargets) 48.dp else 30.dp)
+                        .semantics { contentDescription = matchCase },
+                    colors = IconButtonDefaults.iconToggleButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                ) {
+                    Text("Aa", style = MaterialTheme.typography.labelMedium)
+                }
             }
         },
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
@@ -118,32 +160,29 @@ private fun NoteSearchQuery(search: NoteSearchState, modifier: Modifier) {
  * @param search 当前笔记的查找会话。
  * @param onClose 关闭并恢复宿主焦点。
  * @param compact 是否使用窄屏的整行布局和触摸目标。
+ * @param touchTargets 是否为触摸输入保留 48dp 点击区域。
  */
 @Composable
-private fun NoteSearchActions(search: NoteSearchState, onClose: () -> Unit, compact: Boolean) {
+private fun NoteSearchActions(search: NoteSearchState, onClose: () -> Unit, compact: Boolean, touchTargets: Boolean) {
     val count = stringResource(Res.string.editor_find_count, search.activeIndex + 1, search.matches.size)
     val description =
         if (search.matches.isEmpty() && search.query.isNotEmpty()) stringResource(Res.string.editor_find_empty)
         else stringResource(Res.string.editor_find_count_description, search.activeIndex + 1, search.matches.size)
-    val matchCase = stringResource(Res.string.editor_find_match_case)
-    val actionSize = if (compact) 48.dp else 40.dp
+    val actionSize = if (touchTargets) 48.dp else 32.dp
     Row(if (compact) Modifier.fillMaxWidth() else Modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             count,
-            modifier = Modifier.padding(horizontal = 8.dp).testTag("note-search-count")
+            modifier = Modifier.widthIn(min = 44.dp).testTag("note-search-count")
                 .semantics { contentDescription = description; liveRegion = LiveRegionMode.Polite },
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
         if (compact) Spacer(Modifier.weight(1f))
-        IconToggleButton(
-            checked = search.matchCase, onCheckedChange = { search.toggleCase() }, modifier = Modifier.size(actionSize)
-                .semantics { contentDescription = matchCase }) {
-            Text(
-                "Aa",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (search.matchCase) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        VerticalDivider(
+            modifier = Modifier.padding(horizontal = 8.dp).height(20.dp),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
         NoteSearchButton(
             stringResource(Res.string.editor_find_previous),
             0,
@@ -181,8 +220,8 @@ private fun NoteSearchButton(
         enabled = enabled,
         modifier = Modifier.size(actionSize).semantics { contentDescription = label }) {
         val color = LocalContentColor.current
-        Canvas(Modifier.size(18.dp)) {
-            val stroke = 1.6.dp.toPx()
+        Canvas(Modifier.size(16.dp)) {
+            val stroke = 1.5.dp.toPx()
             if (icon == 2) {
                 drawLine(
                     color,

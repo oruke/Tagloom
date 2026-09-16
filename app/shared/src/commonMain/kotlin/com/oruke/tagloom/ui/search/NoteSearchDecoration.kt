@@ -2,15 +2,17 @@ package com.oruke.tagloom.ui.search
 
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.SemanticsPropertyKey
@@ -21,6 +23,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.search.NoteSearchMatch
 import com.oruke.tagloom.editor.search.NoteSearchState
 import com.oruke.tagloom.editor.search.NoteSearchTarget
@@ -92,10 +95,20 @@ internal fun rememberNoteSearchDecoration(
     var layout by remember(target) { mutableStateOf<TextLayoutResult?>(null) }
     var fieldPosition by remember(target) { mutableStateOf<Offset?>(null) }
     val onMatchPosition by rememberUpdatedState(LocalNoteSearchMatchPosition.current)
-    val inactiveBackground = MaterialTheme.colorScheme.primaryContainer
-    val inactiveForeground = MaterialTheme.colorScheme.onPrimaryContainer
-    val activeBackground = MaterialTheme.colorScheme.primary
-    val activeForeground = MaterialTheme.colorScheme.onPrimary
+    val colors = noteSearchColors()
+    val outlineModifier = Modifier.drawWithCache {
+        val result = layout
+        val path = active?.takeIf {
+            result != null && result.layoutInput.text.text == sourceText && it.start >= 0 && it.end <= result.layoutInput.text.length
+        }?.let { result!!.getPathForRange(it.start, it.end) }
+        onDrawWithContent {
+            drawContent()
+            if (path != null) {
+                // 按实际字符路径绘制并裁掉外半圈，跨行及双向文本仍保持原始字宽和选区。
+                clipPath(path) { drawPath(path, colors.activeOutline, style = Stroke(2.dp.toPx())) }
+            }
+        }
+    }
     val navigationVersion = search?.navigationVersion
     val revealedVersion = search?.revealedVersion
     val layoutText = layout?.layoutInput?.text?.text
@@ -124,6 +137,7 @@ internal fun rememberNoteSearchDecoration(
     }
     return NoteSearchDecoration(
         modifier = if (target == null) Modifier else focusModifier.bringIntoViewRequester(requester)
+            .then(outlineModifier)
             .onGloballyPositioned { fieldPosition = it.positionInRoot() }
             .semantics { this[NoteSearchTargetKey] = target; this[NoteSearchActiveKey] = active != null },
         onTextLayout = { layout = it },
@@ -132,10 +146,10 @@ internal fun rememberNoteSearchDecoration(
                 text,
                 matches,
                 active,
-                inactiveBackground,
-                inactiveForeground,
-                activeBackground,
-                activeForeground
+                colors.matchBackground,
+                colors.matchForeground,
+                colors.activeBackground,
+                colors.activeForeground
             )
         },
     )
