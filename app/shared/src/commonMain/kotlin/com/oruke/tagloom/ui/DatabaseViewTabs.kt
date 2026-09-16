@@ -36,6 +36,14 @@ import com.oruke.tagloom.core.model.ViewDefinition
 import com.oruke.tagloom.core.model.ViewId
 import com.oruke.tagloom.core.model.ViewPresentationKinds
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.database_view_gallery
+import tagloom.app.shared.generated.resources.database_view_kanban
+import tagloom.app.shared.generated.resources.database_view_layout
+import tagloom.app.shared.generated.resources.database_view_name
+import tagloom.app.shared.generated.resources.database_view_table
+import tagloom.app.shared.generated.resources.workspace_action_save
 
 /**
  * 渲染 Database 视图切换条。
@@ -246,7 +254,7 @@ private fun DatabaseViewSettingsContent(
 ) {
     Column(Modifier.widthIn(min = 260.dp).padding(vertical = 4.dp)) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("视图名称", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(Res.string.database_view_name), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 BasicTextField(
                     value = draft,
@@ -260,7 +268,7 @@ private fun DatabaseViewSettingsContent(
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 )
                 Text(
-                    "保存",
+                    stringResource(Res.string.workspace_action_save),
                     modifier = Modifier.clickable(onClick = onSaveName).padding(12.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
@@ -268,7 +276,7 @@ private fun DatabaseViewSettingsContent(
             }
         }
         TagloomMenuDivider()
-        TagloomMenuSectionHeader(title = "显示布局")
+        TagloomMenuSectionHeader(title = stringResource(Res.string.database_view_layout))
         datasetViewKinds(controller, view.databaseId).forEach { choice ->
             val selected = view.presentation.kind == choice.kind
             TagloomMenuItem(
@@ -302,17 +310,18 @@ private data class DatasetViewKindChoice(
  * @param databaseId 当前 Database ID。
  * @return 表格、看板和画廊选择；缺少单选属性时禁用看板。
  */
+@Composable
 private fun datasetViewKinds(
     controller: DatabaseEditorController,
     databaseId: DatabaseId,
 ): List<DatasetViewKindChoice> = listOf(
-    DatasetViewKindChoice(ViewPresentationKinds.TABLE, "表格", true),
+    DatasetViewKindChoice(ViewPresentationKinds.TABLE, stringResource(Res.string.database_view_table), true),
     DatasetViewKindChoice(
         ViewPresentationKinds.KANBAN,
-        "看板",
+        stringResource(Res.string.database_view_kanban),
         controller.propertyDefinitions(databaseId).any { property -> property.type == PropertyTypes.SELECT },
     ),
-    DatasetViewKindChoice(ViewPresentationKinds.GALLERY, "画廊", true),
+    DatasetViewKindChoice(ViewPresentationKinds.GALLERY, stringResource(Res.string.database_view_gallery), true),
 )
 
 /**

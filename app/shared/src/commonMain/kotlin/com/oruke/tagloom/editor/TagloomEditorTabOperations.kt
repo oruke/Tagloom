@@ -101,7 +101,7 @@ fun TagloomEditorState.addTab(tabsId: BlockId): BlockId? {
                     type = BlockTypes.TAB,
                     parentId = tabsId,
                     orderKey = EditorBlockFactory.orderKey(tabs.size),
-                    content = TabBlockContent(RichTextDocumentReducer.fromPlainText("未命名")),
+                    content = TabBlockContent(RichTextDocumentReducer.fromPlainText(contentNames.untitledTab)),
                 ),
                 Block(
                     id = paragraphId,
@@ -142,7 +142,7 @@ fun TagloomEditorState.duplicateTab(
     val clones = descendants.map { block ->
         val clonedContent = if (block.id == source.id) {
             val tabContent = block.content as TabBlockContent
-            tabContent.copy(title = RichTextDocumentReducer.fromPlainText("${tabContent.title.plainText} 副本"))
+            tabContent.copy(title = RichTextDocumentReducer.fromPlainText(contentNames.copyName(tabContent.title.plainText)))
         } else {
             block.content
         }

@@ -154,6 +154,7 @@ internal object BlockDocumentReducer {
      * @param blockId 目标 Block。
      * @param type 新类型。
      * @param idFactory 稳定 ID 生成函数。
+     * @param names 调用方按当前语言解析的新内容命名规则。
      * @return 转换结果；未知或附件 Block 返回空。
      */
     fun turnInto(
@@ -161,6 +162,7 @@ internal object BlockDocumentReducer {
         blockId: BlockId,
         type: EditorBlockType,
         idFactory: (String) -> String,
+        names: EditorContentNames = EditorContentNames(),
     ): BlockDocumentEdit? {
         val target = blocks.singleOrNull { block -> block.id == blockId && !block.deleted } ?: return null
         if (editableText(target) == null && target.content != DividerBlockContent) {
@@ -170,12 +172,13 @@ internal object BlockDocumentReducer {
             val content = BaseTableEditor.createDefault(
                 rowIdFactory = { BaseTableRowId(idFactory("table-row")) },
                 columnIdFactory = { BaseTableColumnId(idFactory("table-column")) },
+                columnName = names::columnName,
             )
             val converted = target.copy(type = BlockTypes.BASE_TABLE, content = content)
             return BlockDocumentEdit(replace(blocks, converted), EditorCursorTarget(converted.id, 0))
         }
         if (type == EditorBlockType.TABS) {
-            return createTabs(blocks, target, idFactory)
+            return createTabs(blocks, target, idFactory, names)
         }
         val converted = convert(target, type)
         val replaced = replace(blocks, converted)
@@ -198,6 +201,7 @@ internal object BlockDocumentReducer {
      * @param rowCount 初始活动行数。
      * @param columnCount 初始活动列数。
      * @param idFactory 稳定 ID 生成函数。
+     * @param names 调用方按当前语言解析的新内容命名规则。
      * @return 转换结果；目标不存在或不可转换时为空。
      */
     fun turnIntoBaseTable(
@@ -206,6 +210,7 @@ internal object BlockDocumentReducer {
         rowCount: Int,
         columnCount: Int,
         idFactory: (String) -> String,
+        names: EditorContentNames = EditorContentNames(),
     ): BlockDocumentEdit? {
         val target = blocks.singleOrNull { block -> block.id == blockId && !block.deleted } ?: return null
         if (editableText(target) == null && target.content != DividerBlockContent) {
@@ -216,6 +221,7 @@ internal object BlockDocumentReducer {
             columnCount = columnCount,
             rowIdFactory = { BaseTableRowId(idFactory("table-row")) },
             columnIdFactory = { BaseTableColumnId(idFactory("table-column")) },
+            columnName = names::columnName,
         )
         val converted = target.copy(type = BlockTypes.BASE_TABLE, content = content)
         return BlockDocumentEdit(replace(blocks, converted), EditorCursorTarget(converted.id, 0))
@@ -229,12 +235,14 @@ internal object BlockDocumentReducer {
      * @param blocks 当前全部 Block。
      * @param target 被包装的当前 Block。
      * @param idFactory 稳定 ID 工厂。
+     * @param names 调用方按当前语言解析的新内容命名规则。
      * @return 结构化 Tabs 编辑结果。
      */
     private fun createTabs(
         blocks: List<Block>,
         target: Block,
         idFactory: (String) -> String,
+        names: EditorContentNames = EditorContentNames(),
     ): BlockDocumentEdit {
         val tabsId = BlockId(idFactory("block"))
         val firstTabId = BlockId(idFactory("block"))
@@ -252,14 +260,14 @@ internal object BlockDocumentReducer {
             type = BlockTypes.TAB,
             parentId = tabsId,
             orderKey = EditorBlockFactory.orderKey(0),
-            content = TabBlockContent(RichTextDocumentReducer.fromPlainText("页签 1")),
+            content = TabBlockContent(RichTextDocumentReducer.fromPlainText(names.tabName(1))),
         )
         val secondTab = Block(
             id = secondTabId,
             type = BlockTypes.TAB,
             parentId = tabsId,
             orderKey = EditorBlockFactory.orderKey(1),
-            content = TabBlockContent(RichTextDocumentReducer.fromPlainText("页签 2")),
+            content = TabBlockContent(RichTextDocumentReducer.fromPlainText(names.tabName(2))),
         )
         val firstContent = target.copy(parentId = firstTabId, orderKey = EditorBlockFactory.orderKey(0))
         val secondContent = Block(

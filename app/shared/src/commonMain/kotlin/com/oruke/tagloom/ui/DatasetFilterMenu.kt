@@ -40,6 +40,26 @@ import com.oruke.tagloom.core.model.SystemFieldNames
 import com.oruke.tagloom.core.model.ViewDefinition
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.database_filter
+import tagloom.app.shared.generated.resources.database_filter_active
+import tagloom.app.shared.generated.resources.database_filter_contains
+import tagloom.app.shared.generated.resources.database_filter_contains_any
+import tagloom.app.shared.generated.resources.database_filter_eq
+import tagloom.app.shared.generated.resources.database_filter_gt
+import tagloom.app.shared.generated.resources.database_filter_is_empty
+import tagloom.app.shared.generated.resources.database_filter_is_not_empty
+import tagloom.app.shared.generated.resources.database_filter_lt
+import tagloom.app.shared.generated.resources.database_filter_ne
+import tagloom.app.shared.generated.resources.database_filter_scope
+import tagloom.app.shared.generated.resources.database_filter_select_option
+import tagloom.app.shared.generated.resources.database_filter_title
+import tagloom.app.shared.generated.resources.database_filter_value
+import tagloom.app.shared.generated.resources.database_system_title
+import tagloom.app.shared.generated.resources.editor_action_apply
+import tagloom.app.shared.generated.resources.workspace_action_cancel
+import tagloom.app.shared.generated.resources.editor_action_clear
 
 /**
  * 渲染与搜索分离的结构化数据集过滤入口。
@@ -58,9 +78,10 @@ internal fun DatasetFilterButton(
 ) {
     var open by remember(view.id) { mutableStateOf(false) }
     val active = view.query.filter.kind != FilterExprKinds.TRUE
+    val label = if (active) stringResource(Res.string.database_filter_active, 1) else stringResource(Res.string.database_filter)
     Box {
         DatasetToolbarAction(
-            label = if (active) "≡  筛选  1" else "≡  筛选",
+            label = "≡  $label",
             active = active,
             compact = compact,
             onClick = { open = true },
@@ -106,7 +127,7 @@ private fun DatasetFilterEditor(
     onClose: () -> Unit,
 ) {
     val properties = controller.propertyDefinitions(view.databaseId)
-    val choices = remember(view.databaseId, properties) { datasetFilterFields(properties) }
+    val choices = datasetFilterFields(properties)
     val original = view.query.filter
     val initialField = original.field ?: FieldRef(FieldRefKinds.SYSTEM, systemField = SystemFieldNames.TITLE)
     var field by remember(view.id, original) { mutableStateOf(initialField) }
@@ -127,12 +148,12 @@ private fun DatasetFilterEditor(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("过滤条件", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            Text("仅当前视图", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(Res.string.database_filter_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(stringResource(Res.string.database_filter_scope), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         DatasetChoiceButton(
-            label = choices.firstOrNull { choice -> choice.field == field }?.label ?: "标题",
+            label = choices.firstOrNull { choice -> choice.field == field }?.label ?: stringResource(Res.string.database_system_title),
             choices = choices.map { choice -> choice.field to choice.label },
             onSelect = { selected ->
                 field = selected
@@ -141,14 +162,14 @@ private fun DatasetFilterEditor(
             },
         )
         DatasetChoiceButton(
-            label = operators.firstOrNull { choice -> choice.first == operator }?.second ?: "包含",
+            label = operators.firstOrNull { choice -> choice.first == operator }?.second ?: stringResource(Res.string.database_filter_contains),
             choices = operators,
             onSelect = { selected -> operator = selected },
         )
         if (operator !in setOf(QueryPredicateOperators.IS_EMPTY, QueryPredicateOperators.IS_NOT_EMPTY)) {
             if (selectedProperty?.type in setOf(PropertyTypes.SELECT, PropertyTypes.MULTI_SELECT)) {
                 DatasetChoiceButton(
-                    label = selectedProperty?.options.orEmpty().firstOrNull { option -> option.id == value }?.label ?: "选择选项",
+                    label = selectedProperty?.options.orEmpty().firstOrNull { option -> option.id == value }?.label ?: stringResource(Res.string.database_filter_select_option),
                     choices = selectedProperty?.options.orEmpty().map { option -> option.id to option.label },
                     onSelect = { selected -> value = selected },
                 )
@@ -163,9 +184,9 @@ private fun DatasetFilterEditor(
                         scope.launch { controller.updateView(view.id) { current -> current.withDatasetFilter(FilterExpr()) } }
                         onClose()
                     },
-                ) { Text("清除") }
+                ) { Text(stringResource(Res.string.editor_action_clear)) }
             }
-            TextButton(onClick = onClose) { Text("取消") }
+            TextButton(onClick = onClose) { Text(stringResource(Res.string.workspace_action_cancel)) }
             TextButton(
                 enabled = operator in setOf(QueryPredicateOperators.IS_EMPTY, QueryPredicateOperators.IS_NOT_EMPTY) || value.isNotBlank(),
                 onClick = {
@@ -184,7 +205,7 @@ private fun DatasetFilterEditor(
                     scope.launch { controller.updateView(view.id) { current -> current.withDatasetFilter(expr) } }
                     onClose()
                 },
-            ) { Text("应用") }
+            ) { Text(stringResource(Res.string.editor_action_apply)) }
         }
     }
 }
@@ -212,7 +233,7 @@ private fun DatasetFilterValueField(
         decorationBox = { inner ->
             Box {
                 if (value.isEmpty()) {
-                    Text("输入值", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(Res.string.database_filter_value), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
                 inner()
             }
@@ -298,8 +319,9 @@ private data class DatasetFilterField(
  * @param properties 数据集可用属性。
  * @return 标题位于首位的字段列表。
  */
+@Composable
 private fun datasetFilterFields(properties: List<PropertyDefinition>): List<DatasetFilterField> = listOf(
-    DatasetFilterField(FieldRef(FieldRefKinds.SYSTEM, systemField = SystemFieldNames.TITLE), "标题"),
+    DatasetFilterField(FieldRef(FieldRefKinds.SYSTEM, systemField = SystemFieldNames.TITLE), stringResource(Res.string.database_system_title)),
 ) + properties.map { property -> DatasetFilterField(FieldRef(FieldRefKinds.PROPERTY, propertyId = property.id), property.name) }
 
 /**
@@ -324,32 +346,33 @@ private fun defaultDatasetFilterOperator(
  * @param property 可空属性；为空表示标题字段。
  * @return 稳定运算符与本地显示名称。
  */
+@Composable
 private fun datasetFilterOperators(property: PropertyDefinition?): List<Pair<String, String>> = when (property?.type) {
     PropertyTypes.SELECT -> listOf(
-        QueryPredicateOperators.EQ to "等于",
-        QueryPredicateOperators.NE to "不等于",
-        QueryPredicateOperators.IS_EMPTY to "为空",
-        QueryPredicateOperators.IS_NOT_EMPTY to "不为空",
+        QueryPredicateOperators.EQ to stringResource(Res.string.database_filter_eq),
+        QueryPredicateOperators.NE to stringResource(Res.string.database_filter_ne),
+        QueryPredicateOperators.IS_EMPTY to stringResource(Res.string.database_filter_is_empty),
+        QueryPredicateOperators.IS_NOT_EMPTY to stringResource(Res.string.database_filter_is_not_empty),
     )
     PropertyTypes.MULTI_SELECT -> listOf(
-        QueryPredicateOperators.CONTAINS_ANY to "包含任一",
-        QueryPredicateOperators.IS_EMPTY to "为空",
-        QueryPredicateOperators.IS_NOT_EMPTY to "不为空",
+        QueryPredicateOperators.CONTAINS_ANY to stringResource(Res.string.database_filter_contains_any),
+        QueryPredicateOperators.IS_EMPTY to stringResource(Res.string.database_filter_is_empty),
+        QueryPredicateOperators.IS_NOT_EMPTY to stringResource(Res.string.database_filter_is_not_empty),
     )
     PropertyTypes.NUMBER,
     PropertyTypes.DATE,
     PropertyTypes.DATETIME,
     -> listOf(
-        QueryPredicateOperators.EQ to "等于",
-        QueryPredicateOperators.GT to "晚于 / 大于",
-        QueryPredicateOperators.LT to "早于 / 小于",
-        QueryPredicateOperators.IS_EMPTY to "为空",
+        QueryPredicateOperators.EQ to stringResource(Res.string.database_filter_eq),
+        QueryPredicateOperators.GT to stringResource(Res.string.database_filter_gt),
+        QueryPredicateOperators.LT to stringResource(Res.string.database_filter_lt),
+        QueryPredicateOperators.IS_EMPTY to stringResource(Res.string.database_filter_is_empty),
     )
     else -> listOf(
-        QueryPredicateOperators.CONTAINS to "包含",
-        QueryPredicateOperators.EQ to "等于",
-        QueryPredicateOperators.IS_EMPTY to "为空",
-        QueryPredicateOperators.IS_NOT_EMPTY to "不为空",
+        QueryPredicateOperators.CONTAINS to stringResource(Res.string.database_filter_contains),
+        QueryPredicateOperators.EQ to stringResource(Res.string.database_filter_eq),
+        QueryPredicateOperators.IS_EMPTY to stringResource(Res.string.database_filter_is_empty),
+        QueryPredicateOperators.IS_NOT_EMPTY to stringResource(Res.string.database_filter_is_not_empty),
     )
 }
 

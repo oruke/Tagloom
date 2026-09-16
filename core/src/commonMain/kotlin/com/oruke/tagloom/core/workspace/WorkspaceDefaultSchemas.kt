@@ -15,27 +15,28 @@ object WorkspaceDefaultSchemas {
     /**
      * 返回 MVP 描述、普通标签、单选和日期属性定义。
      *
+     * @param labels 新工作区的本地化名称；为空时保留历史 schema 的标准名称供兼容和测试使用。
      * @return 按界面顺序排列的四个内置属性定义。
      */
-    fun propertyDefinitions(): List<PropertyDefinition> = listOf(
+    fun propertyDefinitions(labels: WorkspaceSchemaLabels? = null): List<PropertyDefinition> = listOf(
         PropertyDefinition(
             id = WorkspaceDefaults.DEFAULT_TEXT_PROPERTY_ID,
-            name = "描述",
+            name = labels?.description ?: "描述",
             type = PropertyTypes.TEXT,
         ),
-        ordinaryTagsPropertyDefinition(),
+        ordinaryTagsPropertyDefinition(labels?.tags),
         PropertyDefinition(
             id = WorkspaceDefaults.DEFAULT_SELECT_PROPERTY_ID,
-            name = "状态",
+            name = labels?.status ?: "状态",
             type = PropertyTypes.SELECT,
             options = listOf(
-                PropertyOption(WorkspaceDefaults.DEFAULT_SELECT_TODO_OPTION_ID, "待办", "status-pending"),
-                PropertyOption(WorkspaceDefaults.DEFAULT_SELECT_DONE_OPTION_ID, "完成", "status-success"),
+                PropertyOption(WorkspaceDefaults.DEFAULT_SELECT_TODO_OPTION_ID, labels?.todo ?: "待办", "status-pending"),
+                PropertyOption(WorkspaceDefaults.DEFAULT_SELECT_DONE_OPTION_ID, labels?.done ?: "完成", "status-success"),
             ),
         ),
         PropertyDefinition(
             id = WorkspaceDefaults.DEFAULT_DATE_PROPERTY_ID,
-            name = "日期",
+            name = labels?.date ?: "日期",
             type = PropertyTypes.DATE,
         ),
     )
@@ -46,11 +47,12 @@ object WorkspaceDefaultSchemas {
      * 该构造也用于旧工作区尚未落盘该定义时渲染兼容入口；首次创建标签后仍须通过统一
      * schema 事务确认，不能把这个返回值当作已持久化事实。
      *
+     * @param name 初次创建时的本地化名称；为空时返回历史标准定义。
      * @return 使用稳定内置 ID 且允许自由创建选项的属性定义。
      */
-    fun ordinaryTagsPropertyDefinition(): PropertyDefinition = PropertyDefinition(
+    fun ordinaryTagsPropertyDefinition(name: String? = null): PropertyDefinition = PropertyDefinition(
         id = WorkspaceDefaults.DEFAULT_TAGS_PROPERTY_ID,
-        name = "标签",
+        name = name ?: "标签",
         type = PropertyTypes.MULTI_SELECT,
         optionInputMode = PropertyOptionInputMode.FREE,
     )

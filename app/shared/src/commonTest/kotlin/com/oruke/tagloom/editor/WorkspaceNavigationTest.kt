@@ -39,12 +39,13 @@ class WorkspaceNavigationTest {
         val state = createNavigationState(ObjectId("note-first"), ObjectId("note-second"))
         val previousId = state.selectedDocumentId
 
+        state.contentNames = EditorContentNames(untitledNote = "New note example")
         state.createDocument()
 
         val created = requireNotNull(state.selectedDocument)
         assertEquals(3, state.documents.size)
         assertNotEquals(previousId, created.id)
-        assertEquals("未命名笔记", created.note.title)
+        assertEquals("New note example", created.note.title)
         assertEquals(BlockTypes.PARAGRAPH, created.note.blocks.single().type)
         assertTrue(created.note.blocks.single().editableRichText()?.plainText.orEmpty().isEmpty())
         assertFalse(created.persisted)

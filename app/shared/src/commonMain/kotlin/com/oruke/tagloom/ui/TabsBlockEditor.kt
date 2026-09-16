@@ -1,6 +1,12 @@
 package com.oruke.tagloom.ui
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import tagloom.app.shared.generated.resources.editor_tabs_add
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,6 +72,20 @@ import com.oruke.tagloom.editor.renameTab
 import com.oruke.tagloom.editor.selectTab
 import com.oruke.tagloom.editor.visibleBlockDepth
 import com.oruke.tagloom.editor.visibleBlocksInTab
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.workspace_action_cancel
+import tagloom.app.shared.generated.resources.editor_action_rename
+import tagloom.app.shared.generated.resources.editor_tabs_delete
+import tagloom.app.shared.generated.resources.editor_tabs_delete_cascade
+import tagloom.app.shared.generated.resources.editor_tabs_delete_unpack
+import tagloom.app.shared.generated.resources.editor_tabs_duplicate
+import tagloom.app.shared.generated.resources.editor_tabs_move_left
+import tagloom.app.shared.generated.resources.editor_tabs_move_right
+import tagloom.app.shared.generated.resources.editor_tabs_rename_hint
+import tagloom.app.shared.generated.resources.editor_tabs_untitled
+import org.jetbrains.compose.resources.pluralStringResource
+import tagloom.app.shared.generated.resources.editor_tabs_content_count
 
 /**
  * 渲染 Stitch 定稿的 Tabs 容器，并把活动页正文真正放入容器边框内。
@@ -139,13 +159,13 @@ internal fun TabsBlockEditor(
                     },
                 )
             }
-            QuietTabAction("+") {
+            QuietTabAction("+", stringResource(Res.string.editor_tabs_add)) {
                 state.addTab(block.id)?.let { tabId -> renamingTabId = tabId }
             }
         }
         if (renamingTabId != null) {
             Text(
-                "Enter 确认 · Esc 取消",
+                stringResource(Res.string.editor_tabs_rename_hint),
                 modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -215,6 +235,7 @@ private fun TabHeader(
     onDeleteRequest: () -> Unit,
 ) {
     val content = tab.content as? TabBlockContent ?: return
+    val untitled = stringResource(Res.string.editor_tabs_untitled)
     val find = rememberNoteSearchDecoration(NoteSearchTarget(NoteSearchField.TAB, tab.id), editable = renaming)
     val interactionSource = remember(tab.id) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -267,7 +288,7 @@ private fun TabHeader(
                                 false
                             } else when (event.key) {
                                 Key.Enter -> {
-                                    state.renameTab(tab.id, draft.ifBlank { "未命名" })
+                                    state.renameTab(tab.id, draft.ifBlank { untitled })
                                     onRenameEnd()
                                     true
                                 }
@@ -320,7 +341,7 @@ private fun TabHeader(
                 modifier = Modifier.widthIn(min = 160.dp),
             ) {
                 TagloomMenuItem(
-                    text = "重命名",
+                    text = stringResource(Res.string.editor_action_rename),
                     leadingIcon = { Text("✎", style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         onRenameStart()
@@ -328,7 +349,7 @@ private fun TabHeader(
                     },
                 )
                 TagloomMenuItem(
-                    text = "复制标签页",
+                    text = stringResource(Res.string.editor_tabs_duplicate),
                     leadingIcon = { Text("▣", style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         state.duplicateTab(tabsBlock.id, tab.id)
@@ -336,7 +357,7 @@ private fun TabHeader(
                     },
                 )
                 TagloomMenuItem(
-                    text = "向左移动",
+                    text = stringResource(Res.string.editor_tabs_move_left),
                     leadingIcon = { Text("←", style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         state.moveTab(tabsBlock.id, tab.id, BlockMoveDirection.UP)
@@ -344,7 +365,7 @@ private fun TabHeader(
                     },
                 )
                 TagloomMenuItem(
-                    text = "向右移动",
+                    text = stringResource(Res.string.editor_tabs_move_right),
                     leadingIcon = { Text("→", style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         state.moveTab(tabsBlock.id, tab.id, BlockMoveDirection.DOWN)
@@ -353,7 +374,7 @@ private fun TabHeader(
                 )
                 TagloomMenuDivider()
                 TagloomMenuItem(
-                    text = "删除标签页",
+                    text = stringResource(Res.string.editor_tabs_delete),
                     leadingIcon = {
                         Text(
                             "♲",
@@ -376,17 +397,20 @@ private fun TabHeader(
  * 渲染不抢占视觉层级的页签图标动作。
  *
  * @param label 可见符号。
+ * @param description 当前语言的无障碍动作名称。
  * @param onClick 点击动作。
  */
 @Composable
 private fun QuietTabAction(
     label: String,
+    description: String,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .widthIn(min = 24.dp)
             .height(24.dp)
+            .semantics { contentDescription = description }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -402,6 +426,7 @@ private fun QuietTabAction(
  * @param onDeleteContents 连同内容删除。
  * @param onMoveContents 把内容移到容器外后删除页签。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TabDeleteConfirmation(
     blockCount: Int,
@@ -409,20 +434,20 @@ private fun TabDeleteConfirmation(
     onDeleteContents: () -> Unit,
     onMoveContents: () -> Unit,
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f))
             .padding(horizontal = 12.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "⚠  当前标签页包含 $blockCount 个 Block",
-            modifier = Modifier.weight(1f),
+            "⚠  ${pluralStringResource(Res.plurals.editor_tabs_content_count, blockCount, blockCount)}",
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.labelMedium
         )
-        Text("取消", modifier = Modifier.clickable(onClick = onCancel), style = MaterialTheme.typography.labelMedium)
-        TabDeleteAction("连同内容删除", destructive = true, filled = false, onClick = onDeleteContents)
-        TabDeleteAction("移出内容后删除", destructive = false, filled = true, onClick = onMoveContents)
+        Text(stringResource(Res.string.workspace_action_cancel), modifier = Modifier.clickable(onClick = onCancel), style = MaterialTheme.typography.labelMedium)
+        TabDeleteAction(stringResource(Res.string.editor_tabs_delete_cascade), destructive = true, filled = false, onClick = onDeleteContents)
+        TabDeleteAction(stringResource(Res.string.editor_tabs_delete_unpack), destructive = false, filled = true, onClick = onMoveContents)
     }
 }
 
@@ -443,7 +468,7 @@ private fun TabDeleteAction(
 ) {
     val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Box(
-        modifier = Modifier.height(30.dp)
+        modifier = Modifier.heightIn(min = 30.dp)
             .background(if (filled) color else MaterialTheme.colorScheme.surface, RoundedCornerShape(3.dp))
             .border(1.dp, color, RoundedCornerShape(3.dp))
             .clickable(onClick = onClick)

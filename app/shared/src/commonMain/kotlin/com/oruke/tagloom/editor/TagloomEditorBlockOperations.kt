@@ -56,7 +56,7 @@ fun TagloomEditorState.turnBlockInto(
     blockId: BlockId,
     type: EditorBlockType,
 ): EditorCursorTarget? = applyDocumentEdit { blocks ->
-    BlockDocumentReducer.turnInto(blocks, blockId, type, ::createEditorId)
+    BlockDocumentReducer.turnInto(blocks, blockId, type, ::createEditorId, contentNames)
 }
 
 /**
@@ -72,7 +72,7 @@ fun TagloomEditorState.turnBlockIntoBaseTable(
     rowCount: Int,
     columnCount: Int,
 ): EditorCursorTarget? = applyDocumentEdit { blocks ->
-    BlockDocumentReducer.turnIntoBaseTable(blocks, blockId, rowCount, columnCount, ::createEditorId)
+    BlockDocumentReducer.turnIntoBaseTable(blocks, blockId, rowCount, columnCount, ::createEditorId, contentNames)
 }
 
 /**

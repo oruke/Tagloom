@@ -24,6 +24,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.ObjectId
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
 
@@ -109,10 +110,7 @@ internal fun WorkspaceSearchPopover(
                     if (controller.searchHits.isEmpty()) {
                         stringResource(Res.string.workspace_search_confirmed_only)
                     } else {
-                        stringResource(
-                            Res.string.workspace_search_result_count,
-                            controller.searchHits.size,
-                        )
+                        pluralStringResource(Res.plurals.workspace_search_result_count, controller.searchHits.size, controller.searchHits.size)
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

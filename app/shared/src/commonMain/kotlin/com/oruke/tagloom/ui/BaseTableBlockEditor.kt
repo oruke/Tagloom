@@ -66,6 +66,7 @@ import com.oruke.tagloom.editor.updateBaseTableBooleanCell
 import com.oruke.tagloom.editor.updateBaseTableCellText
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.editor_base_table_edit_failed
 import tagloom.app.shared.generated.resources.editor_base_table_add_column
 import tagloom.app.shared.generated.resources.editor_base_table_add_row
 import tagloom.app.shared.generated.resources.editor_base_table_read_only
@@ -74,6 +75,19 @@ import tagloom.app.shared.generated.resources.editor_base_table_type_date
 import tagloom.app.shared.generated.resources.editor_base_table_type_datetime
 import tagloom.app.shared.generated.resources.editor_base_table_type_number
 import tagloom.app.shared.generated.resources.editor_base_table_type_text
+import tagloom.app.shared.generated.resources.editor_base_table_clear
+import tagloom.app.shared.generated.resources.editor_base_table_column_actions
+import tagloom.app.shared.generated.resources.editor_base_table_column_menu
+import tagloom.app.shared.generated.resources.editor_base_table_column_type
+import tagloom.app.shared.generated.resources.editor_base_table_delete_column
+import tagloom.app.shared.generated.resources.editor_base_table_delete_row
+import tagloom.app.shared.generated.resources.editor_base_table_duplicate_column
+import tagloom.app.shared.generated.resources.editor_base_table_duplicate_row
+import tagloom.app.shared.generated.resources.editor_base_table_insert_above
+import tagloom.app.shared.generated.resources.editor_base_table_insert_below
+import tagloom.app.shared.generated.resources.editor_base_table_insert_left
+import tagloom.app.shared.generated.resources.editor_base_table_insert_right
+import tagloom.app.shared.generated.resources.editor_base_table_row_actions
 
 /**
  * 渲染 Stitch 定稿的无标题正文表格。
@@ -97,7 +111,7 @@ internal fun BaseTableBlockEditor(
         if (!knownSchema) {
             TableNotice(stringResource(Res.string.editor_base_table_read_only))
         }
-        state.structuredEditError?.let { message -> TableNotice(message) }
+        state.structuredEditError?.let { TableNotice(stringResource(Res.string.editor_base_table_edit_failed)) }
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val compact = maxWidth < EMBEDDED_BLOCK_COMPACT_BREAKPOINT
             val horizontalScrollState = rememberScrollState()
@@ -197,6 +211,7 @@ private fun BaseTableColumnHeader(
     val interactionSource = remember(column.columnId) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     var menuOpen by remember(column.columnId) { mutableStateOf(false) }
+    val columnMenuDescription = stringResource(Res.string.editor_base_table_column_menu)
     Row(
         modifier = Modifier
             .width((column.width ?: DEFAULT_COLUMN_WIDTH).dp)
@@ -221,7 +236,7 @@ private fun BaseTableColumnHeader(
                 Box(
                     modifier = Modifier.width(28.dp).height(28.dp)
                         .clickable(enabled = enabled) { menuOpen = true }
-                        .semantics { contentDescription = "列菜单" },
+                        .semantics { contentDescription = columnMenuDescription },
                     contentAlignment = Alignment.Center,
                 ) {
                     TagloomChevronDown(Modifier.size(12.dp))
@@ -232,7 +247,7 @@ private fun BaseTableColumnHeader(
                 onDismissRequest = { menuOpen = false },
                 modifier = Modifier.widthIn(min = 160.dp),
             ) {
-                TagloomMenuSectionHeader("列类型")
+                TagloomMenuSectionHeader(stringResource(Res.string.editor_base_table_column_type))
                 BaseTableColumnTypes.EDITABLE.forEach { type ->
                     TagloomMenuItem(
                         text = baseTableTypeLabel(type),
@@ -247,30 +262,30 @@ private fun BaseTableColumnHeader(
                     )
                 }
                 TagloomMenuDivider()
-                TagloomMenuSectionHeader("列操作")
+                TagloomMenuSectionHeader(stringResource(Res.string.editor_base_table_column_actions))
                 TagloomMenuItem(
-                    text = "在左侧插入",
+                    text = stringResource(Res.string.editor_base_table_insert_left),
                     onClick = {
                         state.insertBaseTableColumn(block.id, column.columnId, after = false)
                         menuOpen = false
                     },
                 )
                 TagloomMenuItem(
-                    text = "在右侧插入",
+                    text = stringResource(Res.string.editor_base_table_insert_right),
                     onClick = {
                         state.insertBaseTableColumn(block.id, column.columnId, after = true)
                         menuOpen = false
                     },
                 )
                 TagloomMenuItem(
-                    text = "复制列",
+                    text = stringResource(Res.string.editor_base_table_duplicate_column),
                     onClick = {
                         state.duplicateBaseTableColumn(block.id, column.columnId)
                         menuOpen = false
                     },
                 )
                 TagloomMenuItem(
-                    text = "清空内容",
+                    text = stringResource(Res.string.editor_base_table_clear),
                     destructive = true,
                     onClick = {
                         state.clearBaseTableColumn(block.id, column.columnId)
@@ -279,7 +294,7 @@ private fun BaseTableColumnHeader(
                 )
                 TagloomMenuDivider()
                 TagloomMenuItem(
-                    text = "删除列",
+                    text = stringResource(Res.string.editor_base_table_delete_column),
                     destructive = true,
                     enabled = canDelete,
                     onClick = {
@@ -329,30 +344,30 @@ private fun BaseTableRowMenu(
             onDismissRequest = { menuOpen = false },
             modifier = Modifier.widthIn(min = 140.dp),
         ) {
-            TagloomMenuSectionHeader("行操作")
+            TagloomMenuSectionHeader(stringResource(Res.string.editor_base_table_row_actions))
             TagloomMenuItem(
-                text = "在上方插入",
+                text = stringResource(Res.string.editor_base_table_insert_above),
                 onClick = {
                     state.insertBaseTableRow(block.id, row.rowId, after = false)
                     menuOpen = false
                 },
             )
             TagloomMenuItem(
-                text = "在下方插入",
+                text = stringResource(Res.string.editor_base_table_insert_below),
                 onClick = {
                     state.insertBaseTableRow(block.id, row.rowId, after = true)
                     menuOpen = false
                 },
             )
             TagloomMenuItem(
-                text = "复制行",
+                text = stringResource(Res.string.editor_base_table_duplicate_row),
                 onClick = {
                     state.duplicateBaseTableRow(block.id, row.rowId)
                     menuOpen = false
                 },
             )
             TagloomMenuItem(
-                text = "清空内容",
+                text = stringResource(Res.string.editor_base_table_clear),
                 destructive = true,
                 onClick = {
                     state.clearBaseTableRow(block.id, row.rowId)
@@ -361,7 +376,7 @@ private fun BaseTableRowMenu(
             )
             TagloomMenuDivider()
             TagloomMenuItem(
-                text = "删除行",
+                text = stringResource(Res.string.editor_base_table_delete_row),
                 destructive = true,
                 enabled = canDelete,
                 onClick = {

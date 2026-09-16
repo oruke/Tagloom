@@ -43,6 +43,8 @@ import com.oruke.tagloom.platform.WorkspaceViewDefinition
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.coroutines.cancellation.CancellationException
+import org.jetbrains.compose.resources.getString
+import tagloom.app.shared.generated.resources.*
 
 /**
  * 管理 Database/View 目录状态、派生投影和通过 Note 事务完成的单元格写入。
@@ -156,7 +158,7 @@ internal class WorkspaceDatabaseController(
                 val view = ViewDefinition(
                     id = viewId,
                     databaseId = databaseId,
-                    name = "Table",
+                    name = getString(Res.string.database_view_table),
                     orderKey = "a000000",
                     presentation = ViewPresentation(ViewPresentationKinds.TABLE, fields),
                 )

@@ -107,7 +107,7 @@ internal class PreviewDatabaseController(
         val viewId = ViewId(editorState.createEditorId("preview-view"))
         val database = DatabaseDefinition(
             id = databaseId,
-            name = name.ifBlank { "未命名数据集" },
+            name = name.ifBlank { editorState.contentNames.untitledDatabase },
             sourceTypeId = sourceTypeId,
             includeDescendants = true,
             creationTypeId = sourceTypeId,
@@ -116,7 +116,7 @@ internal class PreviewDatabaseController(
         val view = ViewDefinition(
             id = viewId,
             databaseId = databaseId,
-            name = "表格",
+            name = editorState.contentNames.tableViewName,
             orderKey = "a000000",
             presentation = ViewPresentation(fields = defaultPreviewFields()),
         )
@@ -145,7 +145,7 @@ internal class PreviewDatabaseController(
         val viewId = ViewId(editorState.createEditorId("preview-view"))
         views += current.copy(
             id = viewId,
-            name = name.ifBlank { "未命名视图" },
+            name = name.ifBlank { editorState.contentNames.viewName(viewsFor(databaseId).size + 1) },
             orderKey = "a${viewsFor(databaseId).size.toString().padStart(6, '0')}",
         )
         viewId
@@ -164,7 +164,7 @@ internal class PreviewDatabaseController(
         editorState.documents += EditorDocument(
             id = noteId,
             note = Note(
-                title = "未命名笔记",
+                title = editorState.contentNames.untitledNote,
                 directTagIds = listOf(database.creationTypeId),
                 blocks = listOf(
                     Block(

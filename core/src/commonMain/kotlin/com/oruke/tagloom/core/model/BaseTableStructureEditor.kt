@@ -14,6 +14,7 @@ object BaseTableStructureEditor {
      * @param columnCount 初始活动列数。
      * @param rowIdFactory 稳定行 ID 工厂。
      * @param columnIdFactory 稳定列 ID 工厂。
+     * @param columnName 按从 1 开始的序号生成新列名，既有列名原样保留。
      * @return 使用当前 schema 的规范表格。
      */
     fun create(
@@ -21,6 +22,7 @@ object BaseTableStructureEditor {
         columnCount: Int,
         rowIdFactory: () -> BaseTableRowId,
         columnIdFactory: () -> BaseTableColumnId,
+        columnName: (Int) -> String = Int::toString,
     ): BaseTableBlockContent {
         require(rowCount in SUPPORTED_SIZE) { "BaseTable 行数超出支持范围" }
         require(columnCount in SUPPORTED_SIZE) { "BaseTable 列数超出支持范围" }
@@ -28,7 +30,7 @@ object BaseTableStructureEditor {
             BaseTableColumn(
                 columnId = columnIdFactory(),
                 orderKey = orderKey(index),
-                name = richText(defaultColumnName(index)),
+                name = richText(columnName(index + 1)),
                 type = BaseTableColumnTypes.TEXT,
                 width = if (index == 1) 260 else 180,
             )
@@ -194,6 +196,7 @@ object BaseTableStructureEditor {
      * @param columnCount 目标活动列数。
      * @param rowIdFactory 新增行 ID 工厂。
      * @param columnIdFactory 新增列 ID 工厂。
+     * @param columnName 按从 1 开始的序号生成新列名，既有列名原样保留。
      * @return 调整后的规范表格。
      */
     fun resize(
@@ -202,6 +205,7 @@ object BaseTableStructureEditor {
         columnCount: Int,
         rowIdFactory: () -> BaseTableRowId,
         columnIdFactory: () -> BaseTableColumnId,
+        columnName: (Int) -> String = Int::toString,
     ): BaseTableBlockContent {
         require(rowCount in SUPPORTED_SIZE) { "BaseTable 行数超出支持范围" }
         require(columnCount in SUPPORTED_SIZE) { "BaseTable 列数超出支持范围" }
@@ -219,7 +223,7 @@ object BaseTableStructureEditor {
             BaseTableColumn(
                 columnIdFactory(),
                 orderKey(ordinal),
-                richText(defaultColumnName(ordinal)),
+                richText(columnName(ordinal + 1)),
                 BaseTableColumnTypes.TEXT,
                 width = 180,
             )
@@ -331,18 +335,6 @@ object BaseTableStructureEditor {
      * @return 单段 RichText。
      */
     private fun richText(value: String): RichText = RichText(listOf(InlineRun(value)))
-
-    /**
-     * 返回第 index 列的默认标题。
-     *
-     * @param index 从零开始的列序号。
-     * @return 面向用户的列标题。
-     */
-    private fun defaultColumnName(index: Int): String = when (index) {
-        0 -> "名称"
-        1 -> "内容"
-        else -> "列 ${index + 1}"
-    }
 
     /**
      * 生成固定宽度局部排序键。

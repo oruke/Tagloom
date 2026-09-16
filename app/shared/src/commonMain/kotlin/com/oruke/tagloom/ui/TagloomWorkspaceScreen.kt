@@ -103,6 +103,7 @@ internal fun TagloomWorkspaceScreen(
     workspaceMenu: (@Composable () -> Unit)? = null,
     settingsContent: (@Composable (() -> Unit) -> Unit)? = null,
 ) {
+    ConfigureEditorContentNames(state)
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val searchFocusRequester = remember { FocusRequester() }

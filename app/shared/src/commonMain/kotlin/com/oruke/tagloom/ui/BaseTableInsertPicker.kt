@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +31,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.workspace_action_cancel
+import tagloom.app.shared.generated.resources.editor_action_insert
+import tagloom.app.shared.generated.resources.editor_base_table_columns
+import tagloom.app.shared.generated.resources.editor_base_table_insert_description
+import tagloom.app.shared.generated.resources.editor_base_table_insert_dimensions
+import tagloom.app.shared.generated.resources.editor_base_table_insert_hint
+import tagloom.app.shared.generated.resources.editor_base_table_insert_title
+import tagloom.app.shared.generated.resources.editor_base_table_rows
 
 /**
  * 渲染 `/table` 的 8x8 预览与精确行列设置器。
@@ -58,9 +69,9 @@ internal fun BaseTableInsertPicker(
         ) {
             Text("▦", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Column {
-                Text("简单表格", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(Res.string.editor_base_table_insert_title), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "插入可编辑的行列",
+                    stringResource(Res.string.editor_base_table_insert_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -72,7 +83,7 @@ internal fun BaseTableInsertPicker(
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            Text("插入表格  |  $columns 列 × $rows 行", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(Res.string.editor_base_table_insert_dimensions, columns, rows), style = MaterialTheme.typography.bodySmall)
         }
         Box(
             modifier = Modifier.fillMaxWidth().height(216.dp),
@@ -102,22 +113,22 @@ internal fun BaseTableInsertPicker(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PickerStepper("列", columns, { columns = (columns - 1).coerceAtLeast(1) }, { columns = (columns + 1).coerceAtMost(20) })
-            PickerStepper("行", rows, { rows = (rows - 1).coerceAtLeast(1) }, { rows = (rows + 1).coerceAtMost(20) })
+            PickerStepper(stringResource(Res.string.editor_base_table_columns), columns, { columns = (columns - 1).coerceAtLeast(1) }, { columns = (columns + 1).coerceAtMost(20) })
+            PickerStepper(stringResource(Res.string.editor_base_table_rows), rows, { rows = (rows - 1).coerceAtLeast(1) }, { rows = (rows + 1).coerceAtMost(20) })
         }
         Row(
-            modifier = Modifier.fillMaxWidth().height(46.dp).padding(horizontal = 14.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "方向键选择 · Enter 插入 · Esc 关闭",
+                stringResource(Res.string.editor_base_table_insert_hint),
+                modifier = Modifier.weight(1f).padding(vertical = 8.dp),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.weight(1f))
-            PickerFooterButton("取消", filled = false, onClick = onCancel)
+            PickerFooterButton(stringResource(Res.string.workspace_action_cancel), filled = false, onClick = onCancel)
             Spacer(Modifier.width(6.dp))
-            PickerFooterButton("插入", filled = true) { onCreate(rows, columns) }
+            PickerFooterButton(stringResource(Res.string.editor_action_insert), filled = true) { onCreate(rows, columns) }
         }
     }
 }
@@ -217,7 +228,7 @@ private fun PickerFooterButton(
     onClick: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.height(28.dp).width(58.dp)
+        modifier = Modifier.heightIn(min = 28.dp).widthIn(min = 58.dp)
             .background(
                 if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(3.dp),
@@ -227,7 +238,7 @@ private fun PickerFooterButton(
                 if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                 RoundedCornerShape(3.dp),
             )
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(

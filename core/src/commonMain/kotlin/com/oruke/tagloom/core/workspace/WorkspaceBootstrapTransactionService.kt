@@ -44,7 +44,7 @@ class WorkspaceBootstrapTransactionService(
     private val transactionCoordinator: TransactionCoordinator,
 ) {
     /**
-     * 创建内置根 Note 标签和三个基础属性；已有任何内置对象时拒绝重复引导。
+     * 创建内置根 Note 标签和四个基础属性；已有任何内置对象时拒绝重复引导。
      *
      * @param unlocked 当前已认证的新工作区 manifest。
      * @param actorId 初始化 Actor。
@@ -52,6 +52,7 @@ class WorkspaceBootstrapTransactionService(
      * @param transactionId 初始化事务 ID。
      * @param hybridLogicalTime 初始化 HLC。
      * @param committedAt UTC ISO-8601 确认时间。
+     * @param labels 平台解析的新工作区本地化名称；既有对象不会经过本入口重新命名。
      * @return 新 manifest、默认 schema 快照和提交结果。
      */
     suspend fun createDefaultNoteTag(
@@ -61,12 +62,13 @@ class WorkspaceBootstrapTransactionService(
         transactionId: TransactionId,
         hybridLogicalTime: HybridLogicalTime,
         committedAt: String,
+        labels: WorkspaceSchemaLabels? = null,
     ): WorkspaceBootstrapResult {
         require(actorSequence > 0L) { "Bootstrap Actor 序号必须大于零" }
         require(actorId == hybridLogicalTime.actorId) { "Bootstrap Actor 与 HLC 不一致" }
         require(committedAt.isNotBlank()) { "Bootstrap 时间不能为空" }
         val tagId = WorkspaceDefaults.DEFAULT_NOTE_TAG_ID
-        val propertyDefinitions = WorkspaceDefaultSchemas.propertyDefinitions()
+        val propertyDefinitions = WorkspaceDefaultSchemas.propertyDefinitions(labels)
         val reservedObjectIds = propertyDefinitions.map { definition -> definition.id.value }.toSet() + tagId.value
         require(unlocked.payload.objects.none { record -> record.objectId in reservedObjectIds }) {
             "工作区默认 schema 已经部分或全部存在"

@@ -19,6 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.DatabaseDefinition
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.database_include_descendants
+import tagloom.app.shared.generated.resources.database_source_supertag
 
 /**
  * 在 Database Block 内联切换来源对象类型，不再要求创建前经过独立页面或弹窗。
@@ -57,7 +61,7 @@ internal fun DatabaseSourceSelector(
             onDismissRequest = { menuOpen = false },
         ) {
             TagloomMenuItem(
-                text = "包含子类型",
+                text = stringResource(Res.string.database_include_descendants),
                 leadingIcon = if (database.includeDescendants) {
                     { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
                 } else null,
@@ -72,7 +76,7 @@ internal fun DatabaseSourceSelector(
                 },
             )
             TagloomMenuDivider()
-            TagloomMenuSectionHeader(title = "来源类型")
+            TagloomMenuSectionHeader(title = stringResource(Res.string.database_source_supertag))
             controller.tagDefinitions().forEach { tag ->
                 val selected = tag.id == database.sourceTypeId
                 TagloomMenuItem(

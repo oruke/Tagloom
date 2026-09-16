@@ -49,7 +49,8 @@ fun TagloomEditorState.pasteMarkdownAtBlock(
     val imported = MarkdownCodec.import(
         markdown = markdown,
         options = MarkdownImportOptions(
-            defaultTitle = "粘贴内容",
+            // 粘贴只使用解析结果的 Block；这个非空协议占位不会成为笔记标题。
+            defaultTitle = "pasted-content",
             firstHeadingAsTitle = false,
             importedAt = pastedAt,
             blockIdFactory = {

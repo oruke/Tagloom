@@ -25,6 +25,14 @@ import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.baseTableResizeWouldHideData
 import com.oruke.tagloom.editor.resizeBaseTable
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.editor_action_apply
+import tagloom.app.shared.generated.resources.editor_base_table_columns
+import tagloom.app.shared.generated.resources.editor_base_table_dimensions
+import tagloom.app.shared.generated.resources.editor_base_table_resize
+import tagloom.app.shared.generated.resources.editor_base_table_rows
+import tagloom.app.shared.generated.resources.editor_base_table_shrink_notice
 
 /**
  * 渲染右下角批量尺寸菜单。
@@ -47,7 +55,7 @@ internal fun BaseTableResizeMenu(
     var rows by remember(block.id, menuOpen) { mutableIntStateOf(currentRows) }
     var columns by remember(block.id, menuOpen) { mutableIntStateOf(currentColumns) }
     Box {
-        TableIconAction("↘", "调整行列数", { menuOpen = true }, enabled)
+        TableIconAction("↘", stringResource(Res.string.editor_base_table_resize), { menuOpen = true }, enabled)
         DropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
@@ -56,12 +64,12 @@ internal fun BaseTableResizeMenu(
             shadowElevation = 8.dp,
         ) {
             Column(Modifier.width(250.dp).padding(horizontal = 14.dp, vertical = 8.dp)) {
-                Text("设置表格尺寸", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                DimensionStepper("行", rows, { rows = (rows - 1).coerceAtLeast(1) }, { rows = (rows + 1).coerceAtMost(20) })
-                DimensionStepper("列", columns, { columns = (columns - 1).coerceAtLeast(1) }, { columns = (columns + 1).coerceAtMost(20) })
+                Text(stringResource(Res.string.editor_base_table_dimensions), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                DimensionStepper(stringResource(Res.string.editor_base_table_rows), rows, { rows = (rows - 1).coerceAtLeast(1) }, { rows = (rows + 1).coerceAtMost(20) })
+                DimensionStepper(stringResource(Res.string.editor_base_table_columns), columns, { columns = (columns - 1).coerceAtLeast(1) }, { columns = (columns + 1).coerceAtMost(20) })
                 if (state.baseTableResizeWouldHideData(block.id, rows, columns)) {
                     Text(
-                        "缩小后末尾非空内容将进入历史记录",
+                        stringResource(Res.string.editor_base_table_shrink_notice),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -71,7 +79,7 @@ internal fun BaseTableResizeMenu(
                     horizontalArrangement = Arrangement.End,
                 ) {
                     Text(
-                        "应用",
+                        stringResource(Res.string.editor_action_apply),
                         modifier = Modifier.clickable {
                             state.resizeBaseTable(block.id, rows, columns)
                             menuOpen = false

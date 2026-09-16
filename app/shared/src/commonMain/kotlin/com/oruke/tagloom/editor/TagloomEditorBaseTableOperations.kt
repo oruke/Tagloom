@@ -107,7 +107,7 @@ fun TagloomEditorState.addBaseTableColumn(blockId: BlockId): Boolean = editBaseT
     BaseTableEditor.addColumn(
         content = content,
         columnId = BaseTableColumnId(createEditorId("table-column")),
-        name = RichTextDocumentReducer.fromPlainText("列 $ordinal"),
+        name = RichTextDocumentReducer.fromPlainText(contentNames.columnName(ordinal)),
     )
 }
 
@@ -129,7 +129,7 @@ fun TagloomEditorState.insertBaseTableColumn(
         content = content,
         anchorColumnId = columnId,
         columnId = BaseTableColumnId(createEditorId("table-column")),
-        name = RichTextDocumentReducer.fromPlainText("列 $ordinal"),
+        name = RichTextDocumentReducer.fromPlainText(contentNames.columnName(ordinal)),
         after = after,
     )
 }
@@ -150,7 +150,7 @@ fun TagloomEditorState.duplicateBaseTableColumn(
         content = content,
         sourceColumnId = columnId,
         columnId = BaseTableColumnId(createEditorId("table-column")),
-        name = RichTextDocumentReducer.fromPlainText("${source.name.plainText} 副本"),
+        name = RichTextDocumentReducer.fromPlainText(contentNames.copyName(source.name.plainText)),
     )
 }
 
@@ -187,6 +187,7 @@ fun TagloomEditorState.resizeBaseTable(
         columnCount = columnCount,
         rowIdFactory = { BaseTableRowId(createEditorId("table-row")) },
         columnIdFactory = { BaseTableColumnId(createEditorId("table-column")) },
+        columnName = contentNames::columnName,
     )
 }
 
@@ -331,6 +332,6 @@ private fun TagloomEditorState.editBaseTable(
         edited = updated != content
         block.copy(content = updated)
     }
-    structuredEditError = failure?.let { "无法完成表格编辑：请检查列类型和现有单元格" }
+    structuredEditError = failure?.let { "base-table-edit-failed" }
     return edited
 }

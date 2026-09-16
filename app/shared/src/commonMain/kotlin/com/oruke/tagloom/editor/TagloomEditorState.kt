@@ -33,6 +33,10 @@ class TagloomEditorState(
     /** 生成当前 UTC 时间文本的注入函数。 */
     private val timestampProvider: () -> String,
 ) {
+    /** 当前界面注入的新内容命名规则；更新此配置不改变现有文档或脏状态。 */
+    var contentNames: EditorContentNames = EditorContentNames()
+        internal set
+
     /** 当前内存工作区中的文档集合。 */
     val documents = mutableStateListOf<EditorDocument>()
 
@@ -66,7 +70,7 @@ class TagloomEditorState(
     /** 当前解锁 UI 会话中每个 Tabs 容器选择的活动 tab；不会进入 Note 快照。 */
     internal val activeTabIds = mutableStateMapOf<BlockId, BlockId>()
 
-    /** 最近一次结构化 Block 编辑失败的非敏感提示。 */
+    /** 最近一次结构化 Block 编辑失败的稳定错误码，由 UI 按当前语言显示。 */
     var structuredEditError: String? by mutableStateOf(null)
         internal set
 
@@ -108,7 +112,7 @@ class TagloomEditorState(
         documents += EditorDocument(
             id = documentId,
             note = Note(
-                title = "未命名笔记",
+                title = contentNames.untitledNote,
                 directTagIds = listOf(WorkspaceDefaults.DEFAULT_NOTE_TAG_ID),
                 blocks = listOf(block),
             ),
@@ -314,7 +318,7 @@ class TagloomEditorState(
         val result = MarkdownCodec.import(
             markdown = markdown,
             options = MarkdownImportOptions(
-                defaultTitle = "导入笔记",
+                defaultTitle = contentNames.importedNote,
                 importedAt = importedAt,
                 blockIdFactory = {
                     blockCounter += 1

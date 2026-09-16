@@ -29,6 +29,7 @@ import com.oruke.tagloom.core.transaction.WorkspaceSchemaWriteContext
 import com.oruke.tagloom.core.workspace.ManifestObjectKind
 import com.oruke.tagloom.core.workspace.UnlockedWorkspaceManifest
 import com.oruke.tagloom.core.workspace.WorkspaceBootstrapTransactionService
+import com.oruke.tagloom.platform.localizedWorkspaceSchemaLabels
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.core.workspace.WorkspaceManifestCodec
 import com.oruke.tagloom.core.workspace.WorkspaceManifestService
@@ -134,6 +135,7 @@ class DesktopWorkspaceSession internal constructor(
                 transactionId = TransactionId(idFactory()),
                 hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
                 committedAt = timestampProvider(),
+                labels = localizedWorkspaceSchemaLabels(),
             )
             nextActorSequence += bootstrap.consumedActorSequences
             refreshManifest(bootstrap.encryptedManifest)

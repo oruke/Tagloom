@@ -27,6 +27,8 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.search.NoteSearchField
@@ -155,7 +157,7 @@ internal fun PageHeader(
             if (onWorkspaceMenuRequest != null || workspaceMenu != null) {
                 Box {
                     if (onWorkspaceMenuRequest != null) {
-                        PageIconAction("⋯", onWorkspaceMenuRequest)
+                        PageIconAction("⋯", stringResource(Res.string.editor_page_more_actions), onWorkspaceMenuRequest)
                     }
                     workspaceMenu?.invoke()
                 }
@@ -220,16 +222,20 @@ internal fun PageHeader(
  * 渲染页头右侧不抢占标题注意力的图标动作。
  *
  * @param glyph 稳定单字符图标。
+ * @param description 本地化的无障碍操作名称。
  * @param onClick 点击动作。
  */
 @Composable
 private fun PageIconAction(
     glyph: String,
+    description: String,
     onClick: () -> Unit,
 ) {
     Text(
         text = glyph,
-        modifier = Modifier.clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp),
+        modifier = Modifier.clickable(onClick = onClick)
+            .semantics { contentDescription = description }
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

@@ -53,6 +53,11 @@ import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.database_system_title
 import kotlin.math.roundToInt
+import tagloom.app.shared.generated.resources.database_column_narrow
+import tagloom.app.shared.generated.resources.database_column_standard
+import tagloom.app.shared.generated.resources.database_column_wide
+import tagloom.app.shared.generated.resources.database_column_width
+import tagloom.app.shared.generated.resources.database_hide_field
 
 /**
  * 渲染行等于 Note、列等于字段的可写 Table 投影。
@@ -299,8 +304,8 @@ private fun DatabaseColumnMenu(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         TagloomDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-            TagloomMenuSectionHeader(title = "预设列宽")
-            listOf(96 to "窄列", 180 to "标准列", 300 to "宽列").forEach { (targetWidth, name) ->
+            TagloomMenuSectionHeader(title = stringResource(Res.string.database_column_width))
+            listOf(96 to stringResource(Res.string.database_column_narrow), 180 to stringResource(Res.string.database_column_standard), 300 to stringResource(Res.string.database_column_wide)).forEach { (targetWidth, name) ->
                 TagloomMenuItem(
                     text = name,
                     onClick = {
@@ -311,7 +316,7 @@ private fun DatabaseColumnMenu(
             }
             TagloomMenuDivider()
             TagloomMenuItem(
-                text = "隐藏字段",
+                text = stringResource(Res.string.database_hide_field),
                 enabled = canHide,
                 onClick = {
                     onHide()

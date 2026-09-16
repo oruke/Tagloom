@@ -37,6 +37,7 @@ import com.oruke.tagloom.editor.selectionHasMark
 import com.oruke.tagloom.editor.selectionMarkAttribute
 import com.oruke.tagloom.editor.setSelectionMark
 import com.oruke.tagloom.editor.toggleSelectionMark
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
 
@@ -101,10 +102,7 @@ internal fun SelectionFormattingToolbar(state: TagloomEditorState) {
                     },
                 )
                 Text(
-                    stringResource(
-                        Res.string.editor_selection_character_count,
-                        state.selection.end - state.selection.start,
-                    ),
+                    pluralStringResource(Res.plurals.editor_selection_character_count, state.selection.end - state.selection.start, state.selection.end - state.selection.start),
                     modifier = Modifier.padding(horizontal = 8.dp),
                     style = MaterialTheme.typography.labelSmall,
                 )

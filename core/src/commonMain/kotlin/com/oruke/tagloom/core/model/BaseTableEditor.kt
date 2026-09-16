@@ -11,23 +11,25 @@ object BaseTableEditor {
      *
      * @param rowIdFactory 生成局部稳定 RowId。
      * @param columnIdFactory 生成局部稳定 ColumnId。
+     * @param columnName 按从 1 开始的序号生成列名；默认只使用数字，由 UI 注入本地化名称。
      * @return 使用当前 schema 的初始 BaseTable 内容。
      */
     fun createDefault(
         rowIdFactory: () -> BaseTableRowId,
         columnIdFactory: () -> BaseTableColumnId,
+        columnName: (Int) -> String = Int::toString,
     ): BaseTableBlockContent {
         val firstColumn = BaseTableColumn(
             columnId = columnIdFactory(),
             orderKey = orderKey(0),
-            name = richText("名称"),
+            name = richText(columnName(1)),
             type = BaseTableColumnTypes.TEXT,
             width = 180,
         )
         val secondColumn = BaseTableColumn(
             columnId = columnIdFactory(),
             orderKey = orderKey(1),
-            name = richText("内容"),
+            name = richText(columnName(2)),
             type = BaseTableColumnTypes.TEXT,
             width = 260,
         )
