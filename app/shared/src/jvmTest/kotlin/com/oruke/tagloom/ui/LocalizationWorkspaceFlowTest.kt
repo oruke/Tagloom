@@ -129,11 +129,12 @@ class LocalizationWorkspaceFlowTest {
     }
 
     /**
-     * 通过真实新建笔记入口创建普通笔记，并填写用于持久化核对的脱敏标题。
+     * 通过真实超级标签选择入口创建普通笔记，并填写用于持久化核对的脱敏标题。
      * @param title 本次新笔记的标题。
      */
     private fun ComposeUiTest.createNote(title: String) {
         onAllNodes(hasText(text(Res.string.editor_action_new_note), substring = true) and hasClickAction())[0].performClick()
+        onNodeWithTag("supertag-picker-item-default-note-tag").performClick()
         onNode(hasSetTextAction() and hasText(text(Res.string.editor_new_note_title))).performTextReplacement(title)
     }
 

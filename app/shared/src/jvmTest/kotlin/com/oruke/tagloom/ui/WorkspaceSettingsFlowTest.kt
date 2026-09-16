@@ -46,6 +46,7 @@ class WorkspaceSettingsFlowTest {
             setContent { App(capabilities = environment.capabilities) }
             waitForText("设置")
             onAllNodes(hasText("新建笔记", substring = true) and hasClickAction())[0].performClick()
+            onNodeWithTag("supertag-picker-item-default-note-tag").performClick()
             onNodeWithText("状态").assertDoesNotExist()
             onNodeWithText("日期").assertDoesNotExist()
             onNode(hasSetTextAction() and hasText("未命名笔记")).performTextReplacement(TEST_NOTE_TITLE)
@@ -142,6 +143,7 @@ class WorkspaceSettingsFlowTest {
             saveScreenshot("settings-compact.png")
             onNodeWithText("返回笔记").performClick()
             onAllNodes(hasText("新建笔记", substring = true) and hasClickAction())[0].performClick()
+            onNodeWithTag("supertag-picker-item-default-note-tag").performClick()
             onNode(hasSetTextAction() and hasText("未命名笔记")).performTextReplacement(TEST_NOTE_TITLE)
             onNode(hasText("设置") and hasClickAction()).performClick()
             onNodeWithText("返回笔记").performClick()

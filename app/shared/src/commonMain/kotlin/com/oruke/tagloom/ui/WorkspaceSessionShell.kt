@@ -93,6 +93,7 @@ internal fun WorkspaceSessionShell(
     Box(Modifier.fillMaxSize()) {
         TagloomWorkspaceScreen(
             state = controller.editorState,
+            supertagController = controller.supertags,
             databaseController = controller.databaseController,
             documentFileGateway = documentFileGateway,
             onSaveRequest = onSave,

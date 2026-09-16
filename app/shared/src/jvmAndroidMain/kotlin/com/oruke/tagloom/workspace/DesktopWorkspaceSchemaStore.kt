@@ -5,6 +5,10 @@ import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.ObjectSnapshot
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.TagDefinition
+import com.oruke.tagloom.core.model.TagId
+import com.oruke.tagloom.core.domain.tag.TagResolver
+import com.oruke.tagloom.core.domain.tag.TagResolution
+import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.core.transaction.PropertyDefinitionSnapshotTransactionRequest
 import com.oruke.tagloom.core.transaction.TagDefinitionSnapshotTransactionRequest
 import com.oruke.tagloom.core.transaction.WorkspaceSchemaSnapshotEnvelopeService
@@ -101,10 +105,38 @@ class DesktopWorkspaceSchemaStore(
         definition: TagDefinition,
         context: WorkspaceSchemaWriteContext,
     ): WorkspaceSchemaSnapshotTransactionResult<TagDefinition> {
-        val previous = inspect(unlocked).tags.singleOrNull { snapshot -> snapshot.payload.id == definition.id }
+        val catalog = inspect(unlocked)
+        require(catalog.issues.isEmpty()) { "schema-integrity-failure" }
+        val definitions = catalog.tags.map { it.payload }.associateBy { it.id } + (definition.id to definition)
+        require(TagResolver(WorkspaceDefaults.DEFAULT_NOTE_TAG_ID).resolve(listOf(definition.id), definitions) is TagResolution.Success) {
+            "invalid-supertag-inheritance"
+        }
+        require(definition.propertyBindings.all { binding -> catalog.properties.any { it.payload.id == binding.propertyId } }) {
+            "missing-property-definition"
+        }
+        val previous = catalog.tags.singleOrNull { snapshot -> snapshot.payload.id == definition.id }
         return transactionService.commitTag(
             unlocked,
             TagDefinitionSnapshotTransactionRequest(definition, previous, context),
+        )
+    }
+
+    /**
+     * 为已经完成引用检查的超级标签写入 tombstone，保留历史密文和稳定身份。
+     * @param unlocked 当前已认证 manifest。
+     * @param tagId 待删除超级标签。
+     * @param context 唯一事务身份与时间。
+     * @return 经事务确认的删除结果。
+     */
+    suspend fun deleteTag(
+        unlocked: UnlockedWorkspaceManifest,
+        tagId: TagId,
+        context: WorkspaceSchemaWriteContext,
+    ): WorkspaceSchemaSnapshotTransactionResult<TagDefinition> {
+        val previous = inspect(unlocked).tags.single { it.payload.id == tagId }
+        return transactionService.commitTag(
+            unlocked,
+            TagDefinitionSnapshotTransactionRequest(previous.payload, previous, context, deleted = true),
         )
     }
 

@@ -199,7 +199,7 @@ private fun ObjectTypeSelector(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text("◇", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                SupertagIcon(appliedType?.iconKey ?: rootType.iconKey, Modifier.size(16.dp))
                 Text(label, style = MaterialTheme.typography.labelMedium)
                 TagloomChevronDown(Modifier.size(10.dp))
             }
@@ -228,11 +228,7 @@ private fun ObjectTypeSelector(
                 }
                 TagloomMenuItem(
                     text = definition.name,
-                    leadingIcon = if (selected) {
-                        { Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
-                    } else {
-                        { Text("◇", style = MaterialTheme.typography.labelMedium) }
-                    },
+                    leadingIcon = definition.iconKey?.let { { SupertagIcon(it, Modifier.size(18.dp)) } },
                     trailingText = when {
                         definition.id == rootType.id -> {
                             stringResource(Res.string.editor_identity_root_type_readonly)

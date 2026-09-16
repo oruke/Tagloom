@@ -306,8 +306,17 @@ class DesktopWorkspaceGateway(
      * @return 新确认标签定义。
      */
     override suspend fun saveTagDefinition(definition: TagDefinition): WorkspaceTagDefinition = withContext(Dispatchers.IO) {
+        require(definition.id != com.oruke.tagloom.core.workspace.WorkspaceDefaults.DEFAULT_NOTE_TAG_ID) { "builtin-supertag-readonly" }
         val saved = requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }.saveTagDefinition(definition)
         return@withContext WorkspaceTagDefinition(saved.snapshot.payload)
+    }
+
+    /**
+     * 经活动会话复核引用并确认超级标签 tombstone。
+     * @param tagId 待删除超级标签 ID。
+     */
+    override suspend fun deleteTagDefinition(tagId: com.oruke.tagloom.core.model.TagId): Unit = withContext(Dispatchers.IO) {
+        requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }.deleteTagDefinition(tagId)
     }
 
     /**

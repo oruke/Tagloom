@@ -13,6 +13,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +89,13 @@ internal fun PageHeader(
 ) {
     var exportMenuOpen by remember(document.id) { mutableStateOf(false) }
     val find = rememberNoteSearchDecoration(NoteSearchTarget(NoteSearchField.TITLE))
+    val titleFocus = remember(document.id) { FocusRequester() }
+    LaunchedEffect(document.id, state.newNoteTitleFocusId) {
+        if (state.newNoteTitleFocusId == document.id) {
+            titleFocus.requestFocus()
+            state.newNoteTitleFocusId = null
+        }
+    }
     Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -171,6 +181,7 @@ internal fun PageHeader(
                 onTextLayout = find.onTextLayout,
                 onValueChange = state::updateTitle,
                 modifier = fieldModifier
+                    .focusRequester(titleFocus)
                     .then(find.modifier)
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) {

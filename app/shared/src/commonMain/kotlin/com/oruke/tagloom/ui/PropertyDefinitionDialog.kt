@@ -54,11 +54,13 @@ internal data class PropertyDialogRequest(
  * @param tagDefinitions 可接收新属性 schema 的对象类型。
  * @param onDismiss 取消编辑。
  * @param onConfirm 提交名称、类型、选项输入模式、有序选项草稿和创建目标。
+ * @param fixedDestination 宿主固定的创建目标；指定时不显示无关目标选择。
  */
 @Composable
 internal fun PropertyDefinitionDialog(
     request: PropertyDialogRequest,
     tagDefinitions: List<TagDefinition>,
+    fixedDestination: PropertyDefinitionDestination? = null,
     onDismiss: () -> Unit,
     onConfirm: (
         String,
@@ -151,7 +153,7 @@ internal fun PropertyDefinitionDialog(
                         },
                     )
                 }
-                if (request.existing == null) {
+                if (request.existing == null && fixedDestination == null) {
                     PropertyDestinationPicker(
                         scope = creationScope,
                         tagDefinitions = tagDefinitions,
@@ -163,7 +165,7 @@ internal fun PropertyDefinitionDialog(
             }
         },
         confirmButton = {
-            val destination = when {
+            val destination = fixedDestination ?: when {
                 request.existing != null -> PropertyDefinitionDestination.Workspace
                 creationScope == PropertyCreationScope.CURRENT_NOTE -> PropertyDefinitionDestination.CurrentNote
                 creationScope == PropertyCreationScope.WORKSPACE -> PropertyDefinitionDestination.Workspace

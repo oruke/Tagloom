@@ -19,6 +19,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.CompositionLocalProvider
+import com.oruke.tagloom.editor.createTagDefinitionDraft
+import com.oruke.tagloom.editor.createDocumentWithSupertag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,7 @@ import com.oruke.tagloom.platform.DocumentExportRequest
 import com.oruke.tagloom.platform.DocumentFileGateway
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.supertag_library
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.database_default_name
 import tagloom.app.shared.generated.resources.database_operation_failed
@@ -74,6 +78,7 @@ import tagloom.app.shared.generated.resources.editor_export_word_name
  * 标签和属性属于当前文档内容，固定显示在标题下方，不再占用常驻右侧栏。
  *
  * @param state 编辑器状态。
+ * @param supertagController 当前会话的超级标签维护入口；为空时使用内存预览。
  * @param databaseController Database Block 使用的目录与写入控制器。
  * @param documentFileGateway 平台文件选择与文档编码能力。
  * @param onSaveRequest 可选立即保存动作；内存演示环境为空操作。
@@ -90,6 +95,7 @@ import tagloom.app.shared.generated.resources.editor_export_word_name
 @Composable
 internal fun TagloomWorkspaceScreen(
     state: TagloomEditorState,
+    supertagController: WorkspaceSupertagController? = null,
     databaseController: DatabaseEditorController? = null,
     documentFileGateway: DocumentFileGateway? = null,
     onSaveRequest: () -> Unit = {},
@@ -109,6 +115,27 @@ internal fun TagloomWorkspaceScreen(
     val searchFocusRequester = remember { FocusRequester() }
     // 页面选择随会话保存；编辑器对象继续保留草稿，锁定后整个会话 UI 会被销毁。
     var settingsSelected by rememberSaveable { mutableStateOf(false) }
+    var librarySelected by rememberSaveable { mutableStateOf(false) }
+    var tagRequest by remember { mutableStateOf<SupertagEditRequest?>(null) }
+    var pickerOpen by remember { mutableStateOf(false) }
+    var createAfterTag by remember { mutableStateOf(false) }
+    val tagController =
+        remember(state, supertagController) { supertagController ?: WorkspaceSupertagController(null, state) }
+    val openTag: (TagDefinition, Boolean) -> Unit = { definition, attach ->
+        if (!tagController.busy) {
+            tagController.clearError()
+            settingsSelected = false
+            tagRequest = SupertagEditRequest(definition, attach)
+        }
+    }
+    val createWithTag: (TagDefinition) -> Unit = { definition ->
+        pickerOpen = false
+        librarySelected = false
+        settingsSelected = false
+        tagRequest = null
+        state.createDocumentWithSupertag(definition.id)
+        state.newNoteTitleFocusId = state.selectedDocumentId
+    }
     val exportUnavailableMessage = stringResource(Res.string.editor_export_unavailable)
     val exportFailedMessage = stringResource(Res.string.editor_export_failed)
     val markdownName = stringResource(Res.string.editor_export_markdown_name)
@@ -159,137 +186,204 @@ internal fun TagloomWorkspaceScreen(
         state.applyFreePropertyOption(plan.definition, plan.optionId)
     }
     val createDocument = {
-        settingsSelected = false
-        state.createDocument()
+        if (!tagController.busy) {
+            pickerOpen = true
+        }; Unit
     }
 
-    Box(modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val showNavigation = maxWidth >= 720.dp
-            val navigationModifier = Modifier.fillMaxSize().focusRequester(workspaceFocus).focusable().onPreviewKeyEvent { event ->
-                if (handleNoteSearchKeyEvent(event, noteSearch, document != null && !settingsSelected, closeNoteSearch)) {
-                    return@onPreviewKeyEvent true
-                }
-                if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
-                    return@onPreviewKeyEvent false
-                }
-                when (event.key) {
-                    Key.N -> {
-                        createDocument()
-                        true
-                    }
-
-                    Key.K -> {
-                        if (showNavigation) {
-                            searchFocusRequester.requestFocus()
-                            true
-                        } else {
-                            false
+    CompositionLocalProvider(LocalSupertagEditor provides openTag) {
+        Box(modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val showNavigation = maxWidth >= 720.dp
+                val navigationModifier =
+                    Modifier.fillMaxSize().focusRequester(workspaceFocus).focusable().onPreviewKeyEvent { event ->
+                        if (handleNoteSearchKeyEvent(
+                                event,
+                                noteSearch,
+                                document != null && !settingsSelected && !librarySelected && tagRequest == null,
+                                closeNoteSearch
+                            )
+                        ) {
+                            return@onPreviewKeyEvent true
                         }
-                    }
-
-                    else -> false
-                }
-            }
-            Row(navigationModifier) {
-                if (showNavigation) {
-                    WorkspaceSidebar(
-                        state = state,
-                        searchFocusRequester = searchFocusRequester,
-                        onCreateDocument = createDocument,
-                        onSelectDocument = { documentId ->
-                            state.selectDocument(documentId)
-                            settingsSelected = false
-                        },
-                        onOpenSettings = settingsContent?.let { { settingsSelected = true } },
-                        settingsSelected = settingsSelected,
-                        modifier = Modifier.width(232.dp),
-                    )
-                    VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-                Column(Modifier.weight(1f).background(MaterialTheme.colorScheme.surface)) {
-                    if (!showNavigation && settingsContent != null && !settingsSelected) {
-                        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = createDocument) {
-                                Text(stringResource(Res.string.editor_action_new_note))
+                        if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
+                            return@onPreviewKeyEvent false
+                        }
+                        when (event.key) {
+                            Key.N -> {
+                                createDocument()
+                                true
                             }
-                            Box(Modifier.weight(1f))
-                            WorkspaceSettingsEntry(selected = false, onClick = { settingsSelected = true })
+
+                            Key.K -> {
+                                if (showNavigation) {
+                                    searchFocusRequester.requestFocus()
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+
+                            else -> false
                         }
                     }
-                    if (settingsSelected && settingsContent != null) {
-                        settingsContent { settingsSelected = false }
-                    } else if (document == null) {
-                        EmptyWorkspace(
-                            onCreate = createDocument,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        EditorPane(
+                Row(navigationModifier) {
+                    if (showNavigation) {
+                        WorkspaceSidebar(
                             state = state,
-                            document = document,
-                            search = noteSearch,
-                            onCloseSearch = closeNoteSearch,
-                            databaseController = databaseController,
-                            onCreateDatabaseBlock = createDatabase@{ blockId ->
-                                val documentId = state.selectedDocumentId ?: return@createDatabase
-                                val controller = databaseController ?: return@createDatabase
-                                coroutineScope.launch {
-                                    controller.createDatabaseBlock(
-                                        documentId = documentId,
-                                        blockId = blockId,
-                                        name = defaultDatabaseName,
-                                        sourceTypeId = WorkspaceDefaults.DEFAULT_NOTE_TAG_ID,
-                                    )
-                                    if (controller.operationFailed) {
-                                        snackbarHostState.showSnackbar(databaseOperationFailed)
+                            searchFocusRequester = searchFocusRequester,
+                            onCreateDocument = createDocument,
+                            onSelectDocument = { documentId ->
+                                if (!tagController.busy) {
+                                    state.selectDocument(documentId)
+                                    settingsSelected = false
+                                    librarySelected = false
+                                    tagRequest = null
+                                    createAfterTag = false
+                                }
+                            },
+                            onOpenSettings = settingsContent?.let {
+                                {
+                                    if (!tagController.busy) {
+                                        settingsSelected = true; librarySelected = false; tagRequest = null
                                     }
                                 }
                             },
-                            onExport = { format ->
-                                val gateway = documentFileGateway
-                                if (gateway == null) {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(exportUnavailableMessage)
-                                    }
-                                } else {
-                                    coroutineScope.launch {
-                                        val exported = runCatching {
-                                            gateway.exportDocument(
-                                                DocumentExportRequest(
-                                                    suggestedBaseName = document.note.title.toSafeFileBaseName(),
-                                                    note = document.note,
-                                                    format = format,
-                                                ),
-                                            )
-                                        }.getOrElse {
-                                            snackbarHostState.showSnackbar(exportFailedMessage)
-                                            false
-                                        }
-                                        if (exported) {
-                                            snackbarHostState.showSnackbar(requireNotNull(exportSuccessMessages[format]))
-                                        }
-                                    }
+                            settingsSelected = settingsSelected,
+                            onOpenSupertags = {
+                                if (!tagController.busy) {
+                                    settingsSelected = false; tagRequest = null; librarySelected =
+                                        true; createAfterTag = false; tagController.clearError()
                                 }
                             },
-                            onSaveRequest = onSaveRequest,
-                            onWorkspaceMenuRequest = onWorkspaceMenuRequest,
-                            onSaveTagDefinition = saveTagDefinition,
-                            onSavePropertyDefinition = savePropertyDefinition,
-                            onCreatePropertyOption = createPropertyOption,
-                            saving = saving,
-                            modifier = Modifier.fillMaxSize(),
-                            searchMenu = searchMenu,
-                            workspaceMenu = workspaceMenu,
+                            supertagsSelected = librarySelected || tagRequest != null,
+                            modifier = Modifier.width(232.dp),
                         )
+                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                    Column(Modifier.weight(1f).background(MaterialTheme.colorScheme.surface)) {
+                        if (!showNavigation && !settingsSelected && !librarySelected && tagRequest == null) {
+                            Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = createDocument) {
+                                    Text(stringResource(Res.string.editor_action_new_note))
+                                }
+                                Box(Modifier.weight(1f))
+                                TextButton(onClick = {
+                                    librarySelected = true
+                                }) { Text(org.jetbrains.compose.resources.stringResource(tagloom.app.shared.generated.resources.Res.string.supertag_library)) }
+                                if (settingsContent != null) WorkspaceSettingsEntry(
+                                    selected = false,
+                                    onClick = { settingsSelected = true })
+                            }
+                        }
+                        val editing = tagRequest
+                        if (editing != null) {
+                            SupertagEditorScreen(
+                                state, editing, tagController,
+                                onBack = { tagRequest = null; createAfterTag = false },
+                                onSave = { definition, properties ->
+                                    coroutineScope.launch {
+                                        if (tagController.save(definition, properties, editing.attachToSelected)) {
+                                            tagRequest = null
+                                            if (createAfterTag) {
+                                                createAfterTag = false; createWithTag(definition)
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                        } else if (librarySelected) {
+                            SupertagLibraryScreen(
+                                state, tagController,
+                                onCreate = { openTag(state.createTagDefinitionDraft(""), false) },
+                                onEdit = { openTag(it, false) }, onBack = { librarySelected = false })
+                        } else if (settingsSelected && settingsContent != null) {
+                            settingsContent { settingsSelected = false }
+                        } else if (document == null) {
+                            EmptyWorkspace(
+                                onCreate = createDocument,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            EditorPane(
+                                state = state,
+                                document = document,
+                                search = noteSearch,
+                                onCloseSearch = closeNoteSearch,
+                                databaseController = databaseController,
+                                onCreateDatabaseBlock = createDatabase@{ blockId ->
+                                    val documentId = state.selectedDocumentId ?: return@createDatabase
+                                    val controller = databaseController ?: return@createDatabase
+                                    coroutineScope.launch {
+                                        controller.createDatabaseBlock(
+                                            documentId = documentId,
+                                            blockId = blockId,
+                                            name = defaultDatabaseName,
+                                            sourceTypeId = WorkspaceDefaults.DEFAULT_NOTE_TAG_ID,
+                                        )
+                                        if (controller.operationFailed) {
+                                            snackbarHostState.showSnackbar(databaseOperationFailed)
+                                        }
+                                    }
+                                },
+                                onExport = { format ->
+                                    val gateway = documentFileGateway
+                                    if (gateway == null) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(exportUnavailableMessage)
+                                        }
+                                    } else {
+                                        coroutineScope.launch {
+                                            val exported = runCatching {
+                                                gateway.exportDocument(
+                                                    DocumentExportRequest(
+                                                        suggestedBaseName = document.note.title.toSafeFileBaseName(),
+                                                        note = document.note,
+                                                        format = format,
+                                                    ),
+                                                )
+                                            }.getOrElse {
+                                                snackbarHostState.showSnackbar(exportFailedMessage)
+                                                false
+                                            }
+                                            if (exported) {
+                                                snackbarHostState.showSnackbar(requireNotNull(exportSuccessMessages[format]))
+                                            }
+                                        }
+                                    }
+                                },
+                                onSaveRequest = onSaveRequest,
+                                onWorkspaceMenuRequest = onWorkspaceMenuRequest,
+                                onSaveTagDefinition = saveTagDefinition,
+                                onSavePropertyDefinition = savePropertyDefinition,
+                                onCreatePropertyOption = createPropertyOption,
+                                saving = saving,
+                                modifier = Modifier.fillMaxSize(),
+                                searchMenu = searchMenu,
+                                workspaceMenu = workspaceMenu,
+                            )
+                        }
                     }
                 }
+                if (pickerOpen) SupertagNotePicker(
+                    state, !showNavigation,
+                    onSelect = createWithTag,
+                    onCreate = { name ->
+                        pickerOpen = false
+                        createAfterTag = true
+                        openTag(state.createTagDefinitionDraft(name), false)
+                    },
+                    onManage = {
+                        pickerOpen = false; settingsSelected = false; librarySelected = true; tagRequest =
+                        null; createAfterTag = false
+                    },
+                    onDismiss = { pickerOpen = false })
             }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+            )
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
-        )
     }
 }
 

@@ -353,6 +353,14 @@ interface WorkspaceGateway {
     suspend fun saveTagDefinition(definition: TagDefinition): WorkspaceTagDefinition
 
     /**
+     * 删除未被引用的超级标签，平台必须在统一写入锁内复核引用并写 tombstone。
+     * @param tagId 待删除的稳定超级标签 ID。
+     */
+    suspend fun deleteTagDefinition(tagId: com.oruke.tagloom.core.model.TagId) {
+        error("supertag-deletion-unavailable")
+    }
+
+    /**
      * 创建或更新一个工作区属性定义。
      *
      * @param definition 包含稳定 ID 的完整属性定义。

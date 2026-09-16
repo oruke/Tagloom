@@ -47,7 +47,7 @@ internal fun DocumentMetadataPanel(
     onSavePropertyDefinition: (PropertyDefinition, PropertyDefinitionDestination) -> Unit,
     onCreatePropertyOption: (PropertyId, String) -> Unit,
 ) {
-    var tagDialog by remember(document.id) { mutableStateOf<TagDefinitionDialogRequest?>(null) }
+    val openSupertag = LocalSupertagEditor.current
     var propertyDialog by remember(document.id) { mutableStateOf<PropertyDialogRequest?>(null) }
     val effectiveProperties = state.resolveEffectiveProperties(document.note)
 
@@ -56,10 +56,10 @@ internal fun DocumentMetadataPanel(
             state = state,
             document = document,
             onCreateType = { name ->
-                tagDialog = TagDefinitionDialogRequest(state.createTagDefinitionDraft(name), attachToSelected = true)
+                openSupertag(state.createTagDefinitionDraft(name), true)
             },
             onOpenType = { definition ->
-                tagDialog = TagDefinitionDialogRequest(definition, attachToSelected = false)
+                openSupertag(definition, false)
             },
             onCreateTag = onCreatePropertyOption,
         )
@@ -92,7 +92,7 @@ internal fun DocumentMetadataPanel(
                     propertyDialog = PropertyDialogRequest(definition, definition.name)
                 },
                 onEditSourceType = { definition ->
-                    tagDialog = TagDefinitionDialogRequest(definition, attachToSelected = false)
+                    openSupertag(definition, false)
                 },
                 onCreateOption = onCreatePropertyOption,
                 onCreateProperty = onSavePropertyDefinition,
@@ -109,17 +109,6 @@ internal fun DocumentMetadataPanel(
         }
     }
 
-    tagDialog?.let { request ->
-        TagDefinitionDialog(
-            state = state,
-            request = request,
-            onDismiss = { tagDialog = null },
-            onConfirm = { definition ->
-                onSaveTagDefinition(definition, request.attachToSelected)
-                tagDialog = null
-            },
-        )
-    }
     propertyDialog?.let { request ->
         PropertyDefinitionDialog(
             request = request,

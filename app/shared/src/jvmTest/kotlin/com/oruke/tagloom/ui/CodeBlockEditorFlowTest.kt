@@ -110,6 +110,7 @@ class CodeBlockEditorFlowTest {
     private fun ComposeUiTest.createCodeNote() {
         waitForText("设置")
         onAllNodes(hasText("新建笔记", substring = true) and hasClickAction())[0].performClick()
+        onNodeWithTag("supertag-picker-item-default-note-tag").performClick()
         onNode(hasSetTextAction() and hasText("未命名笔记")).performTextReplacement("代码笔记示例")
         onNode(SemanticsMatcher("正文输入框") {
             it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("text-input-") == true

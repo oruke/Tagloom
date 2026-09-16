@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.TagloomEditorState
 import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.painterResource
+import androidx.compose.ui.platform.testTag
 import tagloom.app.shared.generated.resources.*
 
 /**
@@ -42,6 +45,8 @@ import tagloom.app.shared.generated.resources.*
  * @param onSelectDocument 选择笔记并返回编辑页面。
  * @param onOpenSettings 打开当前工作区设置；预览无设置能力时为空。
  * @param settingsSelected 当前是否显示设置页面。
+ * @param onOpenSupertags 打开超级标签管理。
+ * @param supertagsSelected 当前是否显示超级标签维护页。
  * @param modifier 外部布局修饰符。
  */
 @Composable
@@ -52,6 +57,8 @@ internal fun WorkspaceSidebar(
     onSelectDocument: (com.oruke.tagloom.core.model.ObjectId) -> Unit = state::selectDocument,
     onOpenSettings: (() -> Unit)? = null,
     settingsSelected: Boolean = false,
+    onOpenSupertags: () -> Unit = {},
+    supertagsSelected: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -66,6 +73,17 @@ internal fun WorkspaceSidebar(
             ) {
                 SidebarSearchField(state, searchFocusRequester)
                 NewDocumentAction(onCreateDocument)
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSupertags).testTag("supertag-navigation"),
+                    shape = MaterialTheme.shapes.small,
+                    color = if (supertagsSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Row(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(painterResource(Res.drawable.ic_supertag), null, Modifier.size(18.dp))
+                        Text(stringResource(Res.string.supertag_library), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 20.dp, bottom = 6.dp),
@@ -91,7 +109,7 @@ internal fun WorkspaceSidebar(
                 items(state.visibleDocuments, key = { document -> document.id.value }) { document ->
                     SidebarDocumentItem(
                         document = document,
-                        selected = !settingsSelected && document.id == state.selectedDocumentId,
+                        selected = !settingsSelected && !supertagsSelected && document.id == state.selectedDocumentId,
                         onClick = { onSelectDocument(document.id) },
                     )
                 }

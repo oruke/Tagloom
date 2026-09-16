@@ -46,6 +46,9 @@ class TagloomEditorState(
     /** 当前已认证工作区属性定义；锁定时必须清空。 */
     val propertyDefinitions = mutableStateListOf<PropertyDefinition>()
 
+    /** 新建笔记完成后的一次性标题焦点请求，不进入持久化快照。 */
+    internal var newNoteTitleFocusId: ObjectId? by mutableStateOf(null)
+
     /** 当前选中文档 ID。 */
     var selectedDocumentId: ObjectId? by mutableStateOf(null)
         private set

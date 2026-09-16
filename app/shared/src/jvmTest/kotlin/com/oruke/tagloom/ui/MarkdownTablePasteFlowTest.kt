@@ -52,6 +52,7 @@ class MarkdownTablePasteFlowTest {
                             .fetchSemanticsNodes().isNotEmpty()
                     }
                     onAllNodes(hasText("新建笔记", substring = true) and hasClickAction())[0].performClick()
+                    onNodeWithTag("supertag-picker-item-default-note-tag").performClick()
                     onNode(hasSetTextAction() and hasText("未命名笔记")).performTextReplacement(NOTE_TITLE)
 
                     // 使用官方键盘粘贴路径读取隔离剪贴板，不把 SetText 当作 Ctrl+V 的替代证据。

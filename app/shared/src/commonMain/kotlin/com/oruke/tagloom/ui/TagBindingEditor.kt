@@ -47,6 +47,7 @@ internal fun TagBindingDraftEditor(
     onChange: (TagPropertyBindingDraft) -> Unit,
     onRemove: () -> Unit,
 ) {
+    var expanded by remember(draft.propertyId) { mutableStateOf(false) }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -56,7 +57,7 @@ internal fun TagBindingDraftEditor(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         definition?.name
@@ -70,9 +71,9 @@ internal fun TagBindingDraftEditor(
                         color = if (definition == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = onRemove) { Text(stringResource(Res.string.editor_action_remove)) }
+                TagloomChevronDown()
             }
-            if (definition != null) {
+            if (definition != null && expanded) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     BindingToggle(stringResource(Res.string.editor_tag_required), draft.required) { checked ->
                         onChange(draft.copy(required = checked))
@@ -85,7 +86,9 @@ internal fun TagBindingDraftEditor(
                     }
                 }
                 DefaultPolicyEditor(draft, definition, onChange)
+                if (draft.readonly) Text(stringResource(Res.string.supertag_readonly_hint), style = MaterialTheme.typography.bodySmall)
             }
+            if (expanded) TextButton(onClick = onRemove) { Text(stringResource(Res.string.editor_action_remove)) }
         }
     }
 }

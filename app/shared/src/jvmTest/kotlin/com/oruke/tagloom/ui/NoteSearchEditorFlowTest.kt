@@ -133,6 +133,7 @@ class NoteSearchEditorFlowTest {
             setContent { App(capabilities = environment.capabilities) }
             waitUntil(timeoutMillis = 15_000) { onAllNodesWithText("新建笔记").fetchSemanticsNodes().isNotEmpty() }
             onAllNodesWithText("新建笔记")[0].performClick()
+            onNodeWithTag("supertag-picker-item-default-note-tag").performClick()
             onNode(hasSetTextAction() and hasText("未命名笔记")).performTextReplacement("查找测试")
             val body = SemanticsMatcher("正文输入") {
                 it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("text-input-") == true
@@ -163,6 +164,7 @@ class NoteSearchEditorFlowTest {
             onNode(body).assertTextEquals("needle! changed")
             onNode(body).performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.F) } }
             onAllNodesWithText("新建笔记")[0].performClick()
+            onNodeWithTag("supertag-picker-item-default-note-tag").performClick()
             onNodeWithTag("note-search-bar").assertDoesNotExist()
             onNodeWithTag("note-search-entry").performClick()
             onNodeWithTag("note-search-input").assert(

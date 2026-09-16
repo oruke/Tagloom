@@ -15,6 +15,8 @@ import com.oruke.tagloom.core.workspace.WorkspaceDefaults
  * @param name 用户输入名称。
  * @param parentTagIds 显式父标签；空列表表示隐式继承根 Note。
  * @param propertyBindings 当前标签直接声明的属性绑定。
+ * @param iconKey 显式图标目录键；为空表示不使用图标。
+ * @param availableProperties 已确认属性与当前表单的新属性草稿。
  * @return 已规范化且不会制造继承环的标签定义。
  */
 internal fun TagloomEditorState.buildTagDefinitionDraft(
@@ -22,6 +24,8 @@ internal fun TagloomEditorState.buildTagDefinitionDraft(
     name: String,
     parentTagIds: List<TagId>,
     propertyBindings: List<TagPropertyBinding>,
+    iconKey: String? = existing.iconKey,
+    availableProperties: List<com.oruke.tagloom.core.model.PropertyDefinition> = propertyDefinitions,
 ): TagDefinition {
     val normalizedName = name.trim()
     val normalizedParents = parentTagIds.distinct()
@@ -31,13 +35,14 @@ internal fun TagloomEditorState.buildTagDefinitionDraft(
     require(normalizedParents.all { parentId -> tagDefinitions.any { definition -> definition.id == parentId } }) {
         "父标签不存在"
     }
-    val knownPropertyIds = propertyDefinitions.map { definition -> definition.id }.toSet()
+    val knownPropertyIds = availableProperties.map { definition -> definition.id }.toSet()
     require(propertyBindings.all { binding -> binding.propertyId in knownPropertyIds }) { "标签绑定了不存在的属性" }
 
     val definition = existing.copy(
         name = normalizedName,
         parentTagIds = normalizedParents,
         propertyBindings = propertyBindings,
+        iconKey = iconKey,
     )
     val errors = validateTagDefinition(definition)
     require(errors.isEmpty()) { errors.joinToString(separator = "；") }

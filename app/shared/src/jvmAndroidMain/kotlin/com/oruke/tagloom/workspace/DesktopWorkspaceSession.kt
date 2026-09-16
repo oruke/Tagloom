@@ -80,9 +80,9 @@ class DesktopWorkspaceSession internal constructor(
     private val noteTransactionService: NoteSnapshotTransactionService,
     private val bootstrapTransactionService: WorkspaceBootstrapTransactionService,
     private val backupService: JvmEncryptedWorkspaceBackupService,
-    private val savedQueryLoader: DesktopSavedQueryLoader,
+    internal val savedQueryLoader: DesktopSavedQueryLoader,
     private val savedQueryTransactionService: SavedQuerySnapshotTransactionService,
-    private val schemaStore: DesktopWorkspaceSchemaStore,
+    internal val schemaStore: DesktopWorkspaceSchemaStore,
     internal val databaseStore: DesktopWorkspaceDatabaseStore,
     private val integrityScanner: DesktopWorkspaceIntegrityScanner,
     private val compactionService: DesktopChangeLogCompactionService,
@@ -377,43 +377,6 @@ class DesktopWorkspaceSession internal constructor(
     }
 
     /**
-     * 创建或更新一个工作区标签定义，并确认其 Change 与加密快照。
-     *
-     * @param definition 待保存完整标签定义。
-     * @return 新确认标签定义。
-     */
-    suspend fun saveTagDefinition(definition: TagDefinition): DesktopStoredTagDefinition = sessionMutex.withLock {
-        requireWritable()
-        val result = try {
-            schemaStore.saveTag(unlocked, definition, nextSchemaWriteContext())
-        } catch (error: Throwable) {
-            runCatching { refreshManifest() }
-            throw error
-        }
-        refreshManifest(result.encryptedManifest)
-        DesktopStoredTagDefinition(result.snapshot)
-    }
-
-    /**
-     * 创建或更新一个工作区属性定义，并确认其 Change 与加密快照。
-     *
-     * @param definition 待保存完整属性定义。
-     * @return 新确认属性定义。
-     */
-    suspend fun savePropertyDefinition(definition: PropertyDefinition): DesktopStoredPropertyDefinition =
-        sessionMutex.withLock {
-            requireWritable()
-            val result = try {
-                schemaStore.saveProperty(unlocked, definition, nextSchemaWriteContext())
-            } catch (error: Throwable) {
-                runCatching { refreshManifest() }
-                throw error
-            }
-            refreshManifest(result.encryptedManifest)
-            DesktopStoredPropertyDefinition(result.snapshot)
-        }
-
-    /**
      * 执行一个已确认保存查询，不接受 UI 伪造或未保存条件。
      *
      * @param objectId 保存查询对象 ID。
@@ -571,21 +534,6 @@ class DesktopWorkspaceSession internal constructor(
             readOnly = readOnly,
         )
     }
-
-    /**
-     * 消耗下一个 Actor 序号并生成 schema 写入上下文。
-     *
-     * 序号在提交失败时也不会复用，避免重试产生相同 revision 身份。
-     *
-     * @return 当前写入唯一上下文。
-     */
-    private fun nextSchemaWriteContext(): WorkspaceSchemaWriteContext = WorkspaceSchemaWriteContext(
-        actorId = actorId,
-        actorSequence = nextActorSequence++,
-        transactionId = TransactionId(idFactory()),
-        hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
-        committedAt = timestampProvider(),
-    )
 
     /**
      * 读取并过滤 tombstone Note。

@@ -57,10 +57,13 @@ internal enum class WorkspaceUiPhase {
  * @param editorState 仅在解锁会话内持有 Note 明文的编辑器状态。
  */
 internal class WorkspaceUiController(
-    private val gateway: WorkspaceGateway,
+    internal val gateway: WorkspaceGateway,
     private val searchEngine: SearchEngine,
     val editorState: TagloomEditorState,
 ) {
+    /** 超级标签表单独立编排，复用同一工作区网关与编辑器目录。 */
+    val supertags = WorkspaceSupertagController(gateway, editorState)
+
     /** 当前工作区 UI 阶段。 */
     var phase: WorkspaceUiPhase by mutableStateOf(WorkspaceUiPhase.INITIALIZING)
         private set
@@ -75,7 +78,7 @@ internal class WorkspaceUiController(
 
     /** 当前操作成功后的非敏感提示。 */
     var statusMessage: WorkspaceUiMessage? by mutableStateOf(null)
-        private set
+        internal set
 
     /** 本机最近登记工作区的安全展示信息。 */
     var recentWorkspace: WorkspaceRecentWorkspace? by mutableStateOf(null)
@@ -329,87 +332,6 @@ internal class WorkspaceUiController(
     }
 
     /**
-     * 创建或更新标签定义，并可在确认后立即关联当前 Note。
-     *
-     * @param definition 待确认完整标签定义。
-     * @param attachToSelected 保存成功后是否关联当前 Note。
-     */
-    suspend fun saveTagDefinition(
-        definition: TagDefinition,
-        attachToSelected: Boolean,
-    ) = runOperation {
-        val validationErrors = editorState.validateTagDefinition(definition)
-        require(validationErrors.isEmpty()) { validationErrors.joinToString(separator = "；") }
-        val saved = gateway.saveTagDefinition(definition).definition
-        editorState.upsertTagDefinition(saved)
-        if (attachToSelected) {
-            editorState.setAppliedObjectType(saved.id)
-        } else {
-            editorState.materializeSelectedSnapshotDefaults()
-        }
-        statusMessage = if (attachToSelected) {
-            WorkspaceUiMessage.TagCreatedAndAttached
-        } else {
-            WorkspaceUiMessage.TagUpdated
-        }
-    }
-
-    /**
-     * 创建或更新属性定义，并可在确认后立即加入当前 Note。
-     *
-     * @param definition 待确认完整属性定义。
-     * @param destination 创建后绑定当前笔记、对象类型或仅进入工作区目录。
-     */
-    suspend fun savePropertyDefinition(
-        definition: PropertyDefinition,
-        destination: PropertyDefinitionDestination,
-    ) = runOperation {
-        val saved = gateway.savePropertyDefinition(definition).definition
-        editorState.upsertPropertyDefinition(saved)
-        statusMessage = when (destination) {
-            PropertyDefinitionDestination.CurrentNote -> {
-                editorState.setPropertyAttached(saved.id, attached = true)
-                WorkspaceUiMessage.PropertyCreatedAndAttached
-            }
-            PropertyDefinitionDestination.Workspace -> WorkspaceUiMessage.PropertySaved
-            is PropertyDefinitionDestination.Tag -> {
-                val updatedTag = editorState.bindPropertyToTag(destination.tagId, saved.id)
-                val confirmedTag = gateway.saveTagDefinition(updatedTag).definition
-                editorState.upsertTagDefinition(confirmedTag)
-                editorState.materializeSelectedSnapshotDefaults()
-                WorkspaceUiMessage.PropertyBoundToTag(confirmedTag.name)
-            }
-        }
-    }
-
-    /**
-     * 为自由单选或多选属性确认新选项，并在确认后选择该选项。
-     *
-     * schema 先于 Note 值确认，因此进程中断最多留下未引用的可复用选项，不会让 Note
-     * 指向不存在的选项；Note 值随后仍由统一自动保存链路确认。
-     *
-     * @param propertyId 目标属性稳定 ID。
-     * @param label 用户输入的选项名称。
-     */
-    suspend fun createFreePropertyOptionAndSelect(
-        propertyId: PropertyId,
-        label: String,
-    ) = runOperation {
-        val plan = editorState.planFreePropertyOption(propertyId, label)
-        val confirmedDefinition = if (plan.requiresPersistence) {
-            gateway.savePropertyDefinition(plan.definition).definition
-        } else {
-            plan.definition
-        }
-        editorState.applyFreePropertyOption(confirmedDefinition, plan.optionId)
-        statusMessage = if (plan.requiresPersistence) {
-            WorkspaceUiMessage.OptionSavedAndSelected
-        } else {
-            WorkspaceUiMessage.ExistingOptionSelected
-        }
-    }
-
-    /**
      * 运行一个已确认保存查询。
      *
      * @param objectId 保存查询对象 ID。
@@ -490,7 +412,7 @@ internal class WorkspaceUiController(
      * @param failureMessage 本次操作失败后可安全展示的本地化语义。
      * @param block 单次平台工作区操作。
      */
-    private suspend fun runOperation(
+    internal suspend fun runOperation(
         failureMessage: WorkspaceUiMessage = WorkspaceUiMessage.OperationFailed,
         block: suspend () -> Unit,
     ) {

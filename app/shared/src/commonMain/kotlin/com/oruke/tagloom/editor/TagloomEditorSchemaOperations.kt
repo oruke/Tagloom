@@ -26,8 +26,11 @@ import com.oruke.tagloom.core.workspace.WorkspaceDefaultSchemas
  */
 fun TagloomEditorState.createTagDefinitionDraft(name: String): TagDefinition = TagDefinition(
     id = TagId(createEditorId("tag")),
-    name = name.trim(),
+    name = name.trim().ifEmpty { NEW_SUPERTAG_DRAFT_NAME },
 )
+
+/** 尚未输入名称的新建表单使用合法临时 payload，确认保存时必须替换。 */
+internal const val NEW_SUPERTAG_DRAFT_NAME = "New supertag"
 
 /**
  * 保存属性选项编辑期间允许暂时为空的 UI 草稿。

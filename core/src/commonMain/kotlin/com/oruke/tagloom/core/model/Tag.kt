@@ -17,9 +17,12 @@ data class TagDefinition(
     val propertyBindings: List<TagPropertyBinding> = emptyList(),
     /** 新建同类笔记时使用的模板 Block。 */
     val templateBlocks: List<Block> = emptyList(),
+    /** 用户显式选择的图标目录键；旧快照或清除图标时为空，不根据名称推断。 */
+    val iconKey: String? = null,
 ) {
     init {
         require(name.isNotBlank()) { "标签名称不能为空" }
+        require(iconKey == null || (iconKey.isNotBlank() && iconKey.length <= 64)) { "图标标识无效" }
         require(parentTagIds.distinct().size == parentTagIds.size) { "父标签不能重复" }
         require(propertyBindings.map(TagPropertyBinding::propertyId).distinct().size == propertyBindings.size) {
             "同一标签不能重复绑定相同属性"
