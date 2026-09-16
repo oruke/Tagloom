@@ -411,6 +411,12 @@ private fun BaseTableCellEditor(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            column.type in setOf(BaseTableColumnTypes.DATE, BaseTableColumnTypes.DATETIME) -> TemporalValueField(
+                value = cell.editableText(),
+                dateOnly = column.type == BaseTableColumnTypes.DATE,
+                editable = enabled,
+                onCommit = { state.updateBaseTableCellText(block.id, row.rowId, column.columnId, it) },
+            )
             else -> BaseTableTextField(
                 value = cell.editableText(),
                 onValueChange = { value -> state.updateBaseTableCellText(block.id, row.rowId, column.columnId, value) },

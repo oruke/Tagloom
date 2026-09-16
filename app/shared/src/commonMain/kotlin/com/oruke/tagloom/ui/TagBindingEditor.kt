@@ -161,6 +161,12 @@ private fun DefaultValueInput(
     onChange: (TagPropertyBindingDraft) -> Unit,
 ) {
     when (definition.type) {
+        PropertyTypes.DATE, PropertyTypes.DATETIME -> TemporalValueField(
+            value = draft.defaultValueText,
+            dateOnly = definition.type == PropertyTypes.DATE,
+            editable = true,
+            onCommit = { onChange(draft.copy(defaultValueText = it)) },
+        )
         PropertyTypes.SELECT -> {
             var menuOpen by remember(draft.propertyId) { mutableStateOf(false) }
             val selected = definition.options.firstOrNull { option -> option.id == draft.defaultValueText }
@@ -215,13 +221,7 @@ private fun DefaultValueInput(
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(Res.string.editor_tag_default_value)) },
             placeholder = {
-                Text(
-                    if (definition.type == PropertyTypes.DATE) {
-                        stringResource(Res.string.editor_property_date_placeholder)
-                    } else {
-                        stringResource(Res.string.editor_tag_input_default_value)
-                    },
-                )
+                Text(stringResource(Res.string.editor_tag_input_default_value))
             },
             singleLine = true,
         )

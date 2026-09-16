@@ -157,15 +157,13 @@ private fun PropertyValueControl(
         PropertyTypes.EMAIL,
         -> MetadataTextProperty(state, document, definition, property.value, editable)
 
-        PropertyTypes.NUMBER -> MetadataValidatedProperty(
-            state, document, definition, property.value, editable, ValueValidationMode.NUMBER,
+        PropertyTypes.NUMBER -> MetadataNumberProperty(
+            state, document, definition, property.value, editable,
         )
-        PropertyTypes.DATE -> MetadataValidatedProperty(
-            state, document, definition, property.value, editable, ValueValidationMode.DATE,
-        )
-        PropertyTypes.DATETIME -> MetadataValidatedProperty(
-            state, document, definition, property.value, editable, ValueValidationMode.DATETIME,
-        )
+        PropertyTypes.DATE -> TemporalValueField(property.value.stringContent(), true, editable,
+            onCommit = { state.propertyEditor.updateDate(definition.id, it) })
+        PropertyTypes.DATETIME -> TemporalValueField(property.value.stringContent(), false, editable,
+            onCommit = { state.propertyEditor.updateText(definition.id, it) })
         PropertyTypes.BOOLEAN -> MetadataBooleanProperty(state, document, definition, property.value, editable)
         PropertyTypes.SELECT -> MetadataSelectProperty(
             state, document, definition, property.value, editable, multiple = false, onCreateOption,
@@ -218,23 +216,21 @@ private fun MetadataTextProperty(
 }
 
 /**
- * 渲染需要确认校验的数字、日期或日期时间属性。
+ * 渲染需要确认校验的数值属性；日期类值由独立日期时间编辑流程处理。
  *
  * @param state 编辑器状态。
  * @param document 当前文档。
  * @param definition 属性定义。
  * @param effectiveValue 解析后的当前展示值。
  * @param editable 当前标签约束是否允许编辑。
- * @param mode 值校验与提交策略。
  */
 @Composable
-private fun MetadataValidatedProperty(
+private fun MetadataNumberProperty(
     state: TagloomEditorState,
     document: EditorDocument,
     definition: PropertyDefinition,
     effectiveValue: JsonElement?,
     editable: Boolean,
-    mode: ValueValidationMode,
 ) {
     val displayed = effectiveValue.stringContent()
     var draft by remember(document.id, definition.id, displayed) { mutableStateOf(displayed) }
@@ -246,11 +242,7 @@ private fun MetadataValidatedProperty(
      */
     fun submitDraft() {
         runCatching {
-            when (mode) {
-                ValueValidationMode.NUMBER -> state.propertyEditor.updateNumber(definition.id, draft)
-                ValueValidationMode.DATE -> state.propertyEditor.updateDate(definition.id, draft)
-                ValueValidationMode.DATETIME -> state.propertyEditor.updateText(definition.id, draft)
-            }
+            state.propertyEditor.updateNumber(definition.id, draft)
         }.onSuccess {
             error = null
         }.onFailure {
@@ -262,7 +254,7 @@ private fun MetadataValidatedProperty(
         Row(verticalAlignment = Alignment.CenterVertically) {
             MetadataTextField(
                 value = draft,
-                placeholder = mode.localizedPlaceholder(),
+                placeholder = stringResource(Res.string.editor_property_number_placeholder),
                 onValueChange = { next ->
                     draft = next
                     error = null
@@ -407,31 +399,4 @@ internal fun MetadataInlineAction(
         style = MaterialTheme.typography.bodySmall,
         color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline,
     )
-}
-
-/**
- * 区分紧凑文本控件的提交校验策略。
- *
- */
-private enum class ValueValidationMode {
-    /** 有限数值。 */
-    NUMBER,
-
-    /** ISO 本地日期。 */
-    DATE,
-
-    /** ISO-8601 日期时间。 */
-    DATETIME;
-
-    /**
-     * 返回当前校验策略对应的本地化格式提示。
-     *
-     * @return 数值、日期或日期时间的输入提示。
-     */
-    @Composable
-    fun localizedPlaceholder(): String = when (this) {
-        NUMBER -> stringResource(Res.string.editor_property_number_placeholder)
-        DATE -> stringResource(Res.string.editor_property_date_placeholder)
-        DATETIME -> stringResource(Res.string.editor_property_datetime_placeholder)
-    }
 }

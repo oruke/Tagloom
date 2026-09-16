@@ -354,6 +354,13 @@ private fun DatabaseCell(
         contentAlignment = Alignment.CenterStart,
     ) {
         when {
+            property?.type in setOf(PropertyTypes.DATE, PropertyTypes.DATETIME) -> TemporalValueField(
+                value = value.datasetContentText(), dateOnly = property?.type == PropertyTypes.DATE,
+                editable = column.writable,
+                onCommit = { onCommit(it.takeIf(String::isNotBlank)?.let(::JsonPrimitive)) },
+            )
+            column.field.systemField in setOf(SystemFieldNames.CREATED_AT, SystemFieldNames.UPDATED_AT) ->
+                Text(currentDateTimeSettings().format(value.datasetContentText()), style = MaterialTheme.typography.bodySmall)
             !column.writable || property?.type in setOf(PropertyTypes.FORMULA, PropertyTypes.RELATION, PropertyTypes.FILE) ->
                 Text(value.datasetContentText(), style = MaterialTheme.typography.bodySmall)
             property?.type == PropertyTypes.BOOLEAN -> Checkbox(

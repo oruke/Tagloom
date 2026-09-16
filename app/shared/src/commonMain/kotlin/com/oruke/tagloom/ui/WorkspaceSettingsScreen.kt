@@ -21,6 +21,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -86,6 +90,11 @@ internal fun WorkspaceSettingsScreen(
     onRotateMasterKey: () -> Unit,
     onLock: () -> Unit,
 ) {
+    var dateTimeOpen by remember { mutableStateOf(false) }
+    if (dateTimeOpen) {
+        DateTimeSettingsScreen(onBack = { dateTimeOpen = false })
+        return
+    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize()) {
             TextButton(onClick = onBack, modifier = Modifier.padding(start = 12.dp, top = 8.dp)) {
@@ -122,6 +131,14 @@ internal fun WorkspaceSettingsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+                SettingsActionRow(
+                    icon = Res.drawable.ic_calendar,
+                    title = stringResource(Res.string.datetime_title),
+                    description = stringResource(Res.string.datetime_entry_description),
+                    action = stringResource(Res.string.datetime_configure),
+                    enabled = true,
+                    onClick = { dateTimeOpen = true },
+                )
                 Text(
                     stringResource(Res.string.workspace_settings_device_section),
                     modifier = Modifier.padding(top = 16.dp),

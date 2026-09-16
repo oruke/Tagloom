@@ -22,6 +22,8 @@ import com.oruke.tagloom.core.model.DatasetProjection
 import com.oruke.tagloom.core.model.FieldRef
 import com.oruke.tagloom.core.model.FieldRefKinds
 import com.oruke.tagloom.core.model.ObjectId
+import com.oruke.tagloom.core.model.PropertyTypes
+import com.oruke.tagloom.core.model.SystemFieldNames
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -76,16 +78,20 @@ internal fun DatabaseKanban(
 /**
  * 渲染有限字段的 Gallery 卡片投影。
  *
+ * @param controller 提供字段定义，以识别日期和日期时间值。
  * @param projection 当前投影。
  * @param onOpenNote 打开原始 Note。
  * @param modifier 外部布局。
  */
 @Composable
 internal fun DatabaseGallery(
+    controller: DatabaseEditorController,
     projection: DatasetProjection,
     onOpenNote: (ObjectId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val dateTime = currentDateTimeSettings()
+    val properties = controller.propertyDefinitions(projection.database.id).associateBy { it.id }
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         projection.rows.forEach { row ->
             Surface(
@@ -97,8 +103,15 @@ internal fun DatabaseGallery(
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(row.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     row.values.entries.take(3).forEach { (field, value) ->
+                        val type = properties[field.propertyId]?.type
+                        val raw = value.datasetContentText()
+                        val displayed = when {
+                            type == PropertyTypes.DATE -> dateTime.format(raw, true)
+                            type == PropertyTypes.DATETIME || field.systemField in setOf(SystemFieldNames.CREATED_AT, SystemFieldNames.UPDATED_AT) -> dateTime.format(raw)
+                            else -> raw
+                        }
                         Text(
-                            "${field.propertyId?.value ?: field.systemField}: ${value.datasetContentText()}",
+                            "${field.propertyId?.value ?: field.systemField}: $displayed",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }

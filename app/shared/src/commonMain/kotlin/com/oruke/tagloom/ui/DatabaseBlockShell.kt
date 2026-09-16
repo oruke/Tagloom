@@ -167,6 +167,7 @@ internal fun DatabaseViewPane(
                         Modifier.fillMaxWidth().padding(12.dp),
                     )
                     ViewPresentationKinds.GALLERY -> DatabaseGallery(
+                        controller,
                         projection,
                         onOpenNote,
                         Modifier.fillMaxWidth().padding(12.dp),
