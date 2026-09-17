@@ -17,7 +17,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * 保存超级标签属性绑定在对话框中的可编辑草稿。
+ * 保存超级标签维护表单中属性绑定的可编辑草稿。
  *
  * 默认值使用文本草稿承接尚未完成的输入，只有确认时才按属性 schema 转换成 JSON，
  * 避免数字等类型在用户输入中途被错误拒绝。
@@ -44,17 +44,17 @@ internal data class TagPropertyBindingDraft(
 /**
  * 把已确认标签属性绑定转换为可编辑草稿。
  *
- * @param definition 当前属性定义，用于把选项和基础类型转换为可读文本。
+ * @param definition 当前属性定义；缺失时保留原始默认值文本，供维护页显式处理损坏引用。
  * @return 保留约束、顺序和样式覆盖的 UI 草稿。
  */
-internal fun TagPropertyBinding.toEditorDraft(definition: PropertyDefinition): TagPropertyBindingDraft =
+internal fun TagPropertyBinding.toEditorDraft(definition: PropertyDefinition?): TagPropertyBindingDraft =
     TagPropertyBindingDraft(
         propertyId = propertyId,
         required = required,
         readonly = readonly,
         inheritable = inheritable,
         defaultPolicy = defaultPolicy,
-        defaultValueText = defaultValue.toEditorText(definition),
+        defaultValueText = if (definition != null) defaultValue.toEditorText(definition) else defaultValue?.toString().orEmpty(),
         order = order,
         styleOverride = styleOverride,
     )
@@ -65,7 +65,7 @@ internal fun TagPropertyBinding.toEditorDraft(definition: PropertyDefinition): T
  * 动态和快照策略必须提供合法默认值；`NONE` 会明确清空旧默认值，避免不可见的旧值继续生效。
  *
  * @param definition 当前属性定义，用于按 schema 校验默认值。
- * @param normalizedOrder 对话框最终列表中的顺序。
+ * @param normalizedOrder 确认后的展示顺序；继承覆盖保留父级顺序，新增属性追加到末尾。
  * @return 可持久化标签属性绑定。
  */
 internal fun TagPropertyBindingDraft.toConfirmedBinding(
@@ -93,7 +93,7 @@ internal fun TagPropertyBindingDraft.toConfirmedBinding(
 }
 
 /**
- * 把 JSON 默认值转换为对话框可编辑文本。
+ * 把 JSON 默认值转换为维护表单的可编辑文本。
  *
  * @param definition 属性定义。
  * @return 对应属性类型的紧凑文本；无默认值时为空。

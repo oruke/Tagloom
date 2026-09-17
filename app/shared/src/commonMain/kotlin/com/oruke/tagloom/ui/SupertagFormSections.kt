@@ -24,16 +24,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.core.model.TagId
-import com.oruke.tagloom.core.model.TagPropertyBinding
 import com.oruke.tagloom.editor.TagPropertyBindingDraft
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.buildTagDefinitionDraft
 import com.oruke.tagloom.editor.toConfirmedBinding
-import com.oruke.tagloom.editor.toEditorDraft
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
@@ -65,6 +64,7 @@ internal fun TagParentEditor(
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
         ) {
             if (parentTagIds.isEmpty()) {
                 SchemaPill(
@@ -150,33 +150,5 @@ internal fun ReadOnlyTypeProperties(
                 )
             }
         }
-    }
-}
-
-/**
- * 为标签定义中的既有绑定建立 UI 草稿，并保留损坏引用供用户显式处理。
- *
- * @param bindings 既有标签绑定。
- * @param definitions 当前工作区属性目录。
- * @return 与原绑定顺序一致的草稿。
- */
-internal fun createBindingDrafts(
-    bindings: List<TagPropertyBinding>,
-    definitions: List<PropertyDefinition>,
-): List<TagPropertyBindingDraft> = bindings.map { binding ->
-    val definition = definitions.firstOrNull { property -> property.id == binding.propertyId }
-    if (definition != null) {
-        binding.toEditorDraft(definition)
-    } else {
-        TagPropertyBindingDraft(
-            propertyId = binding.propertyId,
-            required = binding.required,
-            readonly = binding.readonly,
-            inheritable = binding.inheritable,
-            defaultPolicy = binding.defaultPolicy,
-            defaultValueText = binding.defaultValue?.toString().orEmpty(),
-            order = binding.order,
-            styleOverride = binding.styleOverride,
-        )
     }
 }

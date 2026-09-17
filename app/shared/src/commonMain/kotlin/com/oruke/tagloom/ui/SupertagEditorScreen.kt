@@ -53,10 +53,9 @@ internal fun SupertagEditorScreen(
     var parents by remember(original.id) { mutableStateOf(original.parentTagIds) }
     var bindings by remember(original.id) {
         mutableStateOf(
-            createBindingDrafts(
-                original.propertyBindings,
-                state.propertyDefinitions
-            )
+            original.propertyBindings.map { binding ->
+                binding.toEditorDraft(state.propertyDefinitions.firstOrNull { it.id == binding.propertyId })
+            }
         )
     }
     var newProperties by remember(original.id) { mutableStateOf(emptyList<PropertyDefinition>()) }
@@ -66,6 +65,10 @@ internal fun SupertagEditorScreen(
     var newProperty by remember(original.id) { mutableStateOf(false) }
     var invalid by remember(original.id) { mutableStateOf(false) }
     val definitions = (state.propertyDefinitions + newProperties).distinctBy { it.id }
+    val tags = state.tagDefinitions.toList()
+    val propertyEditor = remember(original, parents, bindings, definitions, tags) {
+        resolveTagBindingEditorProperties(original, parents, bindings, tags, definitions)
+    }
     val duplicate = state.tagDefinitions.any { it.id != original.id && it.name.equals(name.trim(), true) }
     val busy = controller.busy
     val title = stringResource(
@@ -87,12 +90,12 @@ internal fun SupertagEditorScreen(
                 }
                 Text(title, Modifier.weight(1f).padding(horizontal = 8.dp), style = MaterialTheme.typography.titleLarge)
                 if (!root) Button(
-                    enabled = !busy && name.isNotBlank() && !duplicate,
+                    enabled = !busy && name.isNotBlank() && !duplicate && propertyEditor.canSave,
                     modifier = Modifier.testTag("supertag-save"),
                     onClick = {
                         runCatching {
-                            state.buildTagDefinitionDraft(original, name, parents, bindings.mapIndexed { index, draft ->
-                                draft.toConfirmedBinding(definitions.single { it.id == draft.propertyId }, index)
+                            state.buildTagDefinitionDraft(original, name, parents, bindings.map { draft ->
+                                draft.toConfirmedBinding(definitions.single { it.id == draft.propertyId }, draft.order)
                             }, icon, definitions)
                         }.onSuccess {
                             onSave(
@@ -188,23 +191,30 @@ internal fun SupertagEditorScreen(
                     )
                     if (root) ReadOnlyTypeProperties(bindings, definitions)
                     else {
-                        bindings.forEach { draft ->
-                            key(draft.propertyId) {
+                        SupertagInheritanceNotice(propertyEditor)
+                        propertyEditor.rows.forEach { row ->
+                            key(row.draft.propertyId) {
                                 TagBindingDraftEditor(
-                                    draft, definitions.firstOrNull { it.id == draft.propertyId },
+                                    row = row,
+                                    enabled = !busy,
                                     onChange = { updated ->
-                                        if (!busy) {
-                                            bindings =
-                                                bindings.map { if (it.propertyId == updated.propertyId) updated else it }; invalid =
-                                                false
+                                        // 重新选择当前值不算修改；解决冲突则必须明确创建本级覆盖。
+                                        if (!busy && (row.conflicted || updated != row.draft)) {
+                                            bindings = if (bindings.any { it.propertyId == updated.propertyId }) {
+                                                bindings.map { if (it.propertyId == updated.propertyId) updated else it }
+                                            } else bindings + updated
+                                            invalid = false
                                         }
                                     },
                                     onRemove = {
-                                        if (!busy) bindings = bindings.filterNot { it.propertyId == draft.propertyId }
+                                        if (!busy) {
+                                            bindings = bindings.filterNot { it.propertyId == row.draft.propertyId }
+                                            invalid = false
+                                        }
                                     })
                             }
                         }
-                        if (bindings.isEmpty()) Text(
+                        if (propertyEditor.rows.isEmpty() && propertyEditor.inheritanceErrors.isEmpty()) Text(
                             stringResource(Res.string.supertag_properties_empty),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -222,12 +232,12 @@ internal fun SupertagEditorScreen(
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.supertag_new_property)) },
                                     onClick = { propertyMenu = false; newProperty = true })
-                                definitions.filterNot { property -> bindings.any { it.propertyId == property.id } }
+                                definitions.filterNot { property -> propertyEditor.rows.any { it.draft.propertyId == property.id } }
                                     .forEach { property ->
                                         DropdownMenuItem(text = { Text(property.name) }, onClick = {
                                             bindings += TagPropertyBinding(
                                                 property.id,
-                                                order = bindings.size
+                                                order = (propertyEditor.rows.maxOfOrNull { it.draft.order } ?: -1) + 1
                                             ).toEditorDraft(property)
                                             propertyMenu = false
                                         })
@@ -255,7 +265,10 @@ internal fun SupertagEditorScreen(
         onConfirm = { propertyName, type, mode, options, _ ->
             val property = state.buildPropertyDefinitionDraft(null, propertyName, type, mode, options)
             newProperties += property
-            bindings += TagPropertyBinding(property.id, order = bindings.size).toEditorDraft(property)
+            bindings += TagPropertyBinding(
+                property.id,
+                order = (propertyEditor.rows.maxOfOrNull { it.draft.order } ?: -1) + 1,
+            ).toEditorDraft(property)
             newProperty = false
         },
     )

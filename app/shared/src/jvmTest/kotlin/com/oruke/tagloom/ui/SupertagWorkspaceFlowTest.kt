@@ -2,11 +2,14 @@ package com.oruke.tagloom.ui
 
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import com.oruke.tagloom.App
 import com.oruke.tagloom.core.model.DefaultValuePolicy
 import com.oruke.tagloom.core.model.PropertyValueSource
+import com.oruke.tagloom.core.model.TagDefinition
+import com.oruke.tagloom.core.model.TagId
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
@@ -15,12 +18,19 @@ import java.nio.file.Path
 import java.util.Locale
 import kotlin.test.*
 
-/** 从真实 App、加密事务与独立工作区验证超级标签搜索、维护和跨会话保存。 */
+/** 从真实 App、加密事务与独立工作区验证笔记类型搜索、维护和跨会话保存。 */
 @OptIn(ExperimentalTestApi::class)
 class SupertagWorkspaceFlowTest {
-    /** 验证居中搜索、取消不创建、保存失败后的可见反馈与重试、键盘创建以及重开后的业务值。 */
+    /** 验证居中搜索、多父选择、属性折叠与悬停、保存重试、键盘创建和重开后的业务值。 */
     @Test
     fun createsEditsAndUsesSupertagsThroughProductionApp() = withEnvironment { environment ->
+        // 通过真实事务准备两个父级，使维护页覆盖多个胶囊和新增按钮并列的布局。
+        runBlocking {
+            environment.gateway.openRecentWorkspace()
+            environment.gateway.saveTagDefinition(TagDefinition(TagId("parent-example"), "Parent example"))
+            environment.gateway.saveTagDefinition(TagDefinition(TagId("secondary-example"), "Secondary example"))
+            environment.gateway.lock()
+        }
         runDesktopComposeUiTest(width = 1280, height = 820) {
             setContent { App(capabilities = environment.capabilities) }
             waitForTag("supertag-navigation")
@@ -40,12 +50,27 @@ class SupertagWorkspaceFlowTest {
             onNodeWithText("选择图标").performClick()
             onNodeWithTag("supertag-icon-search").performTextReplacement("book")
             onNodeWithTag("supertag-icon-book").performClick()
+            onNodeWithText("+ 父类型").performClick()
+            onNodeWithText("Parent example").performClick()
+            onNodeWithText("Secondary example").performClick()
+            onNodeWithTag("supertag-name").performClick()
+            screenshot("parents-desktop.png")
             onNodeWithText("添加属性").performScrollTo().performClick()
             onNodeWithText("新建属性", substring = false).performClick()
             onNode(hasSetTextAction() and hasText("属性名称")).performTextReplacement("Review")
             screenshot("property-create-desktop.png")
             onNode(hasClickAction() and hasAnyAncestor(isDialog()) and hasText("创建到工作区")).performClick()
-            onNodeWithText("Review").performScrollTo().performClick()
+            val propertyHeader = onNodeWithText("Review")
+            propertyHeader.performScrollTo().performMouseInput { moveTo(center) }
+            screenshot("property-collapsed-hover-desktop.png")
+            propertyHeader.performClick()
+            screenshot("property-expanded-hover-desktop.png")
+            propertyHeader.performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            propertyHeader.performKeyInput { pressKey(Key.Spacebar) }
+            onNodeWithText("默认值：不设置").assertDoesNotExist()
+            screenshot("property-keyboard-focus-desktop.png")
+            propertyHeader.performKeyInput { pressKey(Key.Spacebar) }
+            onAllNodes(isRoot())[0].performMouseInput { moveTo(topLeft) }
             onNodeWithText("默认值：不设置").performScrollTo().performClick()
             onNodeWithText("创建时填入").performClick()
             // 在表单下方故意遗漏默认值，确认固定提示可见且草稿保持，然后修正并重试真实保存。
@@ -66,7 +91,7 @@ class SupertagWorkspaceFlowTest {
             // 取消编辑只丢弃草稿；重开仍显示之前确认的图标。
             onNodeWithText("Project Example").performClick()
             onNodeWithText("清除").performClick()
-            onNodeWithContentDescription("返回超级标签").performClick()
+            onNodeWithContentDescription("返回笔记类型").performClick()
             onNodeWithText("Project Example").performClick()
             onNodeWithText("更换图标").assertIsDisplayed().performClick()
             onNodeWithTag("supertag-icon-folder").performClick()
@@ -75,7 +100,7 @@ class SupertagWorkspaceFlowTest {
             waitForTag("supertag-library-search")
             createNoteEntry()
             onNodeWithTag("supertag-picker-search").performTextReplacement("unmatched")
-            onNodeWithText("没有匹配的超级标签").assertIsDisplayed()
+            onNodeWithText("没有匹配的笔记类型").assertIsDisplayed()
             onNodeWithTag("supertag-picker-search").performTextReplacement("PROJECT")
             onNode(hasText("Project Revised") and hasAnyAncestor(isDialog())).assertIsDisplayed()
             screenshot("picker-filtered.png")
@@ -90,7 +115,7 @@ class SupertagWorkspaceFlowTest {
             onNodeWithTag("supertag-navigation").performClick()
             onNodeWithText("Project Revised").performClick()
             onNodeWithText("使用情况").performScrollTo()
-            onNodeWithText("仍被笔记或子超级标签使用，无法删除。").assertIsDisplayed()
+            onNodeWithText("仍被笔记或子类型使用，无法删除。").performScrollTo().assertIsDisplayed()
 
             // 重开走真实认证及解密，核对最终持久化，不能只以界面成功提示作为完成。
             runBlocking {
@@ -110,17 +135,17 @@ class SupertagWorkspaceFlowTest {
         }
     }
 
-    /** 验证窄屏底部选择、从空搜索创建超级标签、图标选择和返回笔记。 */
+    /** 验证窄屏底部选择、从空搜索创建笔记类型、图标选择和返回笔记。 */
     @Test
     fun usesCompactPickerAndMaintenanceForm() = withEnvironment { environment ->
         runDesktopComposeUiTest(width = 480, height = 900) {
             setContent { App(capabilities = environment.capabilities) }
-            waitForText("超级标签")
+            waitForText("笔记类型")
             createNoteEntry()
             onNodeWithTag("supertag-picker-search").assertIsFocused()
             screenshot("picker-compact.png")
             onNodeWithTag("supertag-picker-search").performTextReplacement("Book Sample")
-            onNodeWithText("新建超级标签").performClick()
+            onNodeWithText("新建笔记类型").performClick()
             onNodeWithTag("supertag-name").assertTextContains("Book Sample")
             onNodeWithText("选择图标").performClick()
             screenshot("icons-compact.png")
