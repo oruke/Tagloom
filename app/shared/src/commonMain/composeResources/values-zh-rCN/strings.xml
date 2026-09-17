@@ -278,8 +278,8 @@
     <string name="editor_block_action_indent">缩进</string>
     <string name="editor_block_action_outdent">提升一级</string>
     <string name="editor_block_action_delete">删除</string>
-    <string name="editor_block_add_description">在下方添加 Block</string>
-    <string name="editor_block_actions_description">拖动或打开 Block 菜单</string>
+    <string name="editor_block_insert_after">在下方插入</string>
+    <string name="editor_block_actions_description">块操作：点击打开菜单，拖动调整位置</string>
     <string name="editor_block_unknown_uneditable">当前版本无法编辑此 Block</string>
     <string name="editor_block_read_only">该 Block 当前为只读</string>
     <string name="editor_block_preserved_data">类型：%1$s。原始数据会继续保留。</string>

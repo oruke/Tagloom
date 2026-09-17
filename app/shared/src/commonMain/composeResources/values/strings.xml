@@ -278,8 +278,8 @@
     <string name="editor_block_action_indent">Indent</string>
     <string name="editor_block_action_outdent">Outdent</string>
     <string name="editor_block_action_delete">Delete</string>
-    <string name="editor_block_add_description">Add a block below</string>
-    <string name="editor_block_actions_description">Drag or open the block menu</string>
+    <string name="editor_block_insert_after">Insert below</string>
+    <string name="editor_block_actions_description">Block actions: click for menu, drag to move</string>
     <string name="editor_block_unknown_uneditable">This version cannot edit this block</string>
     <string name="editor_block_read_only">This block is currently read-only</string>
     <string name="editor_block_preserved_data">Type: %1$s. The original data is retained.</string>

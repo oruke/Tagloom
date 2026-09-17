@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.CodeBlockContent
 import com.oruke.tagloom.core.model.PropertyDefinition
@@ -112,64 +114,78 @@ internal fun EditorPane(
     }
 
     CompositionLocalProvider(LocalNoteSearch provides search) {
-        Surface(modifier.fillMaxSize().testTag("editor-pane"), color = MaterialTheme.colorScheme.surface) {
-            NoteSearchOverlay(search, onCloseSearch) { searchEntryModifier ->
-                Box(Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        state = listState,
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
-                    ) {
-                        item(key = "page-header") {
-                            CenteredEditorContent {
-                                PageHeader(
-                                    state = state,
-                                    document = document,
-                                    saving = saving,
-                                    firstBlock = firstBlock,
-                                    onCursorRequest = { target -> cursorRequest = target },
-                                    onExport = onExport,
-                                    onSaveRequest = onSaveRequest,
-                                    onWorkspaceMenuRequest = onWorkspaceMenuRequest,
-                                    onSaveTagDefinition = onSaveTagDefinition,
-                                    onSavePropertyDefinition = onSavePropertyDefinition,
-                                    onCreatePropertyOption = onCreatePropertyOption,
-                                    searchMenu = searchMenu,
-                                    workspaceMenu = workspaceMenu,
-                                    searchEntryModifier = searchEntryModifier,
-                                )
+        EditorBlockDragScope(state, document.id, listState, modifier) {
+            val drag = LocalEditorBlockDrag.current
+            Surface(Modifier.fillMaxSize().testTag("editor-pane"), color = MaterialTheme.colorScheme.surface) {
+                NoteSearchOverlay(search, onCloseSearch) { searchEntryModifier ->
+                    Box(Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize().testTag("editor-block-list"),
+                            state = listState,
+                            contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
+                        ) {
+                            item(key = "page-header") {
+                                CenteredEditorContent {
+                                    PageHeader(
+                                        state = state,
+                                        document = document,
+                                        saving = saving,
+                                        firstBlock = firstBlock,
+                                        onCursorRequest = { target -> cursorRequest = target },
+                                        onExport = onExport,
+                                        onSaveRequest = onSaveRequest,
+                                        onWorkspaceMenuRequest = onWorkspaceMenuRequest,
+                                        onSaveTagDefinition = onSaveTagDefinition,
+                                        onSavePropertyDefinition = onSavePropertyDefinition,
+                                        onCreatePropertyOption = onCreatePropertyOption,
+                                        searchMenu = searchMenu,
+                                        workspaceMenu = workspaceMenu,
+                                        searchEntryModifier = searchEntryModifier,
+                                    )
+                                }
+                            }
+                            itemsIndexed(
+                                items = rootBlocks,
+                                key = { _, block -> block.id.value },
+                            ) { _, block ->
+                                CenteredEditorContent(
+                                    includeGutter = true,
+                                    modifier = Modifier.zIndex(if (block.id in drag?.liftedIds.orEmpty()) 1f else 0f)
+                                        // 只动画重排，避免 Markdown 转换替换输入框时延迟销毁旧焦点节点。
+                                        .animateItem(
+                                            fadeInSpec = null,
+                                            fadeOutSpec = null,
+                                            placementSpec = if (drag?.activeId != null || drag?.releasedPositions?.isNotEmpty() == true) null else tween(
+                                                220
+                                            )
+                                        ),
+                                ) {
+                                    EditorBlockRow(
+                                        state = state,
+                                        databaseController = databaseController,
+                                        block = block,
+                                        depth = state.visibleBlockDepth(block, document.note),
+                                        cursorRequest = cursorRequest,
+                                        commandMenuBlockId = commandMenuBlockId,
+                                        onCursorRequest = { target -> cursorRequest = target },
+                                        onCursorConsumed = { cursorRequest = null },
+                                        onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
+                                        onCommandMenuDismiss = { commandMenuBlockId = null },
+                                        onCreateDatabaseBlock = onCreateDatabaseBlock,
+                                        onOpenNote = state::selectDocument,
+                                        onSaveRequest = onSaveRequest,
+                                    )
+                                }
                             }
                         }
-                        itemsIndexed(
-                            items = rootBlocks,
-                            key = { _, block -> block.id.value },
-                        ) { _, block ->
-                            CenteredEditorContent {
-                                EditorBlockRow(
-                                    state = state,
-                                    databaseController = databaseController,
-                                    block = block,
-                                    depth = state.visibleBlockDepth(block, document.note),
-                                    cursorRequest = cursorRequest,
-                                    commandMenuBlockId = commandMenuBlockId,
-                                    onCursorRequest = { target -> cursorRequest = target },
-                                    onCursorConsumed = { cursorRequest = null },
-                                    onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
-                                    onCommandMenuDismiss = { commandMenuBlockId = null },
-                                    onCreateDatabaseBlock = onCreateDatabaseBlock,
-                                    onOpenNote = state::selectDocument,
-                                    onSaveRequest = onSaveRequest,
-                                )
-                            }
+                        if (state.selection.isNotEmpty && !search.isOpen) {
+                            SelectionFormattingToolbar(state = state)
                         }
+                        DocumentTimestamps(
+                            document = document,
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
+                        )
                     }
-                    if (state.selection.isNotEmpty && !search.isOpen) {
-                        SelectionFormattingToolbar(state = state)
-                    }
-                    DocumentTimestamps(
-                        document = document,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
-                    )
                 }
             }
         }
@@ -180,17 +196,22 @@ internal fun EditorPane(
  * 将标题、属性和正文放入同一居中阅读栏，并为 Block 操作保留对称边距。
  *
  * @param content 阅读栏内的编辑内容，文本本身保持正常阅读方向。
+ * @param includeGutter 是否将手柄及对称留白纳入真实布局范围。
+ * @param modifier 外层列表位移动画与绘制顺序。
  */
 @Composable
-private fun CenteredEditorContent(content: @Composable () -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val horizontalPadding = if (maxWidth < 600.dp) 24.dp else 48.dp
+private fun CenteredEditorContent(
+    includeGutter: Boolean = false,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val horizontalPadding = if (maxWidth < 600.dp) BLOCK_GUTTER_WIDTH + 8.dp else 48.dp
+        val contentWidth = (maxWidth - horizontalPadding * 2).coerceAtLeast(0.dp).coerceAtMost(EDITOR_CONTENT_WIDTH)
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(horizontal = horizontalPadding)
-                .widthIn(max = EDITOR_CONTENT_WIDTH)
-                .fillMaxWidth()
+                .width(contentWidth + if (includeGutter) BLOCK_GUTTER_WIDTH * 2 else 0.dp)
                 .testTag("editor-reading-column"),
         ) {
             content()

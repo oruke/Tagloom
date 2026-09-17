@@ -190,22 +190,26 @@ internal fun TabsBlockEditor(
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
         ) {
-            state.visibleBlocksInTab(block.id, note).forEach { child ->
-                EditorBlockRow(
-                    state = state,
-                    databaseController = databaseController,
-                    block = child,
-                    depth = state.visibleBlockDepth(child, note),
-                    cursorRequest = cursorRequest,
-                    commandMenuBlockId = commandMenuBlockId,
-                    onCursorRequest = onCursorRequest,
-                    onCursorConsumed = onCursorConsumed,
-                    onCommandMenuRequest = onCommandMenuRequest,
-                    onCommandMenuDismiss = onCommandMenuDismiss,
-                    onCreateDatabaseBlock = onCreateDatabaseBlock,
-                    onOpenNote = onOpenNote,
-                    onSaveRequest = onSaveRequest,
-                )
+            androidx.compose.runtime.CompositionLocalProvider(LocalBlockDragContainer provides block.id) {
+                state.visibleBlocksInTab(block.id, note).forEach { child ->
+                    androidx.compose.runtime.key(child.id) {
+                        EditorBlockRow(
+                            state = state,
+                            databaseController = databaseController,
+                            block = child,
+                            depth = state.visibleBlockDepth(child, note),
+                            cursorRequest = cursorRequest,
+                            commandMenuBlockId = commandMenuBlockId,
+                            onCursorRequest = onCursorRequest,
+                            onCursorConsumed = onCursorConsumed,
+                            onCommandMenuRequest = onCommandMenuRequest,
+                            onCommandMenuDismiss = onCommandMenuDismiss,
+                            onCreateDatabaseBlock = onCreateDatabaseBlock,
+                            onOpenNote = onOpenNote,
+                            onSaveRequest = onSaveRequest,
+                        )
+                    }
+                }
             }
         }
     }

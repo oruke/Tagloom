@@ -179,6 +179,7 @@ class NoteSearchEditorFlowTest {
                 it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("code-input-") == true
             }
             onNode(code).performClick().performTextInputSelection(TextRange(0, 3))
+            onNode(code).assertIsFocused()
             onNode(code).performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.F) } }
             onNodeWithTag("note-search-input").assertTextContains("val").performKeyInput { pressKey(Key.Escape) }
             onNode(code).assertIsFocused().performTextInput("var")
