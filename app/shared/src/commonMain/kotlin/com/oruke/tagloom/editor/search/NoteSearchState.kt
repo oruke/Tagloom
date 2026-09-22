@@ -3,6 +3,7 @@ package com.oruke.tagloom.editor.search
 import androidx.compose.runtime.*
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.editor.EditorSelection
+import com.oruke.tagloom.editor.selectionText
 import com.oruke.tagloom.editor.editableRichText
 import com.oruke.tagloom.editor.selectTab
 import com.oruke.tagloom.core.model.CodeBlockContent
@@ -90,7 +91,7 @@ internal class NoteSearchState(
             val selection = editor.selection
             val block = editor.selectedDocument?.note?.blocks?.firstOrNull { it.id == selection.blockId }
             val text = (block?.content as? CodeBlockContent)?.text ?: block?.editableRichText()?.plainText.orEmpty()
-            if (selection.isNotEmpty) {
+            if (selection.isNotEmpty && !selection.isCrossBlock) {
                 query = text.substring(
                     minOf(selection.start, selection.end).coerceIn(0, text.length),
                     maxOf(selection.start, selection.end).coerceIn(0, text.length)
@@ -129,6 +130,19 @@ internal class NoteSearchState(
     /** 在原页签已恢复后还原正文选区，新建的输入框会从该会话状态读取初始偏移。 */
     fun restoreReturnSelection() {
         val selection = returnSelection ?: return
+        if (selection.isCrossBlock) {
+            val blocks = editor.selectedDocument?.note?.blocks.orEmpty().filterNot { it.deleted }.associateBy { it.id }
+            if (selection.ids.any { it !in blocks }) {
+                // 查找打开时仍允许编辑；已被替换的块不能在关闭时复活为失效选区。
+                returnSelection = editor.selection
+                return
+            }
+            editor.selection = selection.copy(
+                start = selection.start.coerceIn(0, blocks[selection.ids.first()]?.selectionText().orEmpty().length),
+                end = selection.end.coerceIn(0, blocks[selection.ids.last()]?.selectionText().orEmpty().length),
+            )
+            return
+        }
         val blockId = selection.blockId ?: return
         if (returnFocusTarget?.blockId != blockId) return
         val text = returnText?.text ?: return

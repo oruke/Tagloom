@@ -127,7 +127,10 @@ fun TagloomEditorState.numberedListOrdinal(blockId: BlockId): Int {
         ordinal += 1
         index -= 1
     }
-    return ordinal
+    // 剪贴板中从列表中段复制的首项可保留原编号；连续后继依然按顺序递增。
+    val start = (siblings[index + 1].attributes[NUMBERED_LIST_START_ATTRIBUTE] as? kotlinx.serialization.json.JsonPrimitive)
+        ?.content?.toIntOrNull()?.coerceIn(1, 1_000_000) ?: 1
+    return start + ordinal - 1
 }
 
 /**

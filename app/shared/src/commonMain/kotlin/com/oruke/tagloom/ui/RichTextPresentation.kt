@@ -65,7 +65,7 @@ private fun InlineMark.toSpanStyle(): SpanStyle? = when (type) {
  * @param token 工作区快照中的稳定颜色名称。
  * @return 未知 token 回退正文墨色，保证旧客户端仍可阅读。
  */
-private fun inlineTextColor(token: String?): Color = when (token) {
+internal fun inlineTextColor(token: String?): Color = when (token) {
     "gray" -> Color(0xFF5F6363)
     "red" -> Color(0xFFA33D3D)
     "orange" -> Color(0xFF934A12)
@@ -84,7 +84,7 @@ private fun inlineTextColor(token: String?): Color = when (token) {
  * @param token 工作区快照中的稳定颜色名称。
  * @return 未知 token 回退默认黄色高亮。
  */
-private fun inlineHighlightColor(token: String?): Color = when (token) {
+internal fun inlineHighlightColor(token: String?): Color = when (token) {
     "gray" -> Color(0xFFE5E7E5)
     "red" -> Color(0xFFF8DADA)
     "orange" -> Color(0xFFFCE1C5)

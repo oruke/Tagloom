@@ -4,6 +4,7 @@ import com.oruke.tagloom.core.model.Annotation
 import com.oruke.tagloom.core.model.AnnotationId
 import com.oruke.tagloom.core.model.AnnotationKinds
 import com.oruke.tagloom.core.model.RichTextEditor
+import com.oruke.tagloom.core.model.RichText
 
 /**
  * 在活动选区切换指定 Mark 类型。
@@ -11,11 +12,7 @@ import com.oruke.tagloom.core.model.RichTextEditor
  * @param markType InlineMarkTypes 中的稳定类型。
  */
 fun TagloomEditorState.toggleSelectionMark(markType: String) {
-    val active = selection.takeIf(EditorSelection::isNotEmpty) ?: return
-    updateBlock(requireNotNull(active.blockId)) { block ->
-        val richText = block.editableRichText() ?: return@updateBlock block
-        block.withEditableRichText(RichTextMarkReducer.toggle(richText, active.start, active.end, markType))
-    }
+    if (selectionHasMark(markType)) clearSelectionMark(markType) else setSelectionMark(markType, emptyMap())
 }
 
 /**
@@ -25,11 +22,10 @@ fun TagloomEditorState.toggleSelectionMark(markType: String) {
  * @return 选区内每个相交 Run 都包含该 Mark 时为 true。
  */
 fun TagloomEditorState.selectionHasMark(markType: String): Boolean {
-    val active = selection.takeIf(EditorSelection::isNotEmpty) ?: return false
-    val block = selectedDocument?.note?.blocks?.singleOrNull { candidate -> candidate.id == active.blockId }
-        ?: return false
-    val richText = block.editableRichText() ?: return false
-    val runs = RichTextSelectionReducer.intersectingRuns(richText, active.start, active.end)
+    val runs = selectedBlockRanges().flatMap { range ->
+        range.block.editableRichText()?.let { RichTextSelectionReducer.intersectingRuns(it, range.start, range.end) }
+            .orEmpty()
+    }
     return runs.isNotEmpty() && runs.all { run -> run.marks.any { mark -> mark.type == markType } }
 }
 
@@ -43,12 +39,8 @@ fun TagloomEditorState.setSelectionMark(
     markType: String,
     attributes: Map<String, String>,
 ) {
-    val active = selection.takeIf(EditorSelection::isNotEmpty) ?: return
-    updateBlock(requireNotNull(active.blockId)) { block ->
-        val richText = block.editableRichText() ?: return@updateBlock block
-        block.withEditableRichText(
-            RichTextMarkReducer.set(richText, active.start, active.end, markType, attributes),
-        )
+    transformSelectedRichText { text, start, end ->
+        RichTextMarkReducer.set(text, start, end, markType, attributes)
     }
 }
 
@@ -58,12 +50,8 @@ fun TagloomEditorState.setSelectionMark(
  * @param markType 待清除稳定类型。
  */
 fun TagloomEditorState.clearSelectionMark(markType: String) {
-    val active = selection.takeIf(EditorSelection::isNotEmpty) ?: return
-    updateBlock(requireNotNull(active.blockId)) { block ->
-        val richText = block.editableRichText() ?: return@updateBlock block
-        block.withEditableRichText(
-            RichTextEditor.removeMark(richText, active.start, active.end, markType),
-        )
+    transformSelectedRichText { text, start, end ->
+        RichTextEditor.removeMark(text, start, end, markType)
     }
 }
 
@@ -78,11 +66,10 @@ fun TagloomEditorState.selectionMarkAttribute(
     markType: String,
     attributeKey: String,
 ): String? {
-    val active = selection.takeIf(EditorSelection::isNotEmpty) ?: return null
-    val block = selectedDocument?.note?.blocks?.singleOrNull { candidate -> candidate.id == active.blockId }
-        ?: return null
-    val richText = block.editableRichText() ?: return null
-    val values = RichTextSelectionReducer.intersectingRuns(richText, active.start, active.end)
+    val values = selectedBlockRanges().flatMap { range ->
+        range.block.editableRichText()?.let { RichTextSelectionReducer.intersectingRuns(it, range.start, range.end) }
+            .orEmpty()
+    }
         .map { run -> run.marks.firstOrNull { mark -> mark.type == markType }?.attributes?.get(attributeKey) }
         .distinct()
     return values.singleOrNull()
@@ -92,15 +79,11 @@ fun TagloomEditorState.selectionMarkAttribute(
  * 把链接草稿应用到活动选区，并替换该范围内已有 Link Mark。
  */
 fun TagloomEditorState.applyLinkToSelection() {
-    val active = selection.takeIf(EditorSelection::isNotEmpty) ?: return
     val href = linkDraft.trim()
     if (href.isEmpty()) {
         return
     }
-    updateBlock(requireNotNull(active.blockId)) { block ->
-        val richText = block.editableRichText() ?: return@updateBlock block
-        block.withEditableRichText(RichTextMarkReducer.setLink(richText, active.start, active.end, href))
-    }
+    transformSelectedRichText { text, start, end -> RichTextMarkReducer.setLink(text, start, end, href) }
     linkDraft = ""
 }
 
@@ -108,7 +91,9 @@ fun TagloomEditorState.applyLinkToSelection() {
  * 把选区工具栏草稿创建为独立 Annotation 并锚定到当前选区。
  */
 fun TagloomEditorState.addAnnotationToSelection() {
-    val active = selection.takeIf(EditorSelection::isNotEmpty) ?: return
+    val ranges = selectedBlockRanges().filter { it.start < it.end && it.block.editableRichText() != null }
+        .associateBy { it.block.id }
+    if (ranges.isEmpty()) return
     val body = annotationDraft.trim()
     if (body.isEmpty()) {
         return
@@ -117,26 +102,27 @@ fun TagloomEditorState.addAnnotationToSelection() {
     val timestamp = currentEditorTimestamp()
     updateSelectedNote { note ->
         val blocks = note.blocks.map { block ->
-            if (block.id != active.blockId) {
+            val range = ranges[block.id]
+            if (range == null) {
                 block
             } else {
                 val richText = block.editableRichText() ?: return@map block
                 block.withEditableRichText(
-                    RichTextEditor.attachAnnotation(richText, active.start, active.end, annotationId),
+                    RichTextEditor.attachAnnotation(richText, range.start, range.end, annotationId),
                 )
             }
         }
         note.copy(
             blocks = blocks,
             annotations = note.annotations + (
-                annotationId to Annotation(
-                    id = annotationId,
-                    kind = AnnotationKinds.NOTE,
-                    body = body,
-                    createdAt = timestamp,
-                    updatedAt = timestamp,
-                )
-                ),
+                    annotationId to Annotation(
+                        id = annotationId,
+                        kind = AnnotationKinds.NOTE,
+                        body = body,
+                        createdAt = timestamp,
+                        updatedAt = timestamp,
+                    )
+                    ),
         )
     }
     annotationDraft = ""
@@ -179,4 +165,19 @@ fun TagloomEditorState.deleteOrphanedAnnotation(
     confirmed: Boolean,
 ) {
     updateSelectedNote { note -> AnnotationReducer.deleteOrphaned(note, annotationId, confirmed) }
+}
+
+/**
+ * 将富文本命令一次应用到全部有效字符区间；代码块保留代码语义。
+ * @param transform 接收富文本和半开区间并返回新富文本的纯变换。
+ */
+private fun TagloomEditorState.transformSelectedRichText(transform: (RichText, Int, Int) -> RichText) {
+    val ranges = selectedBlockRanges().filter { it.start < it.end }.associateBy { it.block.id }
+    updateSelectedNote { note ->
+        note.copy(blocks = note.blocks.map { block ->
+            val range = ranges[block.id] ?: return@map block
+            val text = block.editableRichText() ?: return@map block
+            block.withEditableRichText(transform(text, range.start, range.end))
+        })
+    }
 }

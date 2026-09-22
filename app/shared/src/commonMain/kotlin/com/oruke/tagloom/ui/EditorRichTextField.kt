@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +44,7 @@ import com.oruke.tagloom.editor.BlockMoveDirection
 import com.oruke.tagloom.editor.EditorCursorTarget
 import com.oruke.tagloom.editor.EditorBlockType
 import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.editor.selectedBlockRanges
 import com.oruke.tagloom.editor.TextEditDelta
 import com.oruke.tagloom.editor.adjacentCursor
 import com.oruke.tagloom.editor.applyInlineMarkdownShortcut
@@ -53,9 +53,6 @@ import com.oruke.tagloom.editor.editableRichText
 import com.oruke.tagloom.editor.mergeBlockWithPrevious
 import com.oruke.tagloom.editor.pasteMarkdownAtBlock
 import com.oruke.tagloom.editor.splitBlock
-import com.oruke.tagloom.editor.toggleSelectionMark
-import com.oruke.tagloom.editor.turnBlockInto
-import com.oruke.tagloom.editor.turnBlockIntoBaseTable
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.editor_block_no_matching_commands
@@ -68,7 +65,7 @@ import tagloom.app.shared.generated.resources.editor_block_no_matching_commands
  * @param textStyle Block 类型对应排版。
  * @param placeholder 空 Block 提示。
  * @param cursorRequest 外部请求的焦点与光标位置。
- * @param commandMenuRequested 是否由左侧加号强制打开类型菜单。
+ * @param commandMenuRequested 是否由左侧手柄菜单强制打开类型菜单。
  * @param onCursorRequest 请求另一个 Block 获得焦点。
  * @param onCursorConsumed 当前 Block 已消费焦点请求。
  * @param onCommandMenuDismiss 关闭外部强制菜单。
@@ -95,7 +92,7 @@ internal fun EditorRichTextField(
 ) {
     val richText = block.editableRichText() ?: return
     val modelText = richText.toAnnotatedString()
-    val initialSelection = state.selection.takeIf { selection -> selection.blockId == block.id }
+    val initialSelection = state.selectedBlockRanges().firstOrNull { it.block.id == block.id }
     var fieldValue by remember(block.id) {
         mutableStateOf(
             TextFieldValue(
@@ -111,11 +108,20 @@ internal fun EditorRichTextField(
     val find = rememberNoteSearchDecoration(
         NoteSearchTarget(NoteSearchField.BODY, block.id),
         onRestoreSelection = { start, end ->
-            val restored = TextRange(start.coerceIn(0, fieldValue.text.length), end.coerceIn(0, fieldValue.text.length))
+            val range = if (state.selection.isCrossBlock) state.selectedBlockRanges()
+                .firstOrNull { it.block.id == block.id } else null
+            val restored = TextRange(
+                (range?.start ?: start).coerceIn(0, fieldValue.text.length),
+                (range?.end ?: end).coerceIn(0, fieldValue.text.length)
+            )
             fieldValue = fieldValue.copy(selection = restored, composition = null)
-            state.updateSelection(block.id, restored.start, restored.end)
+            if (!state.selection.isCrossBlock) state.updateSelection(block.id, restored.start, restored.end)
         })
     var focused by remember(block.id) { mutableStateOf(false) }
+    val selection = rememberDocumentSelectionDecoration(
+        state, block.id, fieldValue,
+        onValue = { fieldValue = it }, onFocus = { focusRequester.requestFocus() }, base = find.transformation()
+    )
     var dismissedSlashText by remember(block.id) { mutableStateOf<String?>(null) }
     var selectedCommandIndex by remember(block.id) { mutableIntStateOf(0) }
     var tablePickerOpen by remember(block.id) { mutableStateOf(false) }
@@ -157,166 +163,177 @@ internal fun EditorRichTextField(
     }
 
     Box(modifier) {
-        BasicTextField(
-            value = fieldValue,
-            visualTransformation = find.transformation(),
-            onTextLayout = find.onTextLayout,
-            onValueChange = onValueChange@{ incoming ->
-                val previous = fieldValue
-                val delta = TextEditDelta.between(previous, incoming)
-                if (
-                    incoming.composition == null &&
-                    delta.insertedText.length > 1 &&
-                    ('\n' in delta.insertedText || '\r' in delta.insertedText)
-                ) {
-                    state.pasteMarkdownAtBlock(
-                        blockId = block.id,
-                        selectionStart = delta.replacedStart,
-                        selectionEnd = delta.replacedEnd,
-                        markdown = delta.insertedText,
-                    )?.let { target ->
-                        fieldValue = previous
-                        onCursorRequest(target)
-                        return@onValueChange
+        DocumentSelectionColors(selection.clipboard) {
+            BasicTextField(
+                value = fieldValue,
+                visualTransformation = selection.transformation,
+                onTextLayout = { find.onTextLayout(it); selection.onTextLayout(it) },
+                onValueChange = onValueChange@{ incoming ->
+                    selection.acceptInput(incoming)?.let { fieldValue = it; return@onValueChange }
+                    val previous = fieldValue
+                    val delta = TextEditDelta.between(previous, incoming)
+                    if (
+                        incoming.composition == null &&
+                        delta.insertedText.length > 1 &&
+                        ('\n' in delta.insertedText || '\r' in delta.insertedText)
+                    ) {
+                        state.pasteMarkdownAtBlock(
+                            blockId = block.id,
+                            selectionStart = delta.replacedStart,
+                            selectionEnd = delta.replacedEnd,
+                            markdown = delta.insertedText,
+                        )?.let { target ->
+                            fieldValue = previous
+                            onCursorRequest(target)
+                            return@onValueChange
+                        }
                     }
-                }
-                fieldValue = incoming
-                dismissedSlashText = null
-                state.updateBlockText(block.id, incoming.text)
-                state.updateSelection(block.id, incoming.selection.start, incoming.selection.end)
-                if (incoming.composition == null && incoming.selection.collapsed) {
-                    val inlineTarget = state.applyInlineMarkdownShortcut(block.id, incoming.selection.end)
-                    if (inlineTarget != null) {
-                        onCursorRequest(inlineTarget)
-                    } else if (incoming.selection.end == incoming.text.length) {
-                        state.applyMarkdownShortcut(block.id, incoming.text)?.let(onCursorRequest)
-                    }
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("text-input-${block.id.value}")
-                .then(find.modifier)
-                .focusRequester(focusRequester)
-                .onFocusChanged { focusState ->
-                    focused = focusState.isFocused
-                    if (focusState.isFocused) {
-                        state.updateSelection(block.id, fieldValue.selection.start, fieldValue.selection.end)
-                    }
-                }
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) {
-                        return@onPreviewKeyEvent false
-                    }
-                    val commandPressed = event.isCtrlPressed || event.isMetaPressed
-                    when {
-                        commandPressed && event.isShiftPressed && event.key == Key.S -> {
-                            toggleMark(state, InlineMarkTypes.STRIKETHROUGH)
+                    fieldValue = incoming
+                    dismissedSlashText = null
+                    // 跨块命令可能已更新模型；失焦时原生字段的旧选区回调不能把旧正文写回。
+                    val textChanged = previous.text != incoming.text
+                    if (textChanged) state.updateBlockText(block.id, incoming.text)
+                    if (focused || textChanged) state.updateSelection(
+                        block.id,
+                        incoming.selection.start,
+                        incoming.selection.end
+                    )
+                    if (incoming.composition == null && incoming.selection.collapsed) {
+                        val inlineTarget = state.applyInlineMarkdownShortcut(block.id, incoming.selection.end)
+                        if (inlineTarget != null) {
+                            onCursorRequest(inlineTarget)
+                        } else if (incoming.selection.end == incoming.text.length) {
+                            state.applyMarkdownShortcut(block.id, incoming.text)?.let(onCursorRequest)
                         }
-
-                        commandPressed && event.key == Key.S -> {
-                            onSaveRequest()
-                            true
-                        }
-
-                        commandPressed && event.key == Key.B -> toggleMark(state, InlineMarkTypes.BOLD)
-                        commandPressed && event.key == Key.I -> toggleMark(state, InlineMarkTypes.ITALIC)
-                        commandPressed && event.key == Key.E -> toggleMark(state, InlineMarkTypes.CODE)
-                        commandPressed && event.key == Key.Enter && block.type == BlockTypes.TODO -> {
-                            state.toggleTodo(block.id)
-                            true
-                        }
-
-                        commandPressed && event.isShiftPressed && event.key == Key.DirectionUp -> {
-                            state.moveBlock(block.id, BlockMoveDirection.UP)
-                            true
-                        }
-
-                        commandPressed && event.isShiftPressed && event.key == Key.DirectionDown -> {
-                            state.moveBlock(block.id, BlockMoveDirection.DOWN)
-                            true
-                        }
-
-                        event.key == Key.Tab -> {
-                            if (event.isShiftPressed) state.outdentBlock(block.id) else state.indentBlock(block.id)
-                            true
-                        }
-
-                        event.key == Key.Enter && !event.isShiftPressed && showCommandMenu && commands.isNotEmpty() -> {
-                            val command = commands[selectedCommandIndex]
-                            if (command.type == EditorBlockType.BASE_TABLE) {
-                                tablePickerOpen = true
-                            } else {
-                                applyCommand(
-                                    state = state,
-                                    block = block,
-                                    command = command,
-                                    slashTrigger = slashTrigger,
-                                    onCursorRequest = onCursorRequest,
-                                    onCreateDatabaseBlock = onCreateDatabaseBlock,
-                                )
-                                onCommandMenuDismiss()
-                            }
-                            true
-                        }
-
-                        event.key == Key.Enter && !event.isShiftPressed -> {
-                            state.splitBlock(
-                                block.id,
-                                fieldValue.selection.start,
-                                fieldValue.selection.end,
-                            )?.let(onCursorRequest)
-                            true
-                        }
-
-                        event.key == Key.Backspace && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
-                            state.mergeBlockWithPrevious(block.id)?.let(onCursorRequest) != null
-                        }
-
-                        showCommandMenu && event.key == Key.DirectionDown && commands.isNotEmpty() -> {
-                            selectedCommandIndex = (selectedCommandIndex + 1).coerceAtMost(commands.lastIndex)
-                            true
-                        }
-
-                        showCommandMenu && event.key == Key.DirectionUp && commands.isNotEmpty() -> {
-                            selectedCommandIndex = (selectedCommandIndex - 1).coerceAtLeast(0)
-                            true
-                        }
-
-                        event.key == Key.DirectionUp && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
-                            state.adjacentCursor(block.id, BlockMoveDirection.UP)?.let(onCursorRequest) != null
-                        }
-
-                        event.key == Key.DirectionDown && fieldValue.selection.collapsed &&
-                                fieldValue.selection.end == fieldValue.text.length -> {
-                            state.adjacentCursor(block.id, BlockMoveDirection.DOWN)?.let(onCursorRequest) != null
-                        }
-
-                        showCommandMenu && event.key == Key.Escape -> {
-                            tablePickerOpen = false
-                            dismissedSlashText = fieldValue.text
-                            onCommandMenuDismiss()
-                            true
-                        }
-
-                        else -> false
                     }
                 },
-            textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            decorationBox = { innerTextField ->
-                Box(Modifier.fillMaxWidth()) {
-                    if (fieldValue.text.isEmpty() && !focused) {
-                        Text(
-                            placeholder,
-                            style = textStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                        )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("text-input-${block.id.value}")
+                    .then(find.modifier)
+                    .then(selection.modifier)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { focusState ->
+                        focused = focusState.isFocused
+                        if (focusState.isFocused && !selection.ownsSelection) {
+                            state.updateSelection(block.id, fieldValue.selection.start, fieldValue.selection.end)
+                        }
                     }
-                    innerTextField()
-                }
-            },
-        )
+                    .onPreviewKeyEvent { event ->
+                        if (selection.onKeyEvent(event)) return@onPreviewKeyEvent true
+                        if (event.type != KeyEventType.KeyDown) {
+                            return@onPreviewKeyEvent false
+                        }
+                        val commandPressed = event.isCtrlPressed || event.isMetaPressed
+                        when {
+                            commandPressed && event.isShiftPressed && event.key == Key.S -> {
+                                toggleMark(state, InlineMarkTypes.STRIKETHROUGH)
+                            }
+
+                            commandPressed && event.key == Key.S -> {
+                                onSaveRequest()
+                                true
+                            }
+
+                            commandPressed && event.key == Key.B -> toggleMark(state, InlineMarkTypes.BOLD)
+                            commandPressed && event.key == Key.I -> toggleMark(state, InlineMarkTypes.ITALIC)
+                            commandPressed && event.key == Key.E -> toggleMark(state, InlineMarkTypes.CODE)
+                            commandPressed && event.key == Key.Enter && block.type == BlockTypes.TODO -> {
+                                state.toggleTodo(block.id)
+                                true
+                            }
+
+                            commandPressed && event.isShiftPressed && event.key == Key.DirectionUp -> {
+                                state.moveBlock(block.id, BlockMoveDirection.UP)
+                                true
+                            }
+
+                            commandPressed && event.isShiftPressed && event.key == Key.DirectionDown -> {
+                                state.moveBlock(block.id, BlockMoveDirection.DOWN)
+                                true
+                            }
+
+                            event.key == Key.Tab -> {
+                                if (event.isShiftPressed) state.outdentBlock(block.id) else state.indentBlock(block.id)
+                                true
+                            }
+
+                            event.key == Key.Enter && !event.isShiftPressed && showCommandMenu && commands.isNotEmpty() -> {
+                                val command = commands[selectedCommandIndex]
+                                if (command.type == EditorBlockType.BASE_TABLE) {
+                                    tablePickerOpen = true
+                                } else {
+                                    applyCommand(
+                                        state = state,
+                                        block = block,
+                                        command = command,
+                                        slashTrigger = slashTrigger,
+                                        onCursorRequest = onCursorRequest,
+                                        onCreateDatabaseBlock = onCreateDatabaseBlock,
+                                    )
+                                    onCommandMenuDismiss()
+                                }
+                                true
+                            }
+
+                            event.key == Key.Enter && !event.isShiftPressed -> {
+                                state.splitBlock(
+                                    block.id,
+                                    fieldValue.selection.start,
+                                    fieldValue.selection.end,
+                                )?.let(onCursorRequest)
+                                true
+                            }
+
+                            event.key == Key.Backspace && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
+                                state.mergeBlockWithPrevious(block.id)?.let(onCursorRequest) != null
+                            }
+
+                            showCommandMenu && event.key == Key.DirectionDown && commands.isNotEmpty() -> {
+                                selectedCommandIndex = (selectedCommandIndex + 1).coerceAtMost(commands.lastIndex)
+                                true
+                            }
+
+                            showCommandMenu && event.key == Key.DirectionUp && commands.isNotEmpty() -> {
+                                selectedCommandIndex = (selectedCommandIndex - 1).coerceAtLeast(0)
+                                true
+                            }
+
+                            event.key == Key.DirectionUp && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
+                                state.adjacentCursor(block.id, BlockMoveDirection.UP)?.let(onCursorRequest) != null
+                            }
+
+                            event.key == Key.DirectionDown && fieldValue.selection.collapsed &&
+                                    fieldValue.selection.end == fieldValue.text.length -> {
+                                state.adjacentCursor(block.id, BlockMoveDirection.DOWN)?.let(onCursorRequest) != null
+                            }
+
+                            showCommandMenu && event.key == Key.Escape -> {
+                                tablePickerOpen = false
+                                dismissedSlashText = fieldValue.text
+                                onCommandMenuDismiss()
+                                true
+                            }
+
+                            else -> false
+                        }
+                    },
+                textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { innerTextField ->
+                    Box(Modifier.fillMaxWidth()) {
+                        if (fieldValue.text.isEmpty() && !focused) {
+                            Text(
+                                placeholder,
+                                style = textStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                            )
+                        }
+                        innerTextField()
+                    }
+                },
+            )
+        }
         TagloomDropdownMenu(
             expanded = showCommandMenu && !tablePickerOpen,
             properties = PopupProperties(focusable = false),
@@ -375,117 +392,3 @@ internal fun EditorRichTextField(
         }
     }
 }
-
-/**
- * 对当前非空选区切换 Mark，并向键盘事件报告是否已处理。
- *
- * @param state 编辑器状态。
- * @param markType Mark 稳定类型。
- * @return 存在非空选区时为 true。
- */
-private fun toggleMark(
-    state: TagloomEditorState,
-    markType: String,
-): Boolean {
-    if (!state.selection.isNotEmpty) {
-        return false
-    }
-    state.toggleSelectionMark(markType)
-    return true
-}
-
-/**
- * 清除 Slash 查询文本并转换当前 Block。
- *
- * @param state 编辑器状态。
- * @param block 当前 Block。
- * @param command 目标类型命令。
- * @param slashTrigger 当前输入触发范围；由加号打开时为空。
- * @param onCursorRequest 转换后的焦点请求。
- * @param onCreateDatabaseBlock 请求异步创建并绑定 Database Block。
- */
-private fun applyCommand(
-    state: TagloomEditorState,
-    block: Block,
-    command: EditorBlockCommand,
-    slashTrigger: SlashCommandTrigger?,
-    onCursorRequest: (EditorCursorTarget) -> Unit,
-    onCreateDatabaseBlock: (BlockId) -> Unit,
-) {
-    if (slashTrigger != null) {
-        val currentText = block.editableRichText()?.plainText.orEmpty()
-        state.updateBlockText(
-            block.id,
-            currentText.removeRange(slashTrigger.start, slashTrigger.endExclusive),
-        )
-    }
-    if (command.type == com.oruke.tagloom.editor.EditorBlockType.DATABASE) {
-        onCreateDatabaseBlock(block.id)
-        return
-    }
-    state.turnBlockInto(block.id, command.type)?.let(onCursorRequest)
-}
-
-/**
- * 清除 Slash 查询文本并按用户选择的尺寸创建正文表格。
- *
- * @param state 编辑器状态。
- * @param block 当前命令 Block。
- * @param slashTrigger Slash 触发范围；由加号打开时为空。
- * @param rows 初始活动行数。
- * @param columns 初始活动列数。
- * @param onCursorRequest 转换后的焦点请求。
- */
-private fun applyBaseTableCommand(
-    state: TagloomEditorState,
-    block: Block,
-    slashTrigger: SlashCommandTrigger?,
-    rows: Int,
-    columns: Int,
-    onCursorRequest: (EditorCursorTarget) -> Unit,
-) {
-    if (slashTrigger != null) {
-        val currentText = block.editableRichText()?.plainText.orEmpty()
-        state.updateBlockText(block.id, currentText.removeRange(slashTrigger.start, slashTrigger.endExclusive))
-    }
-    state.turnBlockIntoBaseTable(block.id, rows, columns)?.let(onCursorRequest)
-}
-
-/**
- * 寻找折叠光标所在词中的 Slash 命令触发范围。
- *
- * Slash 只在行首或空白字符之后生效，URL 和普通路径中的 `/` 因此不会意外打开命令菜单。
- *
- * @param value 当前文本框值与光标。
- * @return 可继续输入过滤的 Slash token；不满足触发条件时为空。
- */
-internal fun findSlashCommandTrigger(value: TextFieldValue): SlashCommandTrigger? {
-    if (!value.selection.collapsed) {
-        return null
-    }
-    val caret = value.selection.end.coerceIn(0, value.text.length)
-    if (caret == 0) {
-        return null
-    }
-    val slash = value.text.lastIndexOf('/', caret - 1)
-    if (slash < 0 || (slash > 0 && !value.text[slash - 1].isWhitespace())) {
-        return null
-    }
-    val query = value.text.substring(slash + 1, caret)
-    if (query.any(Char::isWhitespace)) {
-        return null
-    }
-    return SlashCommandTrigger(slash, caret, query)
-}
-
-/**
- * 描述当前 Slash 命令在 Block 纯文本中的范围和查询文本。
- */
-internal data class SlashCommandTrigger(
-    /** `/` 所在字符偏移。 */
-    val start: Int,
-    /** 当前光标位置，也是 token 半开终点。 */
-    val endExclusive: Int,
-    /** 去除 `/` 后用于过滤命令的文本。 */
-    val query: String,
-)

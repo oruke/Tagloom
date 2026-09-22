@@ -115,76 +115,78 @@ internal fun EditorPane(
 
     CompositionLocalProvider(LocalNoteSearch provides search) {
         EditorBlockDragScope(state, document.id, listState, modifier) {
-            val drag = LocalEditorBlockDrag.current
-            Surface(Modifier.fillMaxSize().testTag("editor-pane"), color = MaterialTheme.colorScheme.surface) {
-                NoteSearchOverlay(search, onCloseSearch) { searchEntryModifier ->
-                    Box(Modifier.fillMaxSize()) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().testTag("editor-block-list"),
-                            state = listState,
-                            contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
-                        ) {
-                            item(key = "page-header") {
-                                CenteredEditorContent {
-                                    PageHeader(
-                                        state = state,
-                                        document = document,
-                                        saving = saving,
-                                        firstBlock = firstBlock,
-                                        onCursorRequest = { target -> cursorRequest = target },
-                                        onExport = onExport,
-                                        onSaveRequest = onSaveRequest,
-                                        onWorkspaceMenuRequest = onWorkspaceMenuRequest,
-                                        onSaveTagDefinition = onSaveTagDefinition,
-                                        onSavePropertyDefinition = onSavePropertyDefinition,
-                                        onCreatePropertyOption = onCreatePropertyOption,
-                                        searchMenu = searchMenu,
-                                        workspaceMenu = workspaceMenu,
-                                        searchEntryModifier = searchEntryModifier,
-                                    )
+            DocumentSelectionScope(state, listState, onCursorRequest = { cursorRequest = it }) {
+                val drag = LocalEditorBlockDrag.current
+                Surface(Modifier.fillMaxSize().testTag("editor-pane"), color = MaterialTheme.colorScheme.surface) {
+                    NoteSearchOverlay(search, onCloseSearch) { searchEntryModifier ->
+                        Box(Modifier.fillMaxSize()) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize().testTag("editor-block-list"),
+                                state = listState,
+                                contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
+                            ) {
+                                item(key = "page-header") {
+                                    CenteredEditorContent {
+                                        PageHeader(
+                                            state = state,
+                                            document = document,
+                                            saving = saving,
+                                            firstBlock = firstBlock,
+                                            onCursorRequest = { target -> cursorRequest = target },
+                                            onExport = onExport,
+                                            onSaveRequest = onSaveRequest,
+                                            onWorkspaceMenuRequest = onWorkspaceMenuRequest,
+                                            onSaveTagDefinition = onSaveTagDefinition,
+                                            onSavePropertyDefinition = onSavePropertyDefinition,
+                                            onCreatePropertyOption = onCreatePropertyOption,
+                                            searchMenu = searchMenu,
+                                            workspaceMenu = workspaceMenu,
+                                            searchEntryModifier = searchEntryModifier,
+                                        )
+                                    }
+                                }
+                                itemsIndexed(
+                                    items = rootBlocks,
+                                    key = { _, block -> block.id.value },
+                                ) { _, block ->
+                                    CenteredEditorContent(
+                                        includeGutter = true,
+                                        modifier = Modifier.zIndex(if (block.id in drag?.liftedIds.orEmpty()) 1f else 0f)
+                                            // 只动画重排，避免 Markdown 转换替换输入框时延迟销毁旧焦点节点。
+                                            .animateItem(
+                                                fadeInSpec = null,
+                                                fadeOutSpec = null,
+                                                placementSpec = if (drag?.activeId != null || drag?.releasedPositions?.isNotEmpty() == true) null else tween(
+                                                    220
+                                                )
+                                            ),
+                                    ) {
+                                        EditorBlockRow(
+                                            state = state,
+                                            databaseController = databaseController,
+                                            block = block,
+                                            depth = state.visibleBlockDepth(block, document.note),
+                                            cursorRequest = cursorRequest,
+                                            commandMenuBlockId = commandMenuBlockId,
+                                            onCursorRequest = { target -> cursorRequest = target },
+                                            onCursorConsumed = { cursorRequest = null },
+                                            onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
+                                            onCommandMenuDismiss = { commandMenuBlockId = null },
+                                            onCreateDatabaseBlock = onCreateDatabaseBlock,
+                                            onOpenNote = state::selectDocument,
+                                            onSaveRequest = onSaveRequest,
+                                        )
+                                    }
                                 }
                             }
-                            itemsIndexed(
-                                items = rootBlocks,
-                                key = { _, block -> block.id.value },
-                            ) { _, block ->
-                                CenteredEditorContent(
-                                    includeGutter = true,
-                                    modifier = Modifier.zIndex(if (block.id in drag?.liftedIds.orEmpty()) 1f else 0f)
-                                        // 只动画重排，避免 Markdown 转换替换输入框时延迟销毁旧焦点节点。
-                                        .animateItem(
-                                            fadeInSpec = null,
-                                            fadeOutSpec = null,
-                                            placementSpec = if (drag?.activeId != null || drag?.releasedPositions?.isNotEmpty() == true) null else tween(
-                                                220
-                                            )
-                                        ),
-                                ) {
-                                    EditorBlockRow(
-                                        state = state,
-                                        databaseController = databaseController,
-                                        block = block,
-                                        depth = state.visibleBlockDepth(block, document.note),
-                                        cursorRequest = cursorRequest,
-                                        commandMenuBlockId = commandMenuBlockId,
-                                        onCursorRequest = { target -> cursorRequest = target },
-                                        onCursorConsumed = { cursorRequest = null },
-                                        onCommandMenuRequest = { blockId -> commandMenuBlockId = blockId },
-                                        onCommandMenuDismiss = { commandMenuBlockId = null },
-                                        onCreateDatabaseBlock = onCreateDatabaseBlock,
-                                        onOpenNote = state::selectDocument,
-                                        onSaveRequest = onSaveRequest,
-                                    )
-                                }
+                            if (state.selection.isNotEmpty && !search.isOpen) {
+                                SelectionFormattingToolbar(state = state)
                             }
+                            DocumentTimestamps(
+                                document = document,
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
+                            )
                         }
-                        if (state.selection.isNotEmpty && !search.isOpen) {
-                            SelectionFormattingToolbar(state = state)
-                        }
-                        DocumentTimestamps(
-                            document = document,
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
-                        )
                     }
                 }
             }

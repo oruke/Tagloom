@@ -49,6 +49,7 @@ import com.oruke.tagloom.core.model.CodeBlockContent
 import com.oruke.tagloom.editor.BlockMoveDirection
 import com.oruke.tagloom.editor.EditorCursorTarget
 import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.editor.selectedBlockRanges
 import com.oruke.tagloom.editor.adjacentCursor
 import com.oruke.tagloom.editor.mergeBlockWithPrevious
 import com.oruke.tagloom.editor.updateCodeBlockLanguage
@@ -83,7 +84,7 @@ internal fun EditorCodeField(
 ) {
     val content = block.content as? CodeBlockContent ?: return
     var fieldValue by remember(block.id) {
-        val selection = state.selection.takeIf { it.blockId == block.id }
+        val selection = state.selectedBlockRanges().firstOrNull { it.block.id == block.id }
         mutableStateOf(
             TextFieldValue(
                 content.text, selection = TextRange(
@@ -97,9 +98,14 @@ internal fun EditorCodeField(
     val find = rememberNoteSearchDecoration(
         NoteSearchTarget(NoteSearchField.BODY, block.id),
         onRestoreSelection = { start, end ->
-            val restored = TextRange(start.coerceIn(0, fieldValue.text.length), end.coerceIn(0, fieldValue.text.length))
+            val range = if (state.selection.isCrossBlock) state.selectedBlockRanges()
+                .firstOrNull { it.block.id == block.id } else null
+            val restored = TextRange(
+                (range?.start ?: start).coerceIn(0, fieldValue.text.length),
+                (range?.end ?: end).coerceIn(0, fieldValue.text.length)
+            )
             fieldValue = fieldValue.copy(selection = restored, composition = null)
-            state.updateSelection(block.id, restored.start, restored.end)
+            if (!state.selection.isCrossBlock) state.updateSelection(block.id, restored.start, restored.end)
         })
     var focused by remember(block.id) { mutableStateOf(false) }
     val wrap = block.wrapsCodeLines()
@@ -110,6 +116,14 @@ internal fun EditorCodeField(
         CodeSyntaxPalette.Light
     }
     val syntaxTransformation = rememberCodeVisualTransformation(fieldValue.text, content.language, syntaxPalette)
+    val selection = rememberDocumentSelectionDecoration(
+        state,
+        block.id,
+        fieldValue,
+        onValue = { fieldValue = it },
+        onFocus = { focusRequester.requestFocus() },
+        base = find.transformation(syntaxTransformation)
+    )
 
     LaunchedEffect(content.text) {
         if (fieldValue.text != content.text) {
@@ -158,93 +172,109 @@ internal fun EditorCodeField(
             val availableWidth = maxWidth
             // 仅不换行时使用无限横向测量；禁用滚动手势并不会恢复软换行的宽度约束。
             Box(Modifier.fillMaxWidth().then(if (wrap) Modifier else Modifier.horizontalScroll(horizontalScroll))) {
-                BasicTextField(
-                    value = fieldValue,
-                    onValueChange = { incoming ->
-                        fieldValue = incoming
-                        state.updateCodeBlockText(block.id, incoming.text)
-                        state.updateSelection(block.id, incoming.selection.start, incoming.selection.end)
-                    },
-                    modifier = Modifier
-                        .then(if (wrap) Modifier.fillMaxWidth() else Modifier.widthIn(min = availableWidth))
-                        .testTag("code-input-${block.id.value}")
-                        .then(find.modifier)
-                        .focusRequester(focusRequester)
-                        .onFocusChanged { focusState ->
-                            focused = focusState.isFocused
-                            if (focusState.isFocused) {
-                                state.updateSelection(block.id, fieldValue.selection.start, fieldValue.selection.end)
-                            }
-                        }
-                        .onPreviewKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyDown) {
-                                return@onPreviewKeyEvent false
-                            }
-                            val commandPressed = event.isCtrlPressed || event.isMetaPressed
-                            when {
-                                commandPressed && event.key == Key.S -> {
-                                    onSaveRequest()
-                                    true
-                                }
-
-                                event.key == Key.Tab -> {
-                                    val start = minOf(fieldValue.selection.start, fieldValue.selection.end)
-                                    val end = maxOf(fieldValue.selection.start, fieldValue.selection.end)
-                                    val updated = fieldValue.text.replaceRange(start, end, CODE_INDENT)
-                                    val cursor = start + CODE_INDENT.length
-                                    fieldValue = fieldValue.copy(
-                                        text = updated,
-                                        selection = TextRange(cursor),
-                                        composition = null
+                DocumentSelectionColors(selection.clipboard) {
+                    BasicTextField(
+                        value = fieldValue,
+                        onValueChange = onValueChange@{ incoming ->
+                            selection.acceptInput(incoming)?.let { fieldValue = it; return@onValueChange }
+                            val textChanged = fieldValue.text != incoming.text
+                            fieldValue = incoming
+                            // 焦点转移只更新原生光标，不以过期字段文本覆盖已经完成的跨块编辑。
+                            if (textChanged) state.updateCodeBlockText(block.id, incoming.text)
+                            if (focused || textChanged) state.updateSelection(
+                                block.id,
+                                incoming.selection.start,
+                                incoming.selection.end
+                            )
+                        },
+                        modifier = Modifier
+                            .then(if (wrap) Modifier.fillMaxWidth() else Modifier.widthIn(min = availableWidth))
+                            .testTag("code-input-${block.id.value}")
+                            .then(find.modifier)
+                            .then(selection.modifier)
+                            .focusRequester(focusRequester)
+                            .onFocusChanged { focusState ->
+                                focused = focusState.isFocused
+                                if (focusState.isFocused && !selection.ownsSelection) {
+                                    state.updateSelection(
+                                        block.id,
+                                        fieldValue.selection.start,
+                                        fieldValue.selection.end
                                     )
-                                    state.updateCodeBlockText(block.id, updated)
-                                    state.updateSelection(block.id, cursor, cursor)
-                                    true
                                 }
-
-                                event.key == Key.Backspace && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
-                                    state.mergeBlockWithPrevious(block.id)?.let(onCursorRequest) != null
+                            }
+                            .onPreviewKeyEvent { event ->
+                                if (selection.onKeyEvent(event)) return@onPreviewKeyEvent true
+                                if (event.type != KeyEventType.KeyDown) {
+                                    return@onPreviewKeyEvent false
                                 }
+                                val commandPressed = event.isCtrlPressed || event.isMetaPressed
+                                when {
+                                    commandPressed && event.key == Key.S -> {
+                                        onSaveRequest()
+                                        true
+                                    }
 
-                                event.key == Key.DirectionUp && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
-                                    state.adjacentCursor(block.id, BlockMoveDirection.UP)?.let(onCursorRequest) != null
+                                    event.key == Key.Tab -> {
+                                        val start = minOf(fieldValue.selection.start, fieldValue.selection.end)
+                                        val end = maxOf(fieldValue.selection.start, fieldValue.selection.end)
+                                        val updated = fieldValue.text.replaceRange(start, end, CODE_INDENT)
+                                        val cursor = start + CODE_INDENT.length
+                                        fieldValue = fieldValue.copy(
+                                            text = updated,
+                                            selection = TextRange(cursor),
+                                            composition = null
+                                        )
+                                        state.updateCodeBlockText(block.id, updated)
+                                        state.updateSelection(block.id, cursor, cursor)
+                                        true
+                                    }
+
+                                    event.key == Key.Backspace && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
+                                        state.mergeBlockWithPrevious(block.id)?.let(onCursorRequest) != null
+                                    }
+
+                                    event.key == Key.DirectionUp && fieldValue.selection.collapsed && fieldValue.selection.start == 0 -> {
+                                        state.adjacentCursor(block.id, BlockMoveDirection.UP)
+                                            ?.let(onCursorRequest) != null
+                                    }
+
+                                    event.key == Key.DirectionDown && fieldValue.selection.collapsed &&
+                                            fieldValue.selection.end == fieldValue.text.length -> {
+                                        state.adjacentCursor(block.id, BlockMoveDirection.DOWN)
+                                            ?.let(onCursorRequest) != null
+                                    }
+
+                                    else -> false
                                 }
-
-                                event.key == Key.DirectionDown && fieldValue.selection.collapsed &&
-                                        fieldValue.selection.end == fieldValue.text.length -> {
-                                    state.adjacentCursor(block.id, BlockMoveDirection.DOWN)
-                                        ?.let(onCursorRequest) != null
+                            },
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.5.sp,
+                            lineHeight = 21.sp,
+                        ),
+                        visualTransformation = selection.transformation,
+                        onTextLayout = { find.onTextLayout(it); selection.onTextLayout(it) },
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        decorationBox = { innerTextField ->
+                            Box(Modifier.fillMaxWidth()) {
+                                if (fieldValue.text.isEmpty() && !focused) {
+                                    Text(
+                                        stringResource(Res.string.editor_code_placeholder),
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 13.5.sp,
+                                            lineHeight = 21.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
-
-                                else -> false
+                                innerTextField()
                             }
                         },
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.5.sp,
-                        lineHeight = 21.sp,
-                    ),
-                    visualTransformation = find.transformation(syntaxTransformation),
-                    onTextLayout = find.onTextLayout,
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    decorationBox = { innerTextField ->
-                        Box(Modifier.fillMaxWidth()) {
-                            if (fieldValue.text.isEmpty() && !focused) {
-                                Text(
-                                    stringResource(Res.string.editor_code_placeholder),
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 13.5.sp,
-                                        lineHeight = 21.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            innerTextField()
-                        }
-                    },
-                )
+                    )
+                }
             }
         }
     }

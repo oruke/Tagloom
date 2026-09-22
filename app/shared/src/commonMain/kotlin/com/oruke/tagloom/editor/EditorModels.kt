@@ -28,17 +28,25 @@ data class EditorDocument(
 )
 
 /**
- * 保存当前活动 Block 的字符选区，供顶部样式和加注命令使用。
+ * 保存按文档顺序规范化的字符选区；跨块时 start/end 分别属于首尾块。
  */
 data class EditorSelection(
-    /** 活动 Block；尚未聚焦时为 null。 */
+    /** 按正文顺序排列的首块；尚未聚焦时为 null。 */
     val blockId: BlockId? = null,
-    /** 选区起始字符偏移。 */
+    /** 首块内的选区起始字符偏移。 */
     val start: Int = 0,
-    /** 选区结束字符偏移。 */
+    /** 尾块内的选区结束字符偏移；单块时仍属于首块。 */
     val end: Int = 0,
+    /** 跨块选区包含的连续可编辑块；单块选区为空，保持原有调用兼容。 */
+    val blockIds: List<BlockId> = emptyList(),
 ) {
+    /** 是否跨越两个或更多可编辑块。 */
+    val isCrossBlock: Boolean get() = blockIds.size > 1
+
+    /** 选区涉及的全部块，按正文展示顺序排列。 */
+    val ids: List<BlockId> get() = blockIds.ifEmpty { listOfNotNull(blockId) }
+
     /** 是否存在可应用样式或加注的非空选区。 */
     val isNotEmpty: Boolean
-        get() = blockId != null && start < end
+        get() = blockId != null && (isCrossBlock || start < end)
 }

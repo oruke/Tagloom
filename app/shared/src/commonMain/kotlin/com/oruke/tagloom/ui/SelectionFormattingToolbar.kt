@@ -30,6 +30,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.oruke.tagloom.core.model.InlineMarkAttributes
 import com.oruke.tagloom.core.model.InlineMarkTypes
 import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.editor.selectedPlainText
 import com.oruke.tagloom.editor.addAnnotationToSelection
 import com.oruke.tagloom.editor.applyLinkToSelection
 import com.oruke.tagloom.editor.clearSelectionMark
@@ -102,7 +103,11 @@ internal fun SelectionFormattingToolbar(state: TagloomEditorState) {
                     },
                 )
                 Text(
-                    pluralStringResource(Res.plurals.editor_selection_character_count, state.selection.end - state.selection.start, state.selection.end - state.selection.start),
+                    pluralStringResource(
+                        Res.plurals.editor_selection_character_count,
+                        state.selectedPlainText().length,
+                        state.selectedPlainText().length
+                    ),
                     modifier = Modifier.padding(horizontal = 8.dp),
                     style = MaterialTheme.typography.labelSmall,
                 )

@@ -55,7 +55,7 @@ class TagloomEditorState(
 
     /** 当前活动 Block 选区。 */
     var selection: EditorSelection by mutableStateOf(EditorSelection())
-        private set
+        internal set
 
     /** 左侧笔记列表使用的即时过滤文本。 */
     var filterText: String by mutableStateOf("")
@@ -221,7 +221,7 @@ class TagloomEditorState(
                 )
             }
         }
-        if (selection.blockId == blockId) {
+        if (blockId in selection.ids) {
             selection = EditorSelection()
         }
     }
@@ -393,7 +393,7 @@ class TagloomEditorState(
         require(index >= 0) { "待确认编辑器文档不存在" }
         documents[index] = persistedDocument
         selectedDocumentId = persistedDocument.id
-        if (selection.blockId?.let { blockId -> persistedDocument.note.blocks.any { block -> block.id == blockId } } != true) {
+        if (selection.ids.any { id -> persistedDocument.note.blocks.none { it.id == id && !it.deleted } }) {
             selection = EditorSelection()
         }
     }
