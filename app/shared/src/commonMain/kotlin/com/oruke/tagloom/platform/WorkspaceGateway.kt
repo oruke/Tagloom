@@ -188,6 +188,9 @@ data class WorkspaceSearchHit(
  * 平台实现负责位置选择和真实能力组装；无实现的平台不得在 UI 中展示这些能力。
  */
 interface WorkspaceGateway {
+    /** 当前平台真实接入的服务器恢复能力；未提供实现的平台不展示入口。 */
+    val serverRecovery: WorkspaceServerRecoveryGateway? get() = null
+
     /**
      * 为共享编辑器生成 URL-safe 随机 ID。
      *

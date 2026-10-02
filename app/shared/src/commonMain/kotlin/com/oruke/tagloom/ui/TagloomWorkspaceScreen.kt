@@ -91,6 +91,7 @@ import tagloom.app.shared.generated.resources.editor_export_word_name
  * @param searchMenu 页头搜索浮层内容。
  * @param workspaceMenu 页头笔记操作菜单内容。
  * @param settingsContent 独立设置页内容；接收返回当前笔记的动作，预览时为空。
+ * @param storageMode 当前设备已启用的存储模式，用于侧栏状态展示。
  */
 @Composable
 internal fun TagloomWorkspaceScreen(
@@ -108,6 +109,7 @@ internal fun TagloomWorkspaceScreen(
     searchMenu: (@Composable () -> Unit)? = null,
     workspaceMenu: (@Composable () -> Unit)? = null,
     settingsContent: (@Composable (() -> Unit) -> Unit)? = null,
+    storageMode: com.oruke.tagloom.platform.WorkspaceStorageMode = com.oruke.tagloom.platform.WorkspaceStorageMode.LOCAL,
 ) {
     ConfigureEditorContentNames(state)
     val coroutineScope = rememberCoroutineScope()
@@ -258,6 +260,7 @@ internal fun TagloomWorkspaceScreen(
                             },
                             supertagsSelected = librarySelected || tagRequest != null,
                             modifier = Modifier.width(232.dp),
+                            storageMode = storageMode,
                         )
                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }

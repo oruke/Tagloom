@@ -378,6 +378,9 @@ class DesktopWorkspaceManager(
      */
     fun sessionOrNull(): DesktopWorkspaceSession? = activeSession
 
+    /** @return 当前已认证工作区的本机目录；仅供平台服务绑定私有配置。 */
+    internal fun rootOrNull(): Path? = activeRoot
+
     /**
      * 锁定活动会话并使全部读取、索引和写入入口立即失效。
      */

@@ -41,6 +41,21 @@ internal class WorkspaceNoteSaveDelegate(
     suspend fun saveSelected(): Boolean {
         editorState.materializeSelectedSnapshotDefaults()
         val submitted = editorState.selectedDocument ?: return false
+        saveDocument(submitted)
+        return true
+    }
+
+    /** 保存全部待提交草稿，供完整服务器副本创建前形成已确认状态；任何失败都会阻止上传。 */
+    suspend fun savePending() {
+        editorState.materializeSelectedSnapshotDefaults()
+        editorState.documents.filter { it.dirty }.toList().forEach { saveDocument(it) }
+    }
+
+    /**
+     * 提交一个草稿并保留操作期间发生的内存编辑。
+     * @param submitted 本次提交的不可变草稿版本。
+     */
+    private suspend fun saveDocument(submitted: EditorDocument) {
         autoSaveCoordinator.recordAttempt(submitted)
         val saved = gateway.saveNote(
             objectId = submitted.id.takeIf { submitted.persisted },
@@ -63,7 +78,6 @@ internal class WorkspaceNoteSaveDelegate(
                 draftVersion = current?.draftVersion ?: submitted.draftVersion,
             ),
         )
-        return true
     }
 
     /**

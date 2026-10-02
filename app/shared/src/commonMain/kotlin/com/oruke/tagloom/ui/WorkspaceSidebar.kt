@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.TagloomEditorState
+import com.oruke.tagloom.platform.WorkspaceStorageMode
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.platform.testTag
@@ -48,6 +49,7 @@ import tagloom.app.shared.generated.resources.*
  * @param onOpenSupertags 打开超级标签管理。
  * @param supertagsSelected 当前是否显示超级标签维护页。
  * @param modifier 外部布局修饰符。
+ * @param storageMode 当前设备已实际启用的工作区模式。
  */
 @Composable
 internal fun WorkspaceSidebar(
@@ -60,6 +62,7 @@ internal fun WorkspaceSidebar(
     onOpenSupertags: () -> Unit = {},
     supertagsSelected: Boolean = false,
     modifier: Modifier = Modifier,
+    storageMode: WorkspaceStorageMode = WorkspaceStorageMode.LOCAL,
 ) {
     Surface(
         modifier = modifier.fillMaxHeight(),
@@ -135,7 +138,7 @@ internal fun WorkspaceSidebar(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
-            SidebarSessionStatus()
+            SidebarSessionStatus(storageMode)
         }
     }
 }
@@ -302,10 +305,11 @@ private fun SidebarDocumentItem(
 }
 
 /**
- * 渲染不会与导航争夺注意力的本地解锁状态。
+ * 渲染已解锁状态与当前实际存储模式，不能把服务器模式显示为仅本地。
+ * @param mode 此设备当前工作区模式。
  */
 @Composable
-private fun SidebarSessionStatus() {
+private fun SidebarSessionStatus(mode: WorkspaceStorageMode) {
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     Row(
         modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
@@ -317,7 +321,8 @@ private fun SidebarSessionStatus() {
             shape = CircleShape,
         ) {}
         Text(
-            stringResource(Res.string.editor_sidebar_status_local_unlocked),
+            stringResource(if (mode == WorkspaceStorageMode.SERVER) Res.string.workspace_mode_server_unlocked
+                else Res.string.editor_sidebar_status_local_unlocked),
             modifier = Modifier.padding(start = 8.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

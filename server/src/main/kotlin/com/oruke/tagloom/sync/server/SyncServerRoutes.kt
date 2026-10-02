@@ -31,14 +31,6 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.Serializable
-
-/** 面向客户端的稳定同步错误体。 */
-@Serializable
-data class SyncApiError(
-    /** 可用于客户端分支处理的稳定错误码。 */
-    val code: String,
-)
 
 /** 携带安全 HTTP 状态与稳定错误码的同步协议异常。 */
 class SyncHttpException(
@@ -53,6 +45,7 @@ class SyncHttpException(
  *
  * @param store 只保存端到端密文的内容寻址存储。
  * @param authenticator 设备 Token 认证器。
+ * @param signatureService 验证密文作者签名的密码学服务。
  */
 fun Application.installSyncServer(
     store: BlindSyncStore,
@@ -64,16 +57,16 @@ fun Application.installSyncServer(
     }
     install(StatusPages) {
         exception<SyncHttpException> { call, error ->
-            call.respond(error.status, SyncApiError(error.errorCode))
+            call.respondSyncProblem(error.status, error.errorCode)
         }
         exception<IllegalArgumentException> { call, _ ->
-            call.respond(HttpStatusCode.BadRequest, SyncApiError("invalid_request"))
+            call.respondSyncProblem(HttpStatusCode.BadRequest, "invalid_request")
         }
         exception<BlindSyncContentConflictException> { call, _ ->
-            call.respond(HttpStatusCode.Conflict, SyncApiError("content_id_conflict"))
+            call.respondSyncProblem(HttpStatusCode.Conflict, "content_id_conflict")
         }
         exception<Throwable> { call, _ ->
-            call.respond(HttpStatusCode.InternalServerError, SyncApiError("internal_error"))
+            call.respondSyncProblem(HttpStatusCode.InternalServerError, "internal_error")
         }
     }
 
@@ -90,6 +83,7 @@ fun Application.installSyncServer(
                 val identity = authenticateRequest(call, authenticator)
                 val request = call.receive<SyncPushRequest>()
                 validatePushRequest(
+                    store = store,
                     request = request,
                     identity = identity,
                     authenticator = authenticator,
@@ -127,6 +121,7 @@ fun Application.installSyncServer(
                 val identity = authenticateRequest(call, authenticator)
                 val request = call.receive<SyncPushRequest>()
                 validatePushRequest(
+                    store = store,
                     request = request,
                     identity = identity,
                     authenticator = authenticator,
@@ -191,12 +186,14 @@ private fun authenticateRequest(
  * 已认证设备可以转发同一工作区内其他已登记设备的历史密文，不能伪造或改写其内容。
  *
  * @param request 已完成结构反序列化的批次。
+ * @param store 已接受的历史密文存储，用于识别撤销后的合法幂等重传。
  * @param identity 当前认证设备身份。
  * @param authenticator 设备 Token 与历史签名公钥目录。
  * @param signatureService Ed25519 artifact 签名验证服务。
  * @param expectedKind 指定 endpoint 要求的类型；为空时只允许非 Change 类型。
  */
 private suspend fun validatePushRequest(
+    store: BlindSyncStore,
     request: SyncPushRequest,
     identity: SyncDeviceIdentity,
     authenticator: SyncDeviceAuthenticator,
@@ -217,6 +214,11 @@ private suspend fun validatePushRequest(
             throw SyncHttpException(HttpStatusCode.BadRequest, "artifact_integrity_failed")
         }
         val authorIdentity = SyncDeviceIdentity(identity.workspaceId, artifact.descriptor.actorId)
+        if (!authenticator.isActive(authorIdentity)) {
+            // 撤销后只允许重传已经接受的历史，不允许另一设备代传该作者的新签名内容。
+            val existing = store.getArtifacts(identity.workspaceId, artifact.descriptor.kind, listOf(artifact.artifactId))
+            if (existing.singleOrNull() != artifact) throw SyncHttpException(HttpStatusCode.Forbidden, "artifact_author_revoked")
+        }
         val signingPublicKey = authenticator.signingPublicKey(authorIdentity)
             ?: throw SyncHttpException(HttpStatusCode.Forbidden, "artifact_author_unknown")
         try {

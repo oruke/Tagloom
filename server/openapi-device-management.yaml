@@ -1,0 +1,649 @@
+openapi: 3.1.0
+info:
+  title: Tagloom device management and server recovery
+  version: 1.0.0
+  description: 'Device management and encrypted recovery API. Resources: a workspace owns devices and at most one current
+    RecoverySnapshot; the recovery locator maps to that workspace. Server never receives the Recovery Key, workspace
+    master key or signing seed.
+
+
+    Versioning: additive fields remain in /v1; clients ignore unknown response fields. Incompatible behavior requires
+    a new version and explicit migration; no /v1 retirement is scheduled. Legacy sync artifact APIs remain unchanged.
+
+
+    Recovery derivation: HKDF-SHA-256 with empty salt, 32-byte output; lookup info is tagloom/server-recovery/lookup/v1
+    and auth info is tagloom/server-recovery/auth/v1. Lowercase-hex auth output is used as the bearer token. Only its
+    SHA-256 is stored. The original Recovery Key remains on the client.
+
+
+    Transport: HTTPS is required for production; reject redirects and never log authorization headers, JSON bodies or
+    recovery material. Archive default cap is 512 MiB (TAGLOOM_SYNC_MAX_RECOVERY_BYTES). Management JSON cap is 8192
+    bytes including chunked bodies. Configure request-rate and upload-concurrency limits at the TLS reverse proxy. There
+    is no application-level rate limiter in this version.
+
+
+    Persistence: exclusive process lease, fsync and atomic registry replacement. Legacy credentials are imported once.
+    Revocation survives restarts; the final active device can only be revoked if a confirmed recovery copy exists. Historical
+    public keys remain available. Older archives are retained; automatic archive garbage collection is not implemented.
+
+
+    Error catalog: authentication_required, authentication_failed, bootstrap_authentication_failed, recovery_authentication_failed
+    (401); artifact_author_revoked and existing sync authorization codes (403); device_not_found, recovery_not_ready
+    (404); workspace_already_registered, device_already_registered, device_revoked, credential_changed, last_active_device,
+    recovery_revision_changed, recovery_identity_conflict, content_id_conflict (409); invalid_request, recovery_archive_integrity_failed
+    (400); management_request_too_large, recovery_archive_too_large (413); internal_error (500). Each code uses type
+    urn:tagloom:sync:error:<code>. Recovery lookup does not distinguish nonexistent locators from incorrect proof.
+
+
+    This API publishes explicit recovery copies; it does not merge whole-workspace archives or imply continuous bidirectional
+    sync.'
+servers:
+- url: https://sync.example.invalid
+  description: Illustrative deployment; replace with your configured HTTPS server.
+tags:
+- name: Devices
+  description: Workspace-scoped enrollment and credential lifecycle.
+- name: Recovery
+  description: Opaque encrypted copies and recovery proof enrollment.
+paths:
+  /v1/workspaces/{workspaceId}:
+    parameters:
+    - $ref: '#/components/parameters/workspaceId'
+    put:
+      operationId: registerWorkspace
+      summary: Register the first device without exposing workspace keys
+      tags:
+      - Devices
+      security:
+      - BootstrapBearer: []
+      responses:
+        '200':
+          description: Confirmed result; identical retries return the existing result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceRegistration'
+  /v1/workspaces/{workspaceId}/devices:
+    parameters:
+    - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: listDevices
+      summary: List active and revoked public keys
+      tags:
+      - Devices
+      security:
+      - DeviceBearer: []
+        DeviceActor: []
+      responses:
+        '200':
+          description: Confirmed result; identical retries return the existing result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevicePage'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+      parameters:
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: cursor
+        in: query
+        schema:
+          type: string
+          maxLength: 512
+        description: Opaque nextCursor bound to this workspace. Results ordered by actorId.
+  /v1/workspaces/{workspaceId}/devices/{actorId}:
+    parameters:
+    - $ref: '#/components/parameters/workspaceId'
+    - $ref: '#/components/parameters/actorId'
+    put:
+      operationId: registerDevice
+      summary: Enroll a device in the authenticated workspace
+      tags:
+      - Devices
+      security:
+      - DeviceBearer: []
+        DeviceActor: []
+      responses:
+        '200':
+          description: Confirmed result; identical retries return the existing result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegistration'
+    delete:
+      operationId: revokeDevice
+      summary: Revoke access while retaining historical signature verification keys
+      tags:
+      - Devices
+      security:
+      - DeviceBearer: []
+        DeviceActor: []
+      responses:
+        '204':
+          description: Revoked; repeat revocation by another active device is idempotent.
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+  /v1/workspaces/{workspaceId}/devices/{actorId}/credentials:
+    parameters:
+    - $ref: '#/components/parameters/workspaceId'
+    - $ref: '#/components/parameters/actorId'
+    put:
+      operationId: rotateDeviceCredential
+      summary: Replace an access digest using a compare-and-set precondition
+      tags:
+      - Devices
+      security:
+      - DeviceBearer: []
+        DeviceActor: []
+      responses:
+        '200':
+          description: Confirmed result; identical retries return the existing result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialUpdate'
+  /v1/workspaces/{workspaceId}/recovery-snapshot:
+    parameters:
+    - $ref: '#/components/parameters/workspaceId'
+    put:
+      operationId: publishRecoverySnapshot
+      summary: Publish a complete opaque encrypted archive with a revision precondition
+      tags:
+      - Recovery
+      security:
+      - DeviceBearer: []
+        DeviceActor: []
+      responses:
+        '200':
+          description: Confirmed result; identical retries return the existing result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoverySnapshot'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+      parameters:
+      - name: X-Tagloom-Recovery-Revision
+        in: header
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+        description: Known server revision; zero for the initial copy. Exact-content retries of the latest publication
+          are idempotent.
+      - name: X-Tagloom-Recovery-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        description: HKDF-SHA-256 recovery lookup value; never the Recovery Key.
+      - name: X-Tagloom-Recovery-Token-Sha256
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        description: SHA-256 of the UTF-8 lowercase-hex recovery access token.
+      - name: X-Tagloom-Archive-Sha256
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        description: SHA-256 of all encrypted ZIP bytes.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+    get:
+      operationId: downloadRecoverySnapshot
+      summary: Download the current confirmed encrypted archive
+      tags:
+      - Recovery
+      security:
+      - DeviceBearer: []
+        DeviceActor: []
+      responses:
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+        '200':
+          description: The encrypted ZIP stream. Clients must verify digest, size and local AEAD before use.
+          headers:
+            X-Tagloom-Archive-Sha256:
+              schema:
+                type: string
+                pattern: ^[0-9a-f]{64}$
+                description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+            X-Tagloom-Recovery-Revision:
+              schema:
+                type: integer
+                format: int64
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /v1/recoveries/{recoveryId}/devices/{actorId}:
+    parameters:
+    - $ref: '#/components/parameters/recoveryId'
+    - $ref: '#/components/parameters/actorId'
+    put:
+      operationId: recoverWorkspace
+      summary: Locate original workspace and authorize a fresh device with recovery proof
+      tags:
+      - Devices
+      security:
+      - RecoveryBearer: []
+      responses:
+        '200':
+          description: Confirmed result; identical retries return the existing result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveredWorkspace'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '413':
+          $ref: '#/components/responses/413'
+        '500':
+          $ref: '#/components/responses/500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegistration'
+components:
+  securitySchemes:
+    BootstrapBearer:
+      type: http
+      scheme: bearer
+      description: Independent deployment credential. Only its SHA-256 is configured on the server.
+    DeviceBearer:
+      type: http
+      scheme: bearer
+      description: Random device access token; send X-Tagloom-Actor alongside it.
+    DeviceActor:
+      type: apiKey
+      in: header
+      name: X-Tagloom-Actor
+      description: Opaque active device identity bound to the bearer credential.
+    RecoveryBearer:
+      type: http
+      scheme: bearer
+      description: Domain-separated recovery authentication material; not the Recovery Key.
+  parameters:
+    workspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      description: Opaque workspaceId.
+      schema:
+        type: string
+        pattern: ^[A-Za-z0-9_-]{1,128}$
+        examples:
+        - sample-device
+    actorId:
+      name: actorId
+      in: path
+      required: true
+      description: Opaque actorId.
+      schema:
+        type: string
+        pattern: ^[A-Za-z0-9_-]{1,128}$
+        examples:
+        - sample-device
+    recoveryId:
+      name: recoveryId
+      in: path
+      required: true
+      description: Opaque recoveryId.
+      schema:
+        type: string
+        pattern: ^[0-9a-f]{64}$
+        description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+  schemas:
+    WorkspaceRegistration:
+      type: object
+      required:
+      - actorId
+      - tokenSha256
+      - signingPublicKeyHex
+      properties:
+        actorId:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,128}$
+          examples:
+          - sample-device
+        tokenSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        signingPublicKeyHex:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+      examples:
+      - actorId: sample-device
+        tokenSha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        signingPublicKeyHex: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    DeviceRegistration:
+      type: object
+      required:
+      - tokenSha256
+      - signingPublicKeyHex
+      properties:
+        tokenSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        signingPublicKeyHex:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+    CredentialUpdate:
+      type: object
+      required:
+      - expectedTokenSha256
+      - tokenSha256
+      properties:
+        expectedTokenSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        tokenSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+    Device:
+      type: object
+      required:
+      - actorId
+      - signingPublicKeyHex
+      - registeredAt
+      properties:
+        actorId:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,128}$
+          examples:
+          - sample-device
+        signingPublicKeyHex:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        registeredAt:
+          type: string
+          format: date-time
+        revokedAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      examples:
+      - actorId: sample-device
+        signingPublicKeyHex: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        registeredAt: '2026-01-01T00:00:00Z'
+    DevicePage:
+      type: object
+      required:
+      - devices
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+        nextCursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+    RecoverySnapshot:
+      type: object
+      required:
+      - workspaceId
+      - revision
+      - sha256
+      - size
+      - createdAt
+      properties:
+        workspaceId:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,128}$
+          examples:
+          - sample-device
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lowercase SHA-256 digest, or 32-byte public material as specified.
+        size:
+          type: integer
+          format: int64
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+      examples:
+      - workspaceId: sample-workspace
+        revision: 1
+        sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+        size: 1024
+        createdAt: '2026-01-01T00:00:00Z'
+    RecoveredWorkspace:
+      type: object
+      required:
+      - workspaceId
+      - device
+      - snapshot
+      properties:
+        workspaceId:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,128}$
+          examples:
+          - sample-device
+        device:
+          $ref: '#/components/schemas/Device'
+        snapshot:
+          $ref: '#/components/schemas/RecoverySnapshot'
+    Problem:
+      type: object
+      required:
+      - code
+      - type
+      - title
+      - status
+      - detail
+      properties:
+        code:
+          type: string
+          description: Stable compatibility code; see error catalog in this specification.
+        type:
+          type: string
+          format: uri
+          examples:
+          - urn:tagloom:sync:error:authentication_failed
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+  responses:
+    '400':
+      description: Malformed input or archive digest mismatch.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    '401':
+      description: Missing or invalid authorization; missing recovery locator and wrong proof use the same response.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    '403':
+      description: Device not permitted to perform this operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    '404':
+      description: Requested device or recovery copy is not available.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    '409':
+      description: Identity or revision conflict; never automatically overwrite.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    '413':
+      description: Management JSON exceeds 8192 bytes, or archive exceeds configured limit.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    '500':
+      description: Storage or internal failure; no secret exception details are returned.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

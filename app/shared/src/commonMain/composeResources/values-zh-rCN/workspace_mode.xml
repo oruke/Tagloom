@@ -1,0 +1,21 @@
+<resources>
+    <string name="workspace_mode_title">工作区模式</string>
+    <string name="workspace_mode_local">本地模式</string>
+    <string name="workspace_mode_server">服务器模式</string>
+    <string name="workspace_mode_server_unlocked">已解锁 · 服务器模式</string>
+    <string name="workspace_mode_manage">管理工作区模式</string>
+    <string name="workspace_mode_choose_description">两种模式都支持新建或恢复，可随时在设置中切换。</string>
+    <string name="workspace_mode_settings_description">选择仅在本地保存，或自动更新服务器上的加密副本。</string>
+    <string name="workspace_mode_local_description">笔记仅保存在此设备。停止上传，已有服务器副本会保留；切回时继续使用当前工作区。</string>
+    <string name="workspace_mode_server_description">本地保存后自动更新服务器副本，断网后会重试。其他设备的新内容不会自动合并到此设备。</string>
+    <string name="workspace_mode_restore_local">从本地文件夹恢复</string>
+    <string name="workspace_mode_restore_local_description">输入恢复密钥，然后选择原有的工作区文件夹，找回其中的笔记。</string>
+    <string name="workspace_mode_select_folder_restore">选择文件夹并恢复</string>
+    <string name="workspace_mode_create_server_description">创建独立的新工作区，保存恢复密钥后连接服务器。笔记在本机加密保存，并自动更新到服务器。</string>
+    <string name="workspace_mode_enable_server">连接并切换到服务器模式</string>
+    <string name="workspace_mode_automatic_enabled">自动更新已启用，当前内容已上传。</string>
+    <string name="workspace_mode_pending">本地修改已保存，等待更新服务器副本。</string>
+    <string name="workspace_mode_updating">正在更新服务器副本，本地编辑可继续。</string>
+    <string name="workspace_mode_error_hint">本地笔记已保留。可在设置 → 工作区模式中重试或切换到本地模式。</string>
+    <string name="workspace_mode_registration_required">此工作区尚未在服务器登记，请填写服务器管理员提供的登记访问码。</string>
+</resources>

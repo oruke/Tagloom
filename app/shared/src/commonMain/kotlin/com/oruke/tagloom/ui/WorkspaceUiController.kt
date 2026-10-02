@@ -113,6 +113,21 @@ internal class WorkspaceUiController(
     /** 统一编排 Note 保存与自动保存版本去重。 */
     private val noteSaveDelegate = WorkspaceNoteSaveDelegate(gateway, editorState)
 
+    /** 服务器恢复页面状态与操作，独立于编辑器写入和查询职责。 */
+    val serverRecovery = WorkspaceServerRecoveryController(this)
+
+    /** 在上传完整恢复副本前提交当前会话的全部草稿。 */
+    internal suspend fun flushPendingNotes() = noteSaveDelegate.savePending()
+
+    /**
+     * 接受已验证的服务器恢复结果并刷新当前设备的最近入口。
+     * @param result 已完成本机认证及凭据保护的恢复结果。
+     */
+    internal suspend fun acceptServerRecovery(result: WorkspaceOpenResult) {
+        open(result)
+        recentWorkspace = gateway.recentWorkspaceOrNull()
+    }
+
     /**
      * 读取本机最近登记工作区，决定自动打开、PIN 解锁还是首次连接入口。
      *
@@ -148,7 +163,16 @@ internal class WorkspaceUiController(
      * @param pin 用户为当前设备设置的可选 PIN；为空时不启用 PIN。
      */
     suspend fun prepareCreation(pin: String?) = runOperation {
+        serverRecovery.cancelCreation()
         val prepared = gateway.prepareCreation(pin) ?: return@runOperation
+        presentPreparedCreation(prepared)
+    }
+
+    /**
+     * 展示本地或服务器新建共用的恢复密钥确认页面。
+     * @param prepared 尚未确认发布的新工作区材料。
+     */
+    internal fun presentPreparedCreation(prepared: com.oruke.tagloom.platform.WorkspacePreparedCreation) {
         preparedRecoveryKey = prepared.recoveryKeyText
         phase = WorkspaceUiPhase.RECOVERY_CONFIRMATION
     }
@@ -157,9 +181,11 @@ internal class WorkspaceUiController(
      * 在 Recovery Key 已确认后落盘并打开新工作区。
      */
     suspend fun confirmCreation() = runOperation {
+        val recoveryKey = requireNotNull(preparedRecoveryKey)
         open(gateway.confirmCreation())
         recentWorkspace = gateway.recentWorkspaceOrNull()
         preparedRecoveryKey = null
+        serverRecovery.finishCreation(recoveryKey)
     }
 
     /**
@@ -167,6 +193,7 @@ internal class WorkspaceUiController(
      */
     fun cancelCreation() {
         gateway.cancelCreation()
+        serverRecovery.cancelCreation()
         preparedRecoveryKey = null
         errorMessage = null
         phase = WorkspaceUiPhase.WELCOME
@@ -355,6 +382,7 @@ internal class WorkspaceUiController(
      */
     suspend fun lock() = runOperation {
         gateway.lock()
+        serverRecovery.clear()
         editorState.clearWorkspace()
         databaseController.clear()
         noteSaveDelegate.resetAutoSaveAttempt()
@@ -424,6 +452,8 @@ internal class WorkspaceUiController(
         statusMessage = null
         try {
             block()
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
         } catch (error: Throwable) {
             errorMessage = failureMessage
         } finally {

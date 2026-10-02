@@ -29,6 +29,7 @@ import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.workspace_action_cancel
 import tagloom.app.shared.generated.resources.workspace_action_save
+import tagloom.app.shared.generated.resources.workspace_mode_error_hint
 import tagloom.app.shared.generated.resources.workspace_note_delete_confirm
 import tagloom.app.shared.generated.resources.workspace_note_delete_description
 import tagloom.app.shared.generated.resources.workspace_note_delete_title
@@ -79,7 +80,10 @@ internal fun WorkspaceSessionShell(
     var saveQueryDialog by remember { mutableStateOf(false) }
     var workspaceMenuOpen by remember { mutableStateOf(false) }
     var searchPaletteOpen by remember { mutableStateOf(false) }
+    var serverRecoveryOpen by remember { mutableStateOf(false) }
     val selectedDocument = controller.editorState.selectedDocument
+
+    LaunchedEffect(controller) { controller.serverRecovery.observeAutomaticUpdates() }
 
     LaunchedEffect(selectedDocument?.id, selectedDocument?.draftVersion, selectedDocument?.dirty, controller.busy) {
         if (selectedDocument?.dirty == true && !controller.busy) {
@@ -93,12 +97,14 @@ internal fun WorkspaceSessionShell(
     Box(Modifier.fillMaxSize()) {
         TagloomWorkspaceScreen(
             state = controller.editorState,
+            storageMode = controller.serverRecovery.status?.mode ?: com.oruke.tagloom.platform.WorkspaceStorageMode.LOCAL,
             supertagController = controller.supertags,
             databaseController = controller.databaseController,
             documentFileGateway = documentFileGateway,
             onSaveRequest = onSave,
             settingsContent = { onBack ->
-                WorkspaceSettingsScreen(
+                if (serverRecoveryOpen) ServerRecoverySettingsPane(controller, coroutineScope, onBack = { serverRecoveryOpen = false })
+                else WorkspaceSettingsScreen(
                     requiresPin = controller.recentWorkspace?.requiresPin == true,
                     busy = controller.busy,
                     statusMessage = controller.statusMessage,
@@ -107,6 +113,7 @@ internal fun WorkspaceSessionShell(
                     onBackup = onBackup,
                     onRotateMasterKey = { rotateMasterKey = true },
                     onLock = onLock,
+                    onServerRecovery = if (controller.serverRecovery.available) ({ serverRecoveryOpen = true }) else null,
                 )
             },
             onWorkspaceMenuRequest = {
@@ -164,6 +171,19 @@ internal fun WorkspaceSessionShell(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                 )
+            }
+        }
+        controller.serverRecovery.errorCode?.let { code ->
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = MaterialTheme.shapes.small,
+            ) {
+                androidx.compose.foundation.layout.Column(Modifier.padding(12.dp)) {
+                    ServerRecoveryError(code)
+                    Text(stringResource(tagloom.app.shared.generated.resources.Res.string.workspace_mode_error_hint),
+                        style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }

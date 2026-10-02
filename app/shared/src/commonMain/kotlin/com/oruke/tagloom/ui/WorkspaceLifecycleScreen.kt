@@ -1,5 +1,8 @@
 package com.oruke.tagloom.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,9 +70,16 @@ fun WorkspaceLifecycleScreen(
             recentWorkspace = controller.recentWorkspace,
             busy = controller.busy,
             errorMessage = controller.errorMessage,
+            serverRecovery = controller.serverRecovery,
+            onRestoreServer = { address, key, pin ->
+                coroutineScope.launch { controller.serverRecovery.restore(address, key, pin) }
+            },
             onOpenRecent = { coroutineScope.launch { controller.openRecentWorkspace() } },
             onUnlock = { pin -> coroutineScope.launch { controller.unlockRecentWorkspace(pin) } },
             onCreate = { pin -> coroutineScope.launch { controller.prepareCreation(pin) } },
+            onCreateServer = { address, bootstrap, pin ->
+                coroutineScope.launch { controller.serverRecovery.prepareCreation(address, bootstrap, pin) }
+            },
             onRecover = { recoveryKey, pin ->
                 coroutineScope.launch { controller.unlockWithRecovery(recoveryKey, pin) }
             },
@@ -116,241 +126,6 @@ fun WorkspaceLifecycleScreen(
             onBackup = { coroutineScope.launch { controller.createBackup() } },
             onLock = { coroutineScope.launch { controller.lock() } },
         )
-    }
-}
-
-/**
- * 表示锁定页当前展示的本机访问动作。
- */
-private enum class WorkspaceAccessMode {
-    /** 打开最近登记工作区。 */
-    RECENT,
-
-    /** 选择创建或连接工作区。 */
-    CHOOSE,
-
-    /** 创建新工作区并选择是否启用本机 PIN。 */
-    CREATE,
-
-    /** 使用 Recovery Key 连接或恢复工作区，并选择是否启用本机 PIN。 */
-    RECOVER,
-}
-
-/**
- * 渲染最近工作区优先的锁定入口，并把 Recovery Key 操作后置到显式连接流程。
- *
- * @param recentWorkspace 本机最近登记工作区；为空时显示首次使用入口。
- * @param busy 是否正在执行本机访问或工作区认证。
- * @param errorMessage 当前可安全展示的本地化错误。
- * @param onOpenRecent 使用当前设备系统保护材料重新打开最近工作区。
- * @param onUnlock 使用 PIN 解锁最近登记工作区。
- * @param onCreate 使用可选 PIN 准备新工作区创建。
- * @param onRecover 使用 Recovery Key 和可选 PIN 连接既有工作区。
- * @param onRestoreBackup 使用 Recovery Key 和可选 PIN 恢复密文备份。
- */
-@Composable
-private fun WorkspaceWelcomePane(
-    recentWorkspace: WorkspaceRecentWorkspace?,
-    busy: Boolean,
-    errorMessage: WorkspaceUiMessage?,
-    onOpenRecent: () -> Unit,
-    onUnlock: (String) -> Unit,
-    onCreate: (String?) -> Unit,
-    onRecover: (String, String?) -> Unit,
-    onRestoreBackup: (String, String?) -> Unit,
-) {
-    var mode by remember(recentWorkspace) {
-        mutableStateOf(if (recentWorkspace == null) WorkspaceAccessMode.CHOOSE else WorkspaceAccessMode.RECENT)
-    }
-    var pin by remember { mutableStateOf("") }
-    var confirmedPin by remember { mutableStateOf("") }
-    var recoveryKey by remember { mutableStateOf("") }
-    var pinEnabled by remember(mode) { mutableStateOf(false) }
-    val pinValid = pin.length in 6..12 && pin.all(Char::isDigit)
-    val pinProtectionActive = when (mode) {
-        WorkspaceAccessMode.RECENT -> recentWorkspace?.requiresPin == true
-        WorkspaceAccessMode.CHOOSE -> false
-        WorkspaceAccessMode.CREATE, WorkspaceAccessMode.RECOVER -> pinEnabled
-    }
-
-    CenteredWorkspaceCard {
-        Text(stringResource(Res.string.workspace_app_name), style = MaterialTheme.typography.headlineLarge)
-        when (mode) {
-            WorkspaceAccessMode.RECENT -> {
-                val workspace = requireNotNull(recentWorkspace)
-                Text(
-                    stringResource(Res.string.workspace_access_continue_to, workspace.displayName),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                if (workspace.requiresPin) {
-                    WorkspacePinTextField(
-                        value = pin,
-                        onValueChange = { value -> pin = value },
-                        label = stringResource(Res.string.workspace_access_pin_label),
-                        enabled = !busy,
-                    )
-                    Button(
-                        onClick = { onUnlock(pin) },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy && pinValid,
-                    ) {
-                        Text(stringResource(Res.string.workspace_access_unlock))
-                    }
-                } else {
-                    Text(
-                        stringResource(Res.string.workspace_access_auto_open_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Button(
-                        onClick = onOpenRecent,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                    ) {
-                        Text(stringResource(Res.string.workspace_access_open))
-                    }
-                }
-                TextButton(
-                    onClick = {
-                        pin = ""
-                        confirmedPin = ""
-                        recoveryKey = ""
-                        mode = WorkspaceAccessMode.RECOVER
-                    },
-                    enabled = !busy,
-                ) {
-                    Text(stringResource(Res.string.workspace_access_use_another))
-                }
-            }
-
-            WorkspaceAccessMode.CHOOSE -> {
-                Text(
-                    stringResource(Res.string.workspace_access_create_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Button(
-                    onClick = { mode = WorkspaceAccessMode.CREATE },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !busy,
-                ) {
-                    Text(stringResource(Res.string.workspace_access_create))
-                }
-                OutlinedButton(
-                    onClick = { mode = WorkspaceAccessMode.RECOVER },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !busy,
-                ) {
-                    Text(stringResource(Res.string.workspace_access_recover))
-                }
-            }
-
-            WorkspaceAccessMode.CREATE -> {
-                Text(
-                    stringResource(Res.string.workspace_access_create_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(stringResource(Res.string.workspace_access_create_description))
-                OptionalPinSetup(
-                    pinEnabled = pinEnabled,
-                    onPinEnabledChange = { value ->
-                        pinEnabled = value
-                        if (!value) {
-                            pin = ""
-                            confirmedPin = ""
-                        }
-                    },
-                    pin = pin,
-                    onPinChange = { value -> pin = value },
-                    confirmedPin = confirmedPin,
-                    onConfirmedPinChange = { value -> confirmedPin = value },
-                    enabled = !busy,
-                )
-                Button(
-                    onClick = { onCreate(pin.takeIf { pinEnabled }) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !busy && (!pinEnabled || pinValid && pin == confirmedPin),
-                ) {
-                    Text(stringResource(Res.string.workspace_access_create))
-                }
-                TextButton(
-                    onClick = { mode = if (recentWorkspace == null) WorkspaceAccessMode.CHOOSE else WorkspaceAccessMode.RECENT },
-                    enabled = !busy,
-                ) {
-                    Text(stringResource(Res.string.workspace_access_back))
-                }
-            }
-
-            WorkspaceAccessMode.RECOVER -> {
-                Text(
-                    stringResource(Res.string.workspace_access_recover_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(stringResource(Res.string.workspace_access_recover_description))
-                OutlinedTextField(
-                    value = recoveryKey,
-                    onValueChange = { value -> recoveryKey = value },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(Res.string.workspace_access_recovery_key_label)) },
-                    minLines = 2,
-                    enabled = !busy,
-                )
-                OptionalPinSetup(
-                    pinEnabled = pinEnabled,
-                    onPinEnabledChange = { value ->
-                        pinEnabled = value
-                        if (!value) {
-                            pin = ""
-                            confirmedPin = ""
-                        }
-                    },
-                    pin = pin,
-                    onPinChange = { value -> pin = value },
-                    confirmedPin = confirmedPin,
-                    onConfirmedPinChange = { value -> confirmedPin = value },
-                    enabled = !busy,
-                )
-                Button(
-                    onClick = { onRecover(recoveryKey, pin.takeIf { pinEnabled }) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !busy && recoveryKey.isNotBlank() && (!pinEnabled || pinValid && pin == confirmedPin),
-                ) {
-                    Text(stringResource(Res.string.workspace_access_recover))
-                }
-                OutlinedButton(
-                    onClick = { onRestoreBackup(recoveryKey, pin.takeIf { pinEnabled }) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !busy && recoveryKey.isNotBlank() && (!pinEnabled || pinValid && pin == confirmedPin),
-                ) {
-                    Text(stringResource(Res.string.workspace_access_restore_backup))
-                }
-                TextButton(
-                    onClick = { mode = if (recentWorkspace == null) WorkspaceAccessMode.CHOOSE else WorkspaceAccessMode.RECENT },
-                    enabled = !busy,
-                ) {
-                    Text(stringResource(Res.string.workspace_access_back))
-                }
-            }
-        }
-        Text(
-            stringResource(
-                if (pinProtectionActive) {
-                    Res.string.workspace_access_pin_security_note
-                } else {
-                    Res.string.workspace_access_device_security_note
-                },
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (busy) {
-            Text(
-                stringResource(Res.string.workspace_access_busy),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        errorMessage?.let { message ->
-            Text(message.localizedText(), color = MaterialTheme.colorScheme.error)
-        }
     }
 }
 
@@ -470,15 +245,15 @@ private fun ReadOnlyRecoveryPane(
  * @param content 卡片内容。
  */
 @Composable
-private fun CenteredWorkspaceCard(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+internal fun CenteredWorkspaceCard(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(32.dp), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.widthIn(max = 620.dp),
             shape = MaterialTheme.shapes.large,
             tonalElevation = 3.dp,
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(28.dp),
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(28.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 content = { content() },
             )

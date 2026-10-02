@@ -48,6 +48,8 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 - AnySync 启发的对象 Change DAG、内容寻址密文、heads/inventory 差集同步。
 - Change、Snapshot、Blob、Manifest 密文载荷和 Ed25519 作者签名。
 - Ktor 自部署盲同步服务：服务端只验证公开完整性、设备身份、签名和 DAG 父关系，不持有工作区明文密钥。
+- 持久化设备登记、访问凭据更新、撤销及历史公钥目录；旧凭据文件仅首次迁移，撤销在重启后继续生效。
+- 本地模式与服务器模式：两种模式都能新建和凭 Recovery Key 恢复，可在设置中随时切换。服务器模式在本地保存后自动更新完整密文副本；新设备通过服务器地址与 Recovery Key 找回原工作区，本地模式通过既有文件夹与 Recovery Key 恢复。
 - Agent/CLI/MCP 共用默认拒绝、Note allow-list、风险分级确认和审计契约。
 - AI 上下文硬预算、附件原名默认排除，以及可重建 Block 向量和稳定 RRF 混合排序契约。
 
@@ -60,8 +62,9 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 | Block/RichText/Markdown | `core` 与 `app/shared` 已实现 | JVM Desktop 与 Android 共用编辑和持久化入口；单篇文档文件导出仍未接入 |
 | 文件系统与加密读写 | 共用加密信封、NIO 原子写入、事务恢复和写入租约 | JVM 与 Android actual 已装配；Android 使用私有目录和 `Os.fsync` |
 | 索引与搜索 | 共用 SQL/schema、全文、标签、属性和双链查询 | JVM 使用加密 JDBC；Android 使用 SQLCipher，索引均可从快照重建 |
-| 同步 | 共用 Ktor HTTP、Change DAG 和本地密文副本 | JVM/Android 可用 `createSyncEngine(LocalSyncEngineConfiguration(...))` 显式装配；同步账号、设备登记和合并入口尚未接入 UI |
-| 服务端盲同步 | `server` 独立 JVM 实现 | 可单独启动，只接受已登记设备的密文请求 |
+| 同步 | 共用 Ktor HTTP、Change DAG 和本地密文副本 | JVM/Android 可用 `createSyncEngine(LocalSyncEngineConfiguration(...))` 显式装配；远端 Change 自动合并尚未接入 UI；服务器副本上传与恢复使用独立入口 |
+| 服务端盲同步 | `server` 独立 JVM 实现，持久化设备管理与恢复确认点 | 支持受控首次登记、设备授权/撤销及 Recovery Key 派生凭据恢复 |
+| 工作区模式与恢复 | 完整加密备份、流式 HTTP、版本冲突保护、本机设备保护凭据 | 共享欢迎页支持两种模式新建与恢复，设置可切换；服务器模式自动上传确认版本，不自动合并其他设备变更 |
 | Android | 私有工作区、Keystore、SQLCipher、Ktor 与共享 App | 支持创建、锁定/解锁、PIN、索引重建、密文备份恢复与主密钥轮换 |
 | iOS | 共享 UI 与三项能力契约可交叉编译 | 平台能力工厂为 `TODO`，需 macOS/Xcode 验证 |
 | CLI/MCP | 命令、资源 URI、工具目录与权限契约已实现 | 未提供可执行 CLI/MCP Server |
@@ -148,28 +151,29 @@ Android APK 位于 `app/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ## 启动盲同步服务
 
-服务端必须显式读取设备凭据文件，避免开放注册或默认口令启动。文件是 JSON 数组，每条记录包含随机工作区 ID、随机 Actor ID、Bearer Token 的 SHA-256 和设备 Ed25519 公钥：
-
-```json
-[
-  {
-    "workspaceId": "<random-workspace-id>",
-    "actorId": "<random-device-id>",
-    "tokenSha256": "<64-lowercase-hex-characters>",
-    "signingPublicKeyHex": "<64-lowercase-hex-characters>"
-  }
-]
-```
-
-配置环境变量后运行：
+新部署配置独立的登记访问码摘要和数据目录。登记访问码使用密码学安全随机数生成至少 32 字节，先编码为文本，再对该文本的 UTF-8 字节计算 SHA-256；服务器只保存摘要，访问码由部署者交给需要首次上传的客户端。
 
 ```powershell
-$env:TAGLOOM_SYNC_CREDENTIALS_FILE = '<credentials-json-path>'
+$env:TAGLOOM_SYNC_BOOTSTRAP_TOKEN_SHA256 = '<sha256-of-registration-code>'
 $env:TAGLOOM_SYNC_DATA_DIR = '<ciphertext-data-directory>'
+# 可选；默认单个恢复归档上限 512 MiB。
+$env:TAGLOOM_SYNC_MAX_RECOVERY_BYTES = '<maximum-archive-bytes>'
 .\gradlew.bat :server:run
 ```
 
-服务仅保存密文与公开同步描述符。生产部署仍必须在外层配置 TLS、凭据文件最小权限、备份、限流和监控。
+客户端入口：
+
+1. **本地模式 → 全新创建**：选择空文件夹并离线生成工作区与 Recovery Key。**从本地文件夹恢复**：输入恢复密钥后选择原工作区文件夹，可设置当前设备 PIN；密文 ZIP 备份导入入口继续保留。
+2. **服务器模式 → 全新创建**：填写 HTTPS 地址和登记访问码，确认保存 Recovery Key 后在应用私有目录创建工作区并上传首份密文副本。**从服务器恢复**：只需地址与 Recovery Key，自动分配独立本地副本，无需选择文件夹。
+3. **设置 → 工作区模式**可随时切换。本地转服务器时输入地址与 Recovery Key，首次登记新工作区还需要登记访问码；已有服务器副本可凭密钥重新连接，客户端先认证并核对两端权威对象，一致时才允许继续上传。成功上传后启用自动更新。服务器转本地立即取消在途上传，保留原工作区、恢复密钥和服务器已确认副本；切回时复用设备凭据，不重新建库。
+
+服务器模式仅在应用的已解锁会话中运行，每 3 秒检查已确认 manifest 版本，有变更才生成并上传密文副本；网络失败 30 秒后重试，本地编辑和保存继续可用。冲突、认证失效或密钥轮换会暂停自动上传，并在界面提示处理；设置提供“立即更新副本”供手动重试。首次服务器连接失败时，本地创建结果仍然保留，可在设置中重试。旧版手动上传配置默认保持本地模式，需要主动切换才能启用自动上传。
+
+恢复只包含最近成功上传的内容。不同设备上传使用版本前置条件，过期设备不能覆盖较新的副本；遇到冲突时，请重新从服务器恢复为独立副本核对。主密钥轮换后需要在设置中输入新 Recovery Key 并再次上传；在新副本确认前，服务器旧副本仍使用旧密钥。新副本确认后，旧恢复定位凭据失效，历史归档保留但不再通过恢复入口提供。
+
+旧部署可保留 `TAGLOOM_SYNC_CREDENTIALS_FILE` 完成一次性迁移；格式仍是包含 `workspaceId`、`actorId`、`tokenSha256`、`signingPublicKeyHex` 的 JSON 数组。正式登记库建立后不再重读旧凭据文件；损坏或未知版本会拒绝启动，不能回退到旧凭据。登记库位于数据目录的 `.server/devices.json`，同一目录只能启动一个服务写入者；应与密文归档一起备份。
+
+服务仅保存密文、随机身份、公钥与认证摘要。生产部署需在外层配置 HTTPS、数据目录最小权限、备份、认证限流和上传并发限制；客户端拒绝明文 HTTP 和自动重定向。单个客户端下载同样限制为 512 MiB，大于此值请使用本地备份。旧归档自动清理尚未实现，应监控磁盘容量。管理接口契约及错误码见 [OpenAPI 3.1](./server/openapi-device-management.yaml)。
 
 ## 验证
 
@@ -205,7 +209,7 @@ macOS 还应运行：
 
 ## v0.2 / MVP 验收状态
 
-JVM 与 Android 已共用三项能力和工作区业务流程。Android 派生数据库采用 SQLCipher，JVM 保持现有加密 SQLite 格式；数据库文件不跨设备复制，通过相同的权威加密快照重建。Android 验收需执行设备测试、实际编辑/重启以及密文备份的系统文档交互；iOS actual、同步账号配置 UI、远端变更自动合并仍未实现。
+JVM 与 Android 已共用三项能力和工作区业务流程。Android 派生数据库采用 SQLCipher，JVM 保持现有加密 SQLite 格式；数据库文件不跨设备复制，通过相同的权威加密快照重建。Android 验收需执行设备测试、实际编辑/重启以及密文备份的系统文档交互；iOS actual 和远端 Change 自动合并仍未实现；服务器恢复副本配置及新设备恢复已接入共享 UI。
 
 Android 已在 API 37、x86_64、16 KB 页大小的模拟器完成三个设备集成用例，覆盖加密持久化、Keystore/PIN、索引损坏重建、备份恢复、主密钥轮换、损坏事务隔离及真实回环 HTTP 同步。实际 App 已验证编辑、自动保存、全文搜索、横竖屏切换、系统文档备份和进程重启。APK 的 arm64/x86_64 原生库及 ZIP 对齐检查通过；API 24 与 ARM 真机运行仍未验证。
 

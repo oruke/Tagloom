@@ -1,0 +1,29 @@
+<resources>
+    <string name="server_recovery_choose_description">Start a separate workspace, or use your recovery key to restore notes you have uploaded.</string>
+    <string name="server_recovery_create_new">Create new workspace</string>
+    <string name="server_recovery_local_restore">Restore from a local folder or backup</string>
+    <string name="server_recovery_back">Back to settings</string>
+    <string name="server_recovery_restore">Restore from server</string>
+    <string name="server_recovery_restore_description">Enter your server address and recovery key to restore the latest uploaded notes. Server mode is enabled automatically. No local folder selection is needed.</string>
+    <string name="server_recovery_title">Server recovery copy</string>
+    <string name="server_recovery_description">Automatically upload an encrypted copy of your notes, note types, properties and attachments for recovery on a new device.</string>
+    <string name="server_recovery_entry_description">Keep an encrypted copy that you can restore on a new device with your recovery key.</string>
+    <string name="server_recovery_manage">Manage server copy</string>
+    <string name="server_recovery_address">Server address</string>
+    <string name="server_recovery_address_hint">Use the HTTPS address of your Tagloom server.</string>
+    <string name="server_recovery_bootstrap">Server registration code</string>
+    <string name="server_recovery_bootstrap_hint">Provided by your server administrator for first registration. Leave blank if a server copy already exists; your recovery key can reconnect it.</string>
+    <string name="server_recovery_upload">Upload recovery copy</string>
+    <string name="server_recovery_update">Update copy now</string>
+    <string name="server_recovery_uploaded_at">Last confirmed copy: %1$s</string>
+    <string name="server_recovery_key_rotated">Your master key has changed. Enter the new recovery key to update your server copy. Until then, the previous copy still uses the old key.</string>
+    <string name="server_recovery_success">Recovery copy uploaded. It is ready to restore on another device.</string>
+    <string name="server_recovery_retry">Try again</string>
+    <string name="server_recovery_invalid_address">Enter a valid HTTPS server address without credentials or query parameters.</string>
+    <string name="server_recovery_authentication_failed">The server could not authorize this request. Check the server address and recovery key or registration code.</string>
+    <string name="server_recovery_invalid_key">This recovery key could not unlock the workspace. Check that you entered the complete current key.</string>
+    <string name="server_recovery_conflict">The server copy has changed. Automatic uploads are paused and your local notes are safe. Restore a separate copy from the server to compare before uploading again.</string>
+    <string name="server_recovery_too_large">The encrypted copy exceeds the transfer limit. Use a local backup or check the server capacity limit.</string>
+    <string name="server_recovery_integrity_failed">The downloaded copy did not pass verification. Try again; your existing local workspace has not been replaced.</string>
+    <string name="server_recovery_failed">The operation could not finish. Check the server connection and available storage, then try again. Your existing workspace is preserved.</string>
+</resources>

@@ -80,6 +80,9 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.compose.uiTest)
             implementation(compose.desktop.currentOs)
+            // 恢复验收启动真实生产 Ktor 服务；仅测试依赖，不把服务端打包进客户端。
+            implementation(projects.server)
+            implementation(libs.ktor.serverNetty)
         }
     }
 }

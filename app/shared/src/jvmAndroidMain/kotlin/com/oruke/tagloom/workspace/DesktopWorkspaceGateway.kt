@@ -26,6 +26,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.UUID
+import java.nio.file.Path
+import com.oruke.tagloom.platform.WorkspaceServerRecoveryGateway
+import com.oruke.tagloom.sync.http.jvm.ServerRecoveryClient
 
 /**
  * 通过注入的文档入口编排本地工作区；JVM 与 Android 共用相同业务流程。
@@ -37,7 +40,20 @@ class DesktopWorkspaceGateway(
     private val localAccessService: DesktopWorkspaceLocalAccessService = DesktopWorkspaceLocalAccessService(),
     /** 宿主负责选择目录或传输密文备份，共享业务不区分操作系统。 */
     private val documents: WorkspaceDocumentAccess = platformWorkspaceDocuments(),
+    /** 服务器连接材料的本机私有目录，测试应注入独立临时位置。 */
+    private val recoveryAccessDirectory: Path = DesktopWorkspaceAccessPaths.defaultRegistryFile().parent.resolve("server-recovery"),
+    /** 每次操作独立创建 HTTPS 客户端，允许隔离测试注入回环传输。 */
+    private val recoveryClientFactory: (String) -> ServerRecoveryClient = { ServerRecoveryClient(it) },
 ) : WorkspaceGateway {
+    /** 与本机权威会话共用创建、备份和恢复边界的服务器入口。 */
+    private val serverRecoveryService = DesktopServerRecoveryService(
+        manager, localAccessService, ServerWorkspaceDirectoryStore(recoveryAccessDirectory.resolveSibling("server-workspaces")),
+        ServerRecoveryAccessStore(recoveryAccessDirectory), recoveryClientFactory,
+    )
+
+    /** 只向共享 UI 暴露受控恢复能力。 */
+    override val serverRecovery: WorkspaceServerRecoveryGateway get() = serverRecoveryService
+
     /**
      * 返回当前活动的本地工作区会话，供共享能力代理复用同一条索引连接。
      *
@@ -146,12 +162,14 @@ class DesktopWorkspaceGateway(
         pin: String?,
     ): WorkspaceOpenResult? = withContext(Dispatchers.IO) {
         val root = documents.recoveryDirectory() ?: return@withContext null
-        return@withContext localAccessService.establishLocalAccess(
+        val result = localAccessService.establishLocalAccess(
             root = root,
             pin = pin,
             authenticate = { secret -> manager.recoverAndReplacePasswordSlot(root, recoveryKeyText, secret) },
             onRegistrationFailure = manager::lock,
         ).toSharedWorkspaceOpenResult()
+        serverRecoveryService.useLocalMode()
+        return@withContext result
     }
 
     /**
@@ -399,6 +417,7 @@ class DesktopWorkspaceGateway(
 
     /** 锁定工作区并销毁会话密钥。 */
     override suspend fun lock(): Unit = withContext(Dispatchers.IO) {
+        serverRecoveryService.cancelTransfer()
         manager.lock()
     }
 

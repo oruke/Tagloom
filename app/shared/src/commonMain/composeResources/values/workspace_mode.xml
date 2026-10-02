@@ -1,0 +1,21 @@
+<resources>
+    <string name="workspace_mode_title">Workspace mode</string>
+    <string name="workspace_mode_local">Local mode</string>
+    <string name="workspace_mode_server">Server mode</string>
+    <string name="workspace_mode_server_unlocked">Unlocked · Server mode</string>
+    <string name="workspace_mode_manage">Manage workspace mode</string>
+    <string name="workspace_mode_choose_description">Create or restore in either mode. You can switch modes in settings at any time.</string>
+    <string name="workspace_mode_settings_description">Keep notes on this device, or automatically update an encrypted copy on your server.</string>
+    <string name="workspace_mode_local_description">Notes stay on this device. Uploads stop and the existing server copy is kept. Switching back uses the same workspace.</string>
+    <string name="workspace_mode_server_description">Automatically update the server copy after saving locally, with retries when offline. Changes from other devices are not merged automatically.</string>
+    <string name="workspace_mode_restore_local">Restore from local folder</string>
+    <string name="workspace_mode_restore_local_description">Enter your recovery key, then select the existing workspace folder to restore its notes.</string>
+    <string name="workspace_mode_select_folder_restore">Choose folder and restore</string>
+    <string name="workspace_mode_create_server_description">Create a separate workspace and save its recovery key before connecting. Notes are encrypted locally and automatically uploaded to your server.</string>
+    <string name="workspace_mode_enable_server">Connect and switch to server mode</string>
+    <string name="workspace_mode_automatic_enabled">Automatic updates are on. Your current content has been uploaded.</string>
+    <string name="workspace_mode_pending">Local changes are saved and waiting to upload.</string>
+    <string name="workspace_mode_updating">Updating your server copy. You can keep editing locally.</string>
+    <string name="workspace_mode_error_hint">Your local notes are safe. Retry or switch to local mode in Settings → Workspace mode.</string>
+    <string name="workspace_mode_registration_required">This workspace is not registered on the server yet. Enter the registration code provided by your server administrator.</string>
+</resources>

@@ -39,6 +39,13 @@ data class DeviceCredentialRecord(
 /** 抽象同步 HTTP 请求的设备身份认证。 */
 interface SyncDeviceAuthenticator {
     /**
+     * 判断设备是否仍允许提交新的密文载荷，撤销后历史公钥仍可存在。
+     * @param identity 待查询的工作区设备身份。
+     * @return 当前设备仍有效时为真。
+     */
+    fun isActive(identity: SyncDeviceIdentity): Boolean
+
+    /**
      * 验证工作区、设备与 Bearer Token 是否匹配且未撤销。
      *
      * @param identity 请求声明的随机设备身份。
@@ -70,6 +77,13 @@ class DeviceTokenAuthenticator(
     tokenHashes: Map<SyncDeviceIdentity, ByteArray>,
     signingPublicKeys: Map<SyncDeviceIdentity, ByteArray> = emptyMap(),
 ) : SyncDeviceAuthenticator {
+    /**
+     * 查询当前内存凭据是否仍有效。
+     * @param identity 待查询设备身份。
+     * @return 尚未撤销时为真。
+     */
+    override fun isActive(identity: SyncDeviceIdentity): Boolean = activeTokenHashes.containsKey(identity)
+
     /** 当前仍有效的设备 Token 摘要。 */
     private val activeTokenHashes: ConcurrentHashMap<SyncDeviceIdentity, ByteArray> = ConcurrentHashMap(
         tokenHashes.mapValues { (_, hash) ->

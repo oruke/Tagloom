@@ -78,6 +78,7 @@ internal fun WorkspaceSettingsEntry(
  * @param onBackup 选择位置并创建加密备份。
  * @param onRotateMasterKey 打开主密钥轮换确认流程。
  * @param onLock 锁定当前工作区。
+ * @param onServerRecovery 打开服务器恢复副本设置；平台未实现时为空。
  */
 @Composable
 internal fun WorkspaceSettingsScreen(
@@ -89,6 +90,7 @@ internal fun WorkspaceSettingsScreen(
     onBackup: () -> Unit,
     onRotateMasterKey: () -> Unit,
     onLock: () -> Unit,
+    onServerRecovery: (() -> Unit)? = null,
 ) {
     var dateTimeOpen by remember { mutableStateOf(false) }
     if (dateTimeOpen) {
@@ -185,6 +187,16 @@ internal fun WorkspaceSettingsScreen(
                     enabled = !busy,
                     onClick = onRotateMasterKey,
                 )
+                onServerRecovery?.let { open ->
+                    SettingsActionRow(
+                        icon = Res.drawable.ic_cloud,
+                        title = stringResource(Res.string.workspace_mode_title),
+                        description = stringResource(Res.string.workspace_mode_settings_description),
+                        action = stringResource(Res.string.workspace_mode_manage),
+                        enabled = !busy,
+                        onClick = open,
+                    )
+                }
             }
         }
     }
