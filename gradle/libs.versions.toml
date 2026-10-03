@@ -25,6 +25,7 @@ ktor = "3.5.0"
 logback = "1.5.34"
 material3 = "1.12.0-alpha03"
 syntaxmp = "0.3.0"
+mcp-sdk = "0.15.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -65,6 +66,7 @@ ktor-serverTestHost = { module = "io.ktor:ktor-server-test-host-jvm", version.re
 ktor-serverContentNegotiation = { module = "io.ktor:ktor-server-content-negotiation-jvm", version.ref = "ktor" }
 ktor-serverStatusPages = { module = "io.ktor:ktor-server-status-pages-jvm", version.ref = "ktor" }
 ktor-serializationKotlinxJson = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
+mcp-sdkServer = { module = "io.modelcontextprotocol:kotlin-sdk-server", version.ref = "mcp-sdk" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -30,6 +30,8 @@ data class NoteSnapshotTransactionRequest(
     val committedAt: String,
     /** 是否把 Note 写为保留期内 tombstone。 */
     val deleted: Boolean = false,
+    /** 外部调用成功审计；存在时与快照和 Change 原子确认。 */
+    val auditEvent: com.oruke.tagloom.core.agent.AgentAuditEvent? = null,
 ) {
     init {
         require(actorSequence > 0L) { "Note revision 序号必须大于零" }

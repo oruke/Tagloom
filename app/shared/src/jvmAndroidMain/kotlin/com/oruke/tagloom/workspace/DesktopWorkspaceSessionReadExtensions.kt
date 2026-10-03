@@ -11,3 +11,12 @@ suspend fun DesktopWorkspaceSession.loadNotes(): List<DesktopStoredNote> = sessi
     requireOpen()
     loadActiveNotes()
 }
+
+/**
+ * 读取当前已确认笔记与目录，不重复初始化或迁移。
+ * @return 与当前 manifest 一致的打开状态。
+ */
+suspend fun DesktopWorkspaceSession.reloadState(): DesktopWorkspaceOpenState = sessionMutex.withLock {
+    requireOpen()
+    openState()
+}

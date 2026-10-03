@@ -21,6 +21,10 @@ object AgentAuthorizationService {
             return denied(requiredScope, AgentDenialCode.ITEM_LIMIT_EXCEEDED)
         }
         val allowList = principal.allowedNoteIds
+        // 受限授权不能把新建对象自动扩展为整个工作区访问范围。
+        if (allowList != null && request.tool == AgentToolName.CREATE_NOTE) {
+            return denied(requiredScope, AgentDenialCode.TARGET_OUT_OF_SCOPE)
+        }
         if (allowList != null && !allowList.containsAll(request.targetNoteIds)) {
             return denied(requiredScope, AgentDenialCode.TARGET_OUT_OF_SCOPE)
         }
@@ -29,7 +33,7 @@ object AgentAuthorizationService {
         }
 
         var confirmation = baseConfirmation(request.tool)
-        if (request.itemCount > 1 || request.sendsContentRemotely) {
+        if ((request.itemCount > 1 && confirmation != AgentConfirmationLevel.NONE) || request.sendsContentRemotely) {
             confirmation = maxConfirmation(confirmation, AgentConfirmationLevel.SECOND)
         }
         return AgentAuthorizationDecision(
@@ -49,12 +53,17 @@ object AgentAuthorizationService {
         AgentToolName.SEARCH_NOTES,
         AgentToolName.QUERY_NOTES,
         AgentToolName.GET_BACKLINKS,
+        AgentToolName.RUN_SAVED_QUERY,
         -> AgentPermissionScope.SEARCH_NOTES
 
         AgentToolName.GET_NOTE,
         AgentToolName.GET_BLOCK,
         AgentToolName.GET_TAGS,
         AgentToolName.GET_TAG_SCHEMA,
+        AgentToolName.GET_WORKSPACE_SCHEMA,
+        AgentToolName.LIST_NOTES,
+        AgentToolName.GET_SAVED_QUERIES,
+        AgentToolName.GET_SAVED_QUERY,
         -> AgentPermissionScope.READ_NOTES
 
         AgentToolName.SUGGEST_TAGS,

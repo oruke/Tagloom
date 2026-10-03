@@ -33,6 +33,7 @@ plugins {
 }
 
 include(":app:androidApp")
+include(":app:automation")
 include(":app:desktopApp")
 include(":app:file-system")
 include(":app:index")

@@ -50,7 +50,7 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 - Ktor 自部署盲同步服务：服务端只验证公开完整性、设备身份、签名和 DAG 父关系，不持有工作区明文密钥。
 - 持久化设备登记、访问凭据更新、撤销及历史公钥目录；旧凭据文件仅首次迁移，撤销在重启后继续生效。
 - 本地模式与服务器模式：两种模式都能新建和凭 Recovery Key 恢复，可在设置中随时切换。服务器模式在本地保存后自动更新完整密文副本；新设备通过服务器地址与 Recovery Key 找回原工作区，本地模式通过既有文件夹与 Recovery Key 恢复。
-- Agent/CLI/MCP 共用默认拒绝、Note allow-list、风险分级确认和审计契约。
+- 本机 API、可执行 CLI、stdio MCP 共用桌面已解锁会话，提供笔记读写、类型与属性 schema 读取、查询、双链及 Markdown 导出，统一 Note allow-list、持有者确认和加密审计。
 - AI 上下文硬预算、附件原名默认排除，以及可重建 Block 向量和稳定 RRF 混合排序契约。
 
 ## 当前产品边界
@@ -67,7 +67,7 @@ Tagloom 是一个本地优先、端到端加密的个人知识系统。它以加
 | 工作区模式与恢复 | 完整加密备份、流式 HTTP、版本冲突保护、本机设备保护凭据 | 共享欢迎页支持两种模式新建与恢复，设置可切换；服务器模式自动上传确认版本，不自动合并其他设备变更 |
 | Android | 私有工作区、Keystore、SQLCipher、Ktor 与共享 App | 支持创建、锁定/解锁、PIN、索引重建、密文备份恢复与主密钥轮换 |
 | iOS | 共享 UI 与三项能力契约可交叉编译 | 平台能力工厂为 `TODO`，需 macOS/Xcode 验证 |
-| CLI/MCP | 命令、资源 URI、工具目录与权限契约已实现 | 未提供可执行 CLI/MCP Server |
+| API/CLI/MCP | `app:automation` 提供回环 API、可执行 CLI 与官方 SDK stdio MCP，业务复用客户端会话 | Windows 桌面显式启用 API；CLI/MCP 使用独立会话授权，写入需持有者确认；[使用说明](./docs/local-automation.md) |
 | AI/向量 | 上下文、权限、端口与混合排序契约已实现 | 未接模型或向量数据库，不在 MVP UI 展示 |
 
 ## 架构
@@ -99,6 +99,7 @@ Tagloom/
 │   ├── file-system/            # 文件读写、加密、恢复和写租约能力契约
 │   ├── index/                  # 索引与搜索能力契约
 │   ├── sync/                   # 同步会话能力契约
+│   ├── automation/             # JVM 本机 API、CLI 与 stdio MCP 协议适配器
 │   ├── desktopApp/             # 仅 JVM Desktop 窗口入口与发行配置
 │   ├── androidApp/             # Android 宿主
 │   └── iosApp/                 # SwiftUI/iOS 宿主工程
@@ -112,6 +113,7 @@ Gradle 模块以 [`settings.gradle.kts`](./settings.gradle.kts) 为准：
 
 ```text
 :app:androidApp
+:app:automation
 :app:desktopApp
 :app:file-system
 :app:index
@@ -146,6 +148,8 @@ Windows PowerShell：
 `createDistributable` 的免安装目录位于 `app/desktopApp/build/compose/binaries/main/app`。安装包任务是否可用取决于本机 WiX 工具链；开发验收优先运行该目录中的真实 EXE，而不是只看 Gradle 构建结果。
 
 macOS/Linux 使用 `./gradlew`。iOS 应用需在 macOS 上打开 `app/iosApp/iosApp.xcodeproj`。
+
+本机 API 通过 `TAGLOOM_API_OWNER_TOKEN` 和 `TAGLOOM_API_PORT` 显式启用。CLI/MCP 分发物使用 `:app:automation:installDist` 构建，配置、授权、确认与客户端示例见 [外部入口使用说明](./docs/local-automation.md)。
 
 Android APK 位于 `app/androidApp/build/outputs/apk/debug/androidApp-debug.apk`。工作区与本机解锁登记保存在不参与系统自动备份的应用私有目录；外部 URI 仅用于通过系统文档选择器导入/导出密文 ZIP。卸载应用会删除私有数据与 Keystore 密钥，跨设备恢复需要密文备份和 Recovery Key。旋转屏幕时保留内存草稿与 Recovery Key 确认状态，进程重启后从已确认快照重新认证恢复。
 
@@ -205,7 +209,7 @@ macOS 还应运行：
 
 涉及加密、文件系统、恢复或发行包的改动不能只以编译成功作为完成依据；需要执行真实目录恢复、进程重启或打包应用启动验证。
 
-三个能力模块的公共契约位于各自 `commonMain`；`jvmAndroidMain` 复用文件事务、密码学与工作区流程，平台源集只承载目录持久化、设备保护、SQLite 驱动和宿主交互。Android 设备测试使用真实原生库、Keystore、SQLCipher 与回环 TCP，不以 Host Test 或编译替代运行验证。桌面源码目录除 `main.kt` 外为空，服务端同步实现和协议测试继续独立于客户端能力模块。
+三个能力模块的公共契约位于各自 `commonMain`；`jvmAndroidMain` 复用文件事务、密码学与工作区流程，平台源集只承载目录持久化、设备保护、SQLite 驱动和宿主交互。Android 设备测试使用真实原生库、Keystore、SQLCipher 与回环 TCP，不以 Host Test 或编译替代运行验证。桌面入口负责窗口与本机 API 生命周期装配，服务端同步实现和协议测试继续独立于客户端能力模块。
 
 ## v0.2 / MVP 验收状态
 
@@ -225,6 +229,7 @@ Android 已在 API 37、x86_64、16 KB 页大小的模拟器完成三个设备�
 ## 文档
 
 - [产品与技术设计草案](./Tagloom_产品与技术设计草案.md)
+- [本机 API、CLI 与 MCP](./docs/local-automation.md)
 - [仓库开发约束](./AGENTS.md)
 - [Gradle 模块配置](./settings.gradle.kts)
 - [依赖版本目录](./gradle/libs.versions.toml)

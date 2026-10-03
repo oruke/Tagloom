@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<evaluation>
+  <qa_pair id="confirmed_effort">
+    <question>在固定发布归档场景中，找出筛选已确认发布任务的保存查询，读取实际命中及工作量属性。这些任务的总工作量是多少？只回答整数。</question>
+    <answer>10</answer>
+  </qa_pair>
+  <qa_pair id="earliest_target">
+    <question>固定发布归档中，已确认工作量集合里最早的目标日期是哪一天？先确认保存查询筛选条件，再比较任务的日期属性。只回答 YYYY-MM-DD。</question>
+    <answer>2026-02-06</answer>
+  </qa_pair>
+  <qa_pair id="review_dependencies">
+    <question>在发布归档中，找到依赖两个已确认任务的评审任务，沿它的结构化链接读取依赖。这两个依赖的工作量之和是多少？只回答整数。</question>
+    <answer>8</answer>
+  </qa_pair>
+  <qa_pair id="largest_status">
+    <question>只考虑发布归档直接引用的任务，工作量最大的一项是什么状态？从属性定义把选项 ID 转成显示名称，只回答状态名称。</question>
+    <answer>Canceled</answer>
+  </qa_pair>
+  <qa_pair id="dependent_type">
+    <question>发布归档中，有一个任务直接依赖两个已确认工作项。它应用的具体笔记类型叫什么？结合笔记的类型 ID 和类型目录回答，只回答名称。</question>
+    <answer>Release task</answer>
+  </qa_pair>
+  <qa_pair id="largest_confirmed_code">
+    <question>在发布归档的已确认工作项中，找到工作量最大的一项，再单独读取其代码块。它的代码语言是什么？只回答语言标识。</question>
+    <answer>kotlin</answer>
+  </qa_pair>
+  <qa_pair id="task_backlinks">
+    <question>找出发布归档中工作量最大的已确认任务，读取它的双链并核对每个来源的具体类型。排除归档记录后，有多少同类型任务直接引用它？只回答整数。</question>
+    <answer>1</answer>
+  </qa_pair>
+  <qa_pair id="unconfirmed_references">
+    <question>固定发布归档直接引用的任务中，有多少不在已确认发布工作的保存查询结果内？通过归档链接与查询命中求差集，只回答整数。</question>
+    <answer>2</answer>
+  </qa_pair>
+  <qa_pair id="inherited_status">
+    <question>沿发布评审任务的具体类型查找继承属性。该类型新笔记的状态默认值来自父类型时，显示名称是什么？不要用评审笔记自己的属性值代替 schema 默认值，只回答名称。</question>
+    <answer>Planned</answer>
+  </qa_pair>
+  <qa_pair id="archive_last_target">
+    <question>只沿固定发布归档的直接引用比较目标日期，排除另一周期未被归档引用的任务。归档中的最晚目标日期是什么？只回答 YYYY-MM-DD。</question>
+    <answer>2026-02-10</answer>
+  </qa_pair>
+</evaluation>

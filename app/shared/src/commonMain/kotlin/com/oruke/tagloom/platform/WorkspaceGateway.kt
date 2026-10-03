@@ -188,6 +188,15 @@ data class WorkspaceSearchHit(
  * 平台实现负责位置选择和真实能力组装；无实现的平台不得在 UI 中展示这些能力。
  */
 interface WorkspaceGateway {
+    /** 外部确认写入后的刷新通知，不携带笔记内容；未实现平台不产生通知。 */
+    val externalChanges: kotlinx.coroutines.flow.Flow<Unit> get() = kotlinx.coroutines.flow.emptyFlow()
+
+    /**
+     * 重新读取当前已确认工作区，不改变解锁或恢复状态。
+     * @return 当前状态；没有对应平台能力时为空。
+     */
+    suspend fun reload(): WorkspaceOpenResult? = null
+
     /** 当前平台真实接入的服务器恢复能力；未提供实现的平台不展示入口。 */
     val serverRecovery: WorkspaceServerRecoveryGateway? get() = null
 

@@ -53,6 +53,21 @@ enum class AgentToolName {
     /** 获取 Tag 属性 schema。 */
     GET_TAG_SCHEMA,
 
+    /** 读取当前授权可见的类型与属性 schema。 */
+    GET_WORKSPACE_SCHEMA,
+
+    /** 分页列出授权笔记摘要。 */
+    LIST_NOTES,
+
+    /** 分页列出保存查询。 */
+    GET_SAVED_QUERIES,
+
+    /** 读取一个保存查询定义。 */
+    GET_SAVED_QUERY,
+
+    /** 执行一个已确认保存查询。 */
+    RUN_SAVED_QUERY,
+
     /** 建议 Tag，不直接写入。 */
     SUGGEST_TAGS,
 
@@ -108,6 +123,7 @@ enum class AgentDenialCode {
 }
 
 /** 描述一个外部 Agent 的稳定身份与最小授权范围。 */
+@Serializable
 data class AgentPrincipal(
     /** 随机且不含应用名、账号或邮箱的 principal ID。 */
     val principalId: String,
@@ -125,6 +141,7 @@ data class AgentPrincipal(
 }
 
 /** 描述一次待授权的 Agent 工具调用。 */
+@Serializable
 data class AgentToolRequest(
     /** 调用方生成的随机请求 ID，用于审计幂等关联。 */
     val requestId: String,
@@ -146,6 +163,7 @@ data class AgentToolRequest(
 }
 
 /** 描述授权判定及执行前确认要求。 */
+@Serializable
 data class AgentAuthorizationDecision(
     /** 当前请求是否在 principal 权限范围内。 */
     val allowed: Boolean,

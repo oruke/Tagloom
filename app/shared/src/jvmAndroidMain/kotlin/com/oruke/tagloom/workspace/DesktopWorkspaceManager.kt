@@ -50,6 +50,7 @@ class DesktopWorkspaceManager(
     private var pendingCreation: PendingDesktopWorkspaceCreation? = null
 
     /** 当前已解锁会话。 */
+    @Volatile
     private var activeSession: DesktopWorkspaceSession? = null
 
     /** 当前会话工作区根目录；锁定时同步清除。 */

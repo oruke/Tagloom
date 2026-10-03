@@ -103,18 +103,26 @@ class NoteSnapshotTransactionService(
             value = change,
         )
 
-        // 步骤 2：下一 manifest 同时引用新快照与 Change；原 manifest 仍是当前权威状态。
+        // 成功审计与 Note 共用确认点，防止已写入笔记却缺少审计证据。
+        val audit = request.auditEvent?.let { event ->
+            AgentAuditTransactionService(cryptoProvider, envelopeCryptoService, workspaceManifestService, transactionCoordinator)
+                .encrypt(unlocked, event, request.transactionId)
+        }
+        val records = listOf(snapshotArtifact.record, changeArtifact.record) + listOfNotNull(audit?.record)
+        val artifacts = listOf(snapshotArtifact.artifact, changeArtifact.artifact) + listOfNotNull(audit?.artifact)
+
+        // 步骤 2：下一 manifest 同时引用新快照、Change 与可选审计；原 manifest 仍是当前权威状态。
         val nextManifest = workspaceManifestService.confirmTransaction(
             unlocked = unlocked,
             transactionId = request.transactionId,
-            upserts = listOf(snapshotArtifact.record, changeArtifact.record),
+            upserts = records,
             removedPaths = emptySet(),
         )
         val plan = EncryptedTransactionPlan(
             transactionId = request.transactionId,
             baseManifestRevision = unlocked.payload.revision,
             targetManifestRevision = unlocked.payload.revision + 1L,
-            artifacts = listOf(snapshotArtifact.artifact, changeArtifact.artifact),
+            artifacts = artifacts,
             encryptedManifest = nextManifest,
             manifestSha256 = sha256(nextManifest),
         )

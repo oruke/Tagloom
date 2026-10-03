@@ -45,6 +45,33 @@ class DesktopWorkspaceGateway(
     /** 每次操作独立创建 HTTPS 客户端，允许隔离测试注入回环传输。 */
     private val recoveryClientFactory: (String) -> ServerRecoveryClient = { ServerRecoveryClient(it) },
 ) : WorkspaceGateway {
+    /** 外部写入只通知 UI 重新读取确认点，不通过事件携带明文。 */
+    private val externalChangeNotifications = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** 当前会话复用同一 Agent 服务，防止每次调用重复登记关闭监听。 */
+    private var externalAgent: DesktopAgentWorkspaceService? = null
+
+    /** 供 UI 订阅的确认变化信号，事件中不包含明文或凭据。 */
+    override val externalChanges: kotlinx.coroutines.flow.Flow<Unit> get() = externalChangeNotifications
+
+    /**
+     * 为本机协议适配器提供同一会话的受控工具入口。
+     * @return 锁定时为空；不暴露文件路径或工作区密钥。
+     */
+    @Synchronized
+    fun externalSessionOrNull(): com.oruke.tagloom.core.external.AgentWorkspaceSession? {
+        val session = manager.sessionOrNull() ?: return null.also { externalAgent = null }
+        if (externalAgent?.sessionId != session.actorId.value) {
+            externalAgent = DesktopAgentWorkspaceService(session) { externalChangeNotifications.tryEmit(Unit) }
+        }
+        return externalAgent
+    }
+
+    /** @return 当前已确认工作区；只读取，不重新打开或初始化会话。 */
+    override suspend fun reload(): WorkspaceOpenResult = withContext(Dispatchers.IO) {
+        requireNotNull(manager.sessionOrNull()) { "工作区尚未解锁" }.reloadState().toSharedWorkspaceOpenResult()
+    }
+
     /** 与本机权威会话共用创建、备份和恢复边界的服务器入口。 */
     private val serverRecoveryService = DesktopServerRecoveryService(
         manager, localAccessService, ServerWorkspaceDirectoryStore(recoveryAccessDirectory.resolveSibling("server-workspaces")),

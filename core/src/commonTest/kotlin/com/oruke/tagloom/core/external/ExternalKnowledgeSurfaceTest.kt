@@ -21,7 +21,8 @@ class ExternalKnowledgeSurfaceTest {
         val readTools = ExternalToolCatalog.visibleTools(ExternalSurfaceKind.MCP_STDIO, reader)
 
         assertEquals(
-            setOf("search_notes", "query_notes", "get_note", "get_block", "get_backlinks", "get_tags", "get_tag_schema"),
+            setOf("search_notes", "query_notes", "get_note", "get_block", "get_backlinks", "get_tags", "get_tag_schema",
+                "list_notes", "get_workspace_schema", "get_saved_queries", "get_saved_query", "run_saved_query"),
             readTools.mapNotNull(ExternalToolDescriptor::mcpName).toSet(),
         )
 

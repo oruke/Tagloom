@@ -84,6 +84,7 @@ internal fun WorkspaceSessionShell(
     val selectedDocument = controller.editorState.selectedDocument
 
     LaunchedEffect(controller) { controller.serverRecovery.observeAutomaticUpdates() }
+    LaunchedEffect(controller) { controller.observeExternalChanges() }
 
     LaunchedEffect(selectedDocument?.id, selectedDocument?.draftVersion, selectedDocument?.dirty, controller.busy) {
         if (selectedDocument?.dirty == true && !controller.busy) {

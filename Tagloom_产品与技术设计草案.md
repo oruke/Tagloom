@@ -1442,34 +1442,51 @@ call_remote_ai
 
 # 19. MCP 与 CLI
 
+## 19.0 本机外部入口运行边界
+
+本机 API、CLI、stdio MCP 和内置 Agent 共用 `AgentWorkspaceSession` 与统一工具目录。桌面进程持有已解锁工作区的唯一会话和写入租约；本机 API 仅绑定回环地址。CLI 与 MCP 是 API 客户端，不重新打开目录，不取得主密钥。部署的 `server` 仍只处理密文，不提供笔记明文 API。
+
+`app:automation` 是 JVM 外部协议适配器与可执行 CLI/MCP 模块，生产代码只依赖 `core` 的会话端口。真实笔记读写、schema 解析、索引查询和加密审计由现有客户端工作区应用服务提供，桌面入口负责装配生命周期。API 通过显式环境配置启用，未配置时不监听端口。
+
+API 使用 `/v1`、Bearer 认证、分页集合和 `application/problem+json` 稳定错误。工具调用提交到 `/v1/calls`；只读调用立即返回，写入、导出或删除返回待确认调用。持有者凭独立 owner token 审阅 `/v1/approvals`，完成对应单次或二次确认；普通 Agent token 无权批准。确认绑定原始参数、工作区会话、目标 revision 和有效期，重复提交不得再次写入。锁定、切换工作区或撤销权限后，旧 token、待确认请求和旧会话立即失效。
+
+外部请求的目标 ID、条目数和风险由服务端根据参数推导，不能由调用方自行声明。搜索和双链结果在分页之前与授权 Note 范围取交集；受限 token 不能通过查询、资源 URI 或 schema 读取越权笔记。修改和删除必须携带读取时的 revision，确认前后发生的变更返回冲突，禁止静默覆盖。
+
+成功写入的审计记录与 Note 快照、Change 和 manifest 在同一加密事务确认；读取、拒绝、取消与失败写入独立加密审计记录。审计只保留不透明 principal、请求和目标 ID、工具名、结果及 UTC 时间，不保存参数、正文或凭据。类型与属性建议只计算本地 schema 候选和有效默认值，不调用远程模型。
+
+本轮可执行 MCP 使用官方 Kotlin SDK 的 stdio 传输，工具提供 JSON Schema、风险 annotations 和结构化结果；资源支持 `note://<id>`、`tag://<id>`、`workspace://schema`、`query://saved/<id>`。Streamable HTTP、远程 AI Provider 和公开网络访问保留为后续功能。
+
 ## 19.1 CLI
 
 ```bash
 tagloom search "Kotlin Multiplatform"
 
 tagloom query \
-  --tag Project \
-  --where "status = active"
+  --tag '<typeId>' \
+  --where '<propertyId> = "option-active"'
 
-tagloom get 01JABC --format markdown
+tagloom get '<noteId>'
 
-tagloom backlinks 01JABC
+tagloom backlinks '<noteId>'
 
 tagloom create \
   --title "新的想法" \
-  --tag Idea \
+  --tag '<typeId>' \
   --content "..."
+
+tagloom approve '<callId>'
+tagloom export '<noteId>' --revision '<actorId:sequence>' --mode extended
 ```
 
-CLI 应调用同一个共享核心，不绕过权限、加密和审计系统。
+CLI 调用本机 API 的同一个共享业务入口，不绕过权限、加密和审计系统。类型及属性使用稳定 ID；写入返回待审批提案，持有者从独立终端审阅并确认，导出和删除要求二次确认。运行配置与完整工具目录见 [本机外部入口使用说明](./docs/local-automation.md)。
 
 ## 19.2 MCP Server
 
-支持：
+已提供 stdio；Streamable HTTP 为后续传输：
 
 ```text
 stdio
-Streamable HTTP
+Streamable HTTP（未实现）
 ```
 
 MCP Tools：
@@ -1978,6 +1995,8 @@ Markdown 管道表格粘贴在 `core/commonMain` 解析为现有 BaseTable 内�
 **背景**：CLI、MCP、AI Agent 和 UI 如果各自写文件，会绕过锁定状态、事务、权限和审计规则。
 
 **决定**：所有入口调用同一组 Application Services。工作区锁定后，读取和写入能力立即失效；写入、导出、远程发送和删除按照风险等级执行预览、确认和审计。
+
+**本机落地**：桌面工作区会话实现 `AgentWorkspaceSession`，`app:automation` 提供回环 API 和 CLI/MCP 客户端。每个授权 token 绑定一次解锁会话，scope 与 Note allow-list 逐次复核；持有者确认与 Agent 调用使用不同权限。业务快照和成功审计共用原事务协调器，禁止外部适配器直接写文件或另建明文数据仓库。
 
 **权衡**：安全语义一致且便于测试，但无头 CLI 和本地 MCP 需要明确的解锁会话与授权生命周期。
 

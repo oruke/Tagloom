@@ -77,6 +77,8 @@ data class SearchIndexQuery(
     val limit: Int = 50,
     /** 分页偏移量。 */
     val offset: Int = 0,
+    /** 外部 principal 可读 Note 范围；为空表示全工作区，空集合表示无可读对象。 */
+    val allowedNoteIds: Set<ObjectId>? = null,
 ) {
     init {
         require(limit in 1..500) { "索引查询 limit 必须在 1 到 500 之间" }

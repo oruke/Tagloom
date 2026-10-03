@@ -97,6 +97,9 @@ object DesktopWorkspaceSessionFactory {
                     manifestService,
                     coordinator,
                 ),
+                agentAuditService = com.oruke.tagloom.core.transaction.AgentAuditTransactionService(
+                    cryptoProvider, envelopeService, manifestService, coordinator,
+                ),
                 bootstrapTransactionService = WorkspaceBootstrapTransactionService(
                     cryptoProvider,
                     envelopeService,

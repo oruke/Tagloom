@@ -51,14 +51,13 @@ internal enum class WorkspaceUiPhase {
 
 /**
  * 统一管理共享 UI 的异步工作区生命周期和编辑器明文清理。
- *
- * @param gateway 当前工作区生命周期和权威写入能力。
- * @param searchEngine 当前已打开工作区的查询能力。
- * @param editorState 仅在解锁会话内持有 Note 明文的编辑器状态。
  */
 internal class WorkspaceUiController(
+    /** 当前工作区生命周期和权威写入能力。 */
     internal val gateway: WorkspaceGateway,
+    /** 当前已打开工作区的查询能力。 */
     private val searchEngine: SearchEngine,
+    /** 仅在解锁会话内持有 Note 明文的编辑器状态。 */
     val editorState: TagloomEditorState,
 ) {
     /** 超级标签表单独立编排，复用同一工作区网关与编辑器目录。 */
@@ -68,13 +67,17 @@ internal class WorkspaceUiController(
     var phase: WorkspaceUiPhase by mutableStateOf(WorkspaceUiPhase.INITIALIZING)
         private set
 
+    /** 每次打开或开始锁定时更换的 UI 会话标记，用于丢弃上一会话仍在返回的异步刷新。 */
+    internal var workspaceSessionMarker: Any = Any()
+        private set
+
     /** 平台 I/O 或密码操作是否正在执行。 */
     var busy: Boolean by mutableStateOf(false)
         private set
 
     /** 当前可安全展示的本地错误。 */
     var errorMessage: WorkspaceUiMessage? by mutableStateOf(null)
-        private set
+        internal set
 
     /** 当前操作成功后的非敏感提示。 */
     var statusMessage: WorkspaceUiMessage? by mutableStateOf(null)
@@ -381,6 +384,7 @@ internal class WorkspaceUiController(
      * 锁定工作区，并在 Gateway 销毁密钥后清空全部 Compose 明文状态。
      */
     suspend fun lock() = runOperation {
+        workspaceSessionMarker = Any()
         gateway.lock()
         serverRecovery.clear()
         editorState.clearWorkspace()
@@ -403,6 +407,7 @@ internal class WorkspaceUiController(
      * @param result 平台打开结果。
      */
     private fun open(result: WorkspaceOpenResult) {
+        workspaceSessionMarker = Any()
         noteSaveDelegate.resetAutoSaveAttempt()
         recoveryMessages = result.recoveryMessages
         if (result.readOnly) {

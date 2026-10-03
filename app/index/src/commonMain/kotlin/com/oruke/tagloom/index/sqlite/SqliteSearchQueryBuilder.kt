@@ -56,6 +56,10 @@ internal object SqliteSearchQueryBuilder {
                 )
             """.trimIndent()
         }
+        // 授权过滤必须先于 LIMIT/OFFSET，避免泄露越权命中或使合法结果分页缺失。
+        query.allowedNoteIds?.let { ids ->
+            conditions += if (ids.isEmpty()) "0 = 1" else "d.note_id IN (${ids.joinToString { "?" }})"
+        }
 
         val projection = if (usesFullText) {
             """
@@ -112,6 +116,7 @@ internal object SqliteSearchQueryBuilder {
             add(filter.propertyId.value)
             add(filter.canonicalValue)
         }
+        query.allowedNoteIds?.sortedBy { it.value }?.forEach { add(it.value) }
         add(query.limit)
         add(query.offset)
     }

@@ -3,6 +3,7 @@ package com.oruke.tagloom.core.external
 import com.oruke.tagloom.core.agent.AgentPermissionScope
 import com.oruke.tagloom.core.agent.AgentPrincipal
 import com.oruke.tagloom.core.agent.AgentToolName
+import kotlinx.serialization.Serializable
 
 /** 定义同一知识工具协议暴露到的外部入口。 */
 enum class ExternalSurfaceKind {
@@ -17,6 +18,7 @@ enum class ExternalSurfaceKind {
 }
 
 /** 描述一个外部入口可发现但仍需逐次授权的工具。 */
+@Serializable
 data class ExternalToolDescriptor(
     /** 共享核心工具名称。 */
     val tool: AgentToolName,
@@ -68,20 +70,25 @@ object ExternalToolCatalog {
 
     /** CLI 与 MCP 共享的完整工具目录；删除工具仍由 [visibleTools] 默认隐藏。 */
     private val ALL_TOOLS: List<ExternalToolDescriptor> = listOf(
+        tool(AgentToolName.LIST_NOTES, "list", "list_notes", AgentPermissionScope.READ_NOTES),
         tool(AgentToolName.SEARCH_NOTES, "search", "search_notes", AgentPermissionScope.SEARCH_NOTES),
         tool(AgentToolName.QUERY_NOTES, "query", "query_notes", AgentPermissionScope.SEARCH_NOTES),
         tool(AgentToolName.GET_NOTE, "get", "get_note", AgentPermissionScope.READ_NOTES),
-        tool(AgentToolName.GET_BLOCK, null, "get_block", AgentPermissionScope.READ_NOTES),
+        tool(AgentToolName.GET_BLOCK, "block", "get_block", AgentPermissionScope.READ_NOTES),
         tool(AgentToolName.GET_BACKLINKS, "backlinks", "get_backlinks", AgentPermissionScope.SEARCH_NOTES),
         tool(AgentToolName.GET_TAGS, "tags", "get_tags", AgentPermissionScope.READ_NOTES),
         tool(AgentToolName.GET_TAG_SCHEMA, "tag-schema", "get_tag_schema", AgentPermissionScope.READ_NOTES),
-        tool(AgentToolName.SUGGEST_TAGS, null, "suggest_tags", AgentPermissionScope.SUGGEST_CHANGES),
-        tool(AgentToolName.SUGGEST_PROPERTIES, null, "suggest_properties", AgentPermissionScope.SUGGEST_CHANGES),
+        tool(AgentToolName.GET_WORKSPACE_SCHEMA, "schema", "get_workspace_schema", AgentPermissionScope.READ_NOTES),
+        tool(AgentToolName.GET_SAVED_QUERIES, "queries", "get_saved_queries", AgentPermissionScope.READ_NOTES),
+        tool(AgentToolName.GET_SAVED_QUERY, "saved-query", "get_saved_query", AgentPermissionScope.READ_NOTES),
+        tool(AgentToolName.RUN_SAVED_QUERY, "run-query", "run_saved_query", AgentPermissionScope.SEARCH_NOTES),
+        tool(AgentToolName.SUGGEST_TAGS, "suggest-tags", "suggest_tags", AgentPermissionScope.SUGGEST_CHANGES),
+        tool(AgentToolName.SUGGEST_PROPERTIES, "suggest-properties", "suggest_properties", AgentPermissionScope.SUGGEST_CHANGES),
         tool(AgentToolName.CREATE_NOTE, "create", "create_note", AgentPermissionScope.WRITE_NOTES),
         tool(AgentToolName.UPDATE_NOTE, "update", "update_note", AgentPermissionScope.WRITE_NOTES),
         tool(AgentToolName.ADD_TAG_TO_NOTE, "add-tag", "add_tag_to_note", AgentPermissionScope.WRITE_NOTES),
         tool(AgentToolName.EXPORT_NOTE, "export", "export_note", AgentPermissionScope.EXPORT_NOTES),
-        tool(AgentToolName.DELETE_NOTE, null, "delete_note", AgentPermissionScope.DELETE_NOTES, dangerous = true),
+        tool(AgentToolName.DELETE_NOTE, "delete", "delete_note", AgentPermissionScope.DELETE_NOTES, dangerous = true),
     )
 
     /**

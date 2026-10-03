@@ -6,7 +6,7 @@
 
 - 产品与架构基线以 [`Tagloom_产品与技术设计草案.md`](./Tagloom_产品与技术设计草案.md) 为准。
 - `README.md` 是面向开发者的项目入口，只描述已经确认的方向和当前真实实现状态。
-- 当前仓库已完成 v0.2 Windows MVP 的核心实现：桌面工作区生命周期、加密快照与事务、派生索引、Block/RichText 编辑、Markdown、备份恢复、主密钥轮换和 Change checkpoint 均已有自动化验证，Windows 分发包也已完成真实启动与界面渲染检查。同步、Android/iOS 功能对等、可执行 CLI/MCP、AI Provider 和向量数据库仍不属于桌面 MVP 的可用入口。除非代码、测试和真实运行结果已经证明，不得把预留协议写成终端用户可用功能。
+- 当前仓库已完成 v0.2 Windows MVP 的核心实现：桌面工作区生命周期、加密快照与事务、派生索引、Block/RichText 编辑、Markdown、备份恢复、主密钥轮换和 Change checkpoint 均已有自动化验证，Windows 分发包也已完成真实启动与界面渲染检查。后续本机 API、可执行 CLI 与 stdio MCP 已提供独立受控入口，详见 `docs/local-automation.md`；远端 Change 自动合并、Android/iOS 功能对等、AI Provider 和向量数据库仍未提供完整可用入口。除非代码、测试和真实运行结果已经证明，不得把预留协议写成终端用户可用功能。
 - 架构决策发生变化时，先更新设计文档中的对应章节和 ADR，再实现代码；不得让代码与文档长期维持两套事实。
 - 设计文档中的示例 ID、路径、版本和性能指标是协议说明或设计预算，不得直接当成生产默认值。
 
@@ -28,6 +28,7 @@
 | `core` | KMP 领域模型、用例、端口、确定性解析器和跨平台协议 | 不依赖 Compose、Android API、SQLite、Ktor Server、具体加密 SDK或本地绝对路径 |
 | `app/shared` | 跨平台 Compose UI、页面状态、交互编排和资源 | 不直接操作加密文件、数据库或同步协议；不复制领域规则 |
 | `app/desktopApp` | JVM Desktop 入口、窗口和桌面平台装配、发行包配置 | 不承载可复用业务规则 |
+| `app/automation` | JVM 回环 API、可执行 CLI、stdio MCP 和外部授权/审批适配 | 不另开工作区、不持有主密钥、不绕过客户端应用服务直接读写文件 |
 | `app/androidApp` | Android 入口、生命周期和 Android 平台装配 | 不把 Android 类型泄漏到 `commonMain` |
 | `app/iosApp` | iOS 入口、SwiftUI 宿主和 Apple 平台装配 | 不在 Swift 层重复 Kotlin 领域逻辑 |
 | `server` | Ktor 密文同步与后续 AI Gateway 的服务端入口 | 不复用客户端文件存储实现，不读取工作区明文，不把服务端实体放入共享领域层 |

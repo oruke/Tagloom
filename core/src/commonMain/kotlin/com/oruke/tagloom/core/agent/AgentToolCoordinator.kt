@@ -1,8 +1,11 @@
 package com.oruke.tagloom.core.agent
 
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.Serializable
+import kotlinx.coroutines.CancellationException
 
 /** 定义 Agent 工具调用的稳定审计结果。 */
+@Serializable
 enum class AgentAuditOutcome {
     /** scope 或目标范围拒绝。 */
     DENIED,
@@ -18,6 +21,7 @@ enum class AgentAuditOutcome {
 }
 
 /** 描述执行前展示给用户的最小变更或数据发送预览。 */
+@Serializable
 data class AgentToolPreview(
     /** 不包含正文的预览标题。 */
     val title: String,
@@ -27,6 +31,8 @@ data class AgentToolPreview(
     val destructive: Boolean,
     /** 是否会把任何明文发送到工作区之外。 */
     val sendsContentRemotely: Boolean,
+    /** 仅向持有者展示的变更差异或导出损失；不进入日志和审计。 */
+    val details: JsonElement? = null,
 ) {
     init {
         require(title.isNotBlank()) { "Agent 预览标题不能为空" }
@@ -35,6 +41,7 @@ data class AgentToolPreview(
 }
 
 /** 保存用户对一次已预览请求给出的确认事实。 */
+@Serializable
 data class AgentConfirmationEvidence(
     /** 必须与预览请求一致的随机请求 ID。 */
     val requestId: String,
@@ -51,6 +58,7 @@ data class AgentConfirmationEvidence(
 }
 
 /** 描述不包含密钥或 Token 的本地加密审计事件。 */
+@Serializable
 data class AgentAuditEvent(
     /** 原始工具请求 ID。 */
     val requestId: String,
@@ -73,6 +81,7 @@ data class AgentAuditEvent(
 }
 
 /** 描述工具执行返回的结构化结果。 */
+@Serializable
 data class AgentToolResult(
     /** 工具是否完成预期业务结果。 */
     val succeeded: Boolean,
@@ -161,6 +170,7 @@ class AgentToolCoordinator(
         return try {
             AgentPreparedToolCall(principal, request, decision, executionPort.preview(request))
         } catch (error: Throwable) {
+            if (error is CancellationException) throw error
             auditPort.append(auditEvent(principal, request, AgentAuditOutcome.FAILED, occurredAt))
             throw error
         }
@@ -186,8 +196,13 @@ class AgentToolCoordinator(
         }
         val successEvent = auditEvent(prepared.principal, prepared.request, AgentAuditOutcome.EXECUTED, occurredAt)
         return try {
-            executionPort.execute(prepared.request, successEvent)
+            val result = executionPort.execute(prepared.request, successEvent)
+            if (!result.succeeded) {
+                auditPort.append(auditEvent(prepared.principal, prepared.request, AgentAuditOutcome.FAILED, occurredAt))
+            }
+            result
         } catch (error: Throwable) {
+            if (error is CancellationException) throw error
             auditPort.append(auditEvent(prepared.principal, prepared.request, AgentAuditOutcome.FAILED, occurredAt))
             throw error
         }

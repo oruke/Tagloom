@@ -47,48 +47,49 @@ import java.nio.file.Path
 
 /**
  * 持有一个桌面端已解锁工作区的主密钥、事务协调器和加密索引生命周期。
- *
- * @param paths 工作区受控路径。
- * @param fileSystem 当前工作区绑定的 JVM 文件能力。
- * @param writeLease 当前会话持有的跨进程单写入者租约。
- * @param manifestService manifest 认证与更新服务。
- * @param unlocked 初始已解锁 manifest；会话取得主密钥所有权。
- * @param projection 权威快照到加密索引的投影器。
- * @param transactionCoordinator 工作区唯一写入协调器。
- * @param noteTransactionService Note 统一事务入口。
- * @param bootstrapTransactionService 默认工作区对象初始化事务入口。
- * @param backupService 只读取当前确认点的密文备份服务。
- * @param savedQueryLoader 从权威密文加载保存查询。
- * @param savedQueryTransactionService 保存查询统一事务入口。
- * @param schemaStore Tag 与 PropertyDefinition 权威密文读写入口。
- * @param databaseStore Database 与 View 权威密文读写入口。
- * @param integrityScanner 扫描全部 manifest 密文对象。
- * @param compactionService 验证并提交 Change checkpoint 的桌面维护服务。
- * @param actorId 当前桌面会话随机 Actor ID。
- * @param idFactory 生成对象与事务的不透明 ID。
- * @param currentTimeMillis 提供 HLC 物理时间。
- * @param timestampProvider 提供 UTC ISO-8601 时间。
  */
 class DesktopWorkspaceSession internal constructor(
+    /** 工作区受控路径，不允许外部调用直接访问。 */
     private val paths: JvmWorkspacePaths,
+    /** 当前工作区绑定的 JVM 文件能力。 */
     internal val fileSystem: JvmWorkspaceFileSystem,
+    /** 当前会话持有的跨进程单写入者租约。 */
     private val writeLease: WorkspaceWriteLease,
+    /** manifest 认证与更新服务。 */
     private val manifestService: WorkspaceManifestService,
+    /** 当前已解锁 manifest；会话取得主密钥所有权。 */
     internal var unlocked: UnlockedWorkspaceManifest,
-    private val projection: DesktopIndexProjection,
+    /** 权威快照到加密索引的投影器。 */
+    internal val projection: DesktopIndexProjection,
+    /** 工作区唯一文件写入协调器。 */
     private val transactionCoordinator: TransactionCoordinator,
-    private val noteTransactionService: NoteSnapshotTransactionService,
+    /** 桌面与外部调用复用的 Note 统一事务入口。 */
+    internal val noteTransactionService: NoteSnapshotTransactionService,
+    /** 外部读取和失败调用的加密审计事务入口。 */
+    internal val agentAuditService: com.oruke.tagloom.core.transaction.AgentAuditTransactionService,
+    /** 默认工作区对象初始化事务入口。 */
     private val bootstrapTransactionService: WorkspaceBootstrapTransactionService,
+    /** 只读取当前确认点的密文备份服务。 */
     private val backupService: JvmEncryptedWorkspaceBackupService,
+    /** 从权威密文加载保存查询。 */
     internal val savedQueryLoader: DesktopSavedQueryLoader,
+    /** 保存查询统一事务入口。 */
     private val savedQueryTransactionService: SavedQuerySnapshotTransactionService,
+    /** Tag 与 PropertyDefinition 权威密文读写入口。 */
     internal val schemaStore: DesktopWorkspaceSchemaStore,
+    /** Database 与 View 权威密文读写入口。 */
     internal val databaseStore: DesktopWorkspaceDatabaseStore,
+    /** 扫描全部 manifest 密文对象的完整性服务。 */
     private val integrityScanner: DesktopWorkspaceIntegrityScanner,
+    /** 验证并提交 Change checkpoint 的桌面维护服务。 */
     private val compactionService: DesktopChangeLogCompactionService,
+    /** 当前解锁会话随机 Actor ID，同时区分外部授权生命周期。 */
     internal val actorId: ActorId,
+    /** 生成对象与事务的不透明 ID。 */
     internal val idFactory: () -> String,
+    /** 提供 HLC 物理时间。 */
     internal val currentTimeMillis: () -> Long,
+    /** 提供 UTC ISO-8601 时间。 */
     internal val timestampProvider: () -> String,
 ) {
     /** 串行化会话状态刷新、锁定和业务调用。 */
@@ -98,7 +99,11 @@ class DesktopWorkspaceSession internal constructor(
     internal var nextActorSequence: Long = 1L
 
     /** 锁定后立即拒绝全部读取和写入。 */
-    private var closed: Boolean = false
+    @Volatile
+    internal var closed: Boolean = false
+
+    /** 锁定前同步清理外部明文缓存的生命周期订阅；回调不得读写工作区。 */
+    internal val externalCloseListeners = mutableListOf<() -> Unit>()
 
     /** 恢复无法证明完整状态时进入只读模式。 */
     private var readOnly: Boolean = false
@@ -164,38 +169,7 @@ class DesktopWorkspaceSession internal constructor(
         note: Note,
         expectedRevision: ObjectRevision? = null,
     ): DesktopStoredNote = sessionMutex.withLock {
-        requireWritable()
-        val targetId = objectId ?: ObjectId(idFactory())
-        val previous = projection.loadSnapshots().singleOrNull { snapshot -> snapshot.header.objectId == targetId }
-        if (expectedRevision != null) {
-            require(previous?.header?.revision == expectedRevision) { "Note revision 已落后，拒绝覆盖更新" }
-        }
-        val noteWithDefaultTag = if (previous == null && WorkspaceDefaults.DEFAULT_NOTE_TAG_ID !in note.directTagIds) {
-            note.copy(directTagIds = note.directTagIds + WorkspaceDefaults.DEFAULT_NOTE_TAG_ID)
-        } else {
-            note
-        }
-        val result = try {
-            noteTransactionService.commit(
-                unlocked = unlocked,
-                request = NoteSnapshotTransactionRequest(
-                    objectId = targetId,
-                    note = noteWithDefaultTag,
-                    previousSnapshot = previous,
-                    actorId = actorId,
-                    actorSequence = nextActorSequence++,
-                    transactionId = TransactionId(idFactory()),
-                    hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
-                    committedAt = timestampProvider(),
-                ),
-            )
-        } catch (error: Throwable) {
-            // manifest 可能已确认而派生更新或清理失败；重新读取确认点，避免会话继续使用旧 revision。
-            runCatching { refreshManifest() }
-            throw error
-        }
-        refreshManifest(result.encryptedManifest)
-        DesktopStoredNote(result.snapshot)
+        saveNoteLocked(objectId, note, expectedRevision)
     }
 
     /**
@@ -204,24 +178,7 @@ class DesktopWorkspaceSession internal constructor(
      * @param objectId 待删除 Note ID。
      */
     suspend fun deleteNote(objectId: ObjectId) = sessionMutex.withLock {
-        requireWritable()
-        val previous = projection.loadSnapshots().singleOrNull { snapshot -> snapshot.header.objectId == objectId }
-            ?: throw IllegalArgumentException("待删除 Note 不存在")
-        val result = noteTransactionService.commit(
-            unlocked = unlocked,
-            request = NoteSnapshotTransactionRequest(
-                objectId = objectId,
-                note = previous.payload,
-                previousSnapshot = previous,
-                actorId = actorId,
-                actorSequence = nextActorSequence++,
-                transactionId = TransactionId(idFactory()),
-                hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
-                committedAt = timestampProvider(),
-                deleted = true,
-            ),
-        )
-        refreshManifest(result.encryptedManifest)
+        deleteNoteLocked(objectId)
     }
 
     /**
@@ -435,7 +392,7 @@ class DesktopWorkspaceSession internal constructor(
             )
         } catch (error: Throwable) {
             // 轮换失败后旧会话也必须关闭；清理失败只能作为附加证据，不能覆盖原始业务异常。
-            closed = true
+            invalidateExternalAccess()
             closeResources()?.let { cleanupFailure ->
                 if (cleanupFailure !== error) {
                     error.addSuppressed(cleanupFailure)
@@ -445,7 +402,7 @@ class DesktopWorkspaceSession internal constructor(
         }
 
         // 轮换尝试后旧索引密钥和旧主密钥都不得继续服务，Manager 会按权威 manifest 重新打开。
-        closed = true
+        invalidateExternalAccess()
         val cleanupFailure = closeResources()
         if (cleanupFailure != null) {
             // 新结果尚未交给 Manager，不能在旧会话关闭失败时遗留新主密钥和 Recovery Key。
@@ -462,7 +419,7 @@ class DesktopWorkspaceSession internal constructor(
         if (closed) {
             return@withLock
         }
-        closed = true
+        invalidateExternalAccess()
         closeResources()?.let { throw it }
     }
 
@@ -519,7 +476,7 @@ class DesktopWorkspaceSession internal constructor(
      *
      * @return 活动 Note、恢复报告和只读状态。
      */
-    private suspend fun openState(): DesktopWorkspaceOpenState {
+    internal suspend fun openState(): DesktopWorkspaceOpenState {
         val schemas = schemaStore.load(unlocked)
         val databases = databaseStore.load(unlocked)
         return DesktopWorkspaceOpenState(
@@ -561,13 +518,13 @@ class DesktopWorkspaceSession internal constructor(
 
     /** 拒绝锁定后的全部操作。 */
     internal fun requireOpen() {
-        check(!closed) { "工作区已经锁定" }
+        if (closed) throw com.oruke.tagloom.core.external.ExternalCallException("workspace_locked")
     }
 
     /** 拒绝锁定或只读安全模式下的写入。 */
     internal fun requireWritable() {
         requireOpen()
-        check(!readOnly) { "工作区处于只读恢复模式" }
+        if (readOnly) throw com.oruke.tagloom.core.external.ExternalCallException("workspace_read_only")
     }
 
 }
