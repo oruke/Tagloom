@@ -10,6 +10,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
+import io.ktor.server.config.MapApplicationConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
@@ -152,6 +153,8 @@ private class ManagementServerFixture(
      * @param block HTTP 验证流程。
      */
     fun server(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
+        // 此夹具显式提供部署参数，不能额外自动加载默认 YAML 的生产模块。
+        environment { config = MapApplicationConfig() }
         application { configureSyncServer(SyncServerConfiguration(root, digest(bootstrap), maximumRecoveryBytes = maximumBytes)) }
         block()
     }

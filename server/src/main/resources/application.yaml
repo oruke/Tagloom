@@ -1,0 +1,19 @@
+# Ktor 默认加载此文件；-config 可指定外部 YAML，-host/-port/-P 可覆盖配置项。
+ktor:
+  application:
+    modules:
+      - com.oruke.tagloom.ApplicationKt.module
+  deployment:
+    host: "$TAGLOOM_SYNC_HOST:0.0.0.0"
+    port: "$TAGLOOM_SYNC_PORT:8080"
+
+tagloom:
+  sync:
+    # 相对路径基于启动时的工作目录；Gradle :server:run 使用 server 目录。
+    dataDir: "$TAGLOOM_SYNC_DATA_DIR:data"
+    # 首次登记访问码的 SHA-256，不填写访问码明文；已有登记库允许留空。
+    bootstrapTokenSha256: "$?TAGLOOM_SYNC_BOOTSTRAP_TOKEN_SHA256"
+    # 可选，仅在首次创建登记库时导入旧 JSON 凭据文件。
+    credentialsFile: "$?TAGLOOM_SYNC_CREDENTIALS_FILE"
+    # 单个恢复归档的字节上限，默认 512 MiB。
+    maxRecoveryBytes: "$TAGLOOM_SYNC_MAX_RECOVERY_BYTES:536870912"

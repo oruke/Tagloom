@@ -31,6 +31,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
+import io.ktor.server.config.MapApplicationConfig
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
@@ -47,6 +48,8 @@ class SyncServerTest {
      */
     @Test
     fun pushesFetchesAndDeduplicatesEncryptedChanges() = testApplication {
+        // 本场景自行装配路由，不加载生产 YAML 中的自动模块和部署目录。
+        environment { config = MapApplicationConfig() }
         val provider = LibsodiumCryptoProvider()
         provider.initialize()
         val signingKey = provider.generateDeviceSigningKeyPair()
@@ -103,6 +106,7 @@ class SyncServerTest {
      */
     @Test
     fun rejectsUnauthenticatedCrossWorkspaceAndTamperedPushes() = testApplication {
+        environment { config = MapApplicationConfig() }
         val provider = LibsodiumCryptoProvider()
         provider.initialize()
         val signingKey = provider.generateDeviceSigningKeyPair()

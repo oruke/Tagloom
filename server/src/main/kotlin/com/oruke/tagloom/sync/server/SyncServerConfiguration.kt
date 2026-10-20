@@ -2,6 +2,7 @@ package com.oruke.tagloom.sync.server
 
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.config.ApplicationConfig
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -40,16 +41,26 @@ fun Application.configureSyncServer(configuration: SyncServerConfiguration) {
     }
 }
 
-/** @return 从环境变量读取的服务端部署配置；旧凭据只承担一次性迁移。 */
-internal fun syncServerConfigurationFromEnvironment(): SyncServerConfiguration {
-    val root = System.getenv("TAGLOOM_SYNC_DATA_DIR")?.takeIf(String::isNotBlank)?.let(Path::of) ?: Path.of("data")
-    val legacy = System.getenv("TAGLOOM_SYNC_CREDENTIALS_FILE")?.takeIf(String::isNotBlank)?.let(Path::of)
-    val bootstrap = System.getenv("TAGLOOM_SYNC_BOOTSTRAP_TOKEN_SHA256")?.takeIf(String::isNotBlank)?.also(::requireSyncDigest)
+/**
+ * 将 Ktor 已加载的部署配置映射为服务参数，并在创建存储前完成校验。
+ * @receiver YAML、环境变量替换与命令行覆盖合并后的 Ktor 配置。
+ * @return 可用于生产装配的服务配置；首次启动仍需受控登记材料。
+ */
+internal fun ApplicationConfig.syncServerConfiguration(): SyncServerConfiguration {
+    // 阶段一：只读取已解析配置，默认值与环境变量替换统一由 YAML 声明。
+    val rootValue = property("tagloom.sync.dataDir").getString()
+    require(rootValue.isNotBlank()) { "tagloom.sync.dataDir 不能为空" }
+    val root = Path.of(rootValue)
+    val legacy = propertyOrNull("tagloom.sync.credentialsFile")?.getString()
+        ?.takeIf(String::isNotBlank)?.let(Path::of)
+    val bootstrap = propertyOrNull("tagloom.sync.bootstrapTokenSha256")?.getString()
+        ?.takeIf(String::isNotBlank)?.also(::requireSyncDigest)
+    val limit = property("tagloom.sync.maxRecoveryBytes").getString().toLongOrNull()
+        ?.takeIf { it > 0 } ?: error("tagloom.sync.maxRecoveryBytes 必须为正整数")
+
+    // 阶段二：已登记的部署允许关闭首次登记；新目录不能因配置缺失变成开放注册。
     check(legacy != null || bootstrap != null || Files.exists(root.resolve(".server/devices.json"))) {
-        "首次启动需配置 TAGLOOM_SYNC_BOOTSTRAP_TOKEN_SHA256 或旧版 TAGLOOM_SYNC_CREDENTIALS_FILE"
+        "首次启动需配置 tagloom.sync.bootstrapTokenSha256 或 tagloom.sync.credentialsFile"
     }
-    val limit = System.getenv("TAGLOOM_SYNC_MAX_RECOVERY_BYTES")?.let {
-        it.toLongOrNull()?.takeIf { number -> number > 0 } ?: error("恢复归档容量配置无效")
-    } ?: 512L * 1024 * 1024
     return SyncServerConfiguration(root, bootstrap, legacy, limit)
 }

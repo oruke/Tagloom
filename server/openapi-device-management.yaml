@@ -17,7 +17,8 @@ info:
 
 
     Transport: HTTPS is required for production; reject redirects and never log authorization headers, JSON bodies or
-    recovery material. Archive default cap is 512 MiB (TAGLOOM_SYNC_MAX_RECOVERY_BYTES). Management JSON cap is 8192
+    recovery material. Archive default cap is 512 MiB (tagloom.sync.maxRecoveryBytes in application.yaml, optionally
+    overridden by TAGLOOM_SYNC_MAX_RECOVERY_BYTES). Management JSON cap is 8192
     bytes including chunked bodies. Configure request-rate and upload-concurrency limits at the TLS reverse proxy. There
     is no application-level rate limiter in this version.
 

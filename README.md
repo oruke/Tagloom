@@ -155,15 +155,28 @@ Android APK 位于 `app/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ## 启动盲同步服务
 
-新部署配置独立的登记访问码摘要和数据目录。登记访问码使用密码学安全随机数生成至少 32 字节，先编码为文本，再对该文本的 UTF-8 字节计算 SHA-256；服务器只保存摘要，访问码由部署者交给需要首次上传的客户端。
+服务通过 Ktor `EngineMain` 默认加载 [`server/src/main/resources/application.yaml`](./server/src/main/resources/application.yaml)。监听地址、端口和同步服务参数统一在 YAML 维护；配置中保留原有环境变量替换，也可直接填写部署值。登记访问码使用密码学安全随机数生成至少 32 字节，先编码为文本，再对该文本的 UTF-8 字节计算 SHA-256；服务器只保存摘要，访问码由部署者交给需要首次上传的客户端。
+
+建议复制为已忽略的本地配置文件，填写 `tagloom.sync.dataDir` 和 `tagloom.sync.bootstrapTokenSha256`，再通过 `-config` 加载：
 
 ```powershell
-$env:TAGLOOM_SYNC_BOOTSTRAP_TOKEN_SHA256 = '<sha256-of-registration-code>'
-$env:TAGLOOM_SYNC_DATA_DIR = '<ciphertext-data-directory>'
-# 可选；默认单个恢复归档上限 512 MiB。
-$env:TAGLOOM_SYNC_MAX_RECOVERY_BYTES = '<maximum-archive-bytes>'
-.\gradlew.bat :server:run
+Copy-Item 'server/src/main/resources/application.yaml' 'server/application-local.yaml'
+# 编辑 server/application-local.yaml，填写本次部署参数。
+.\gradlew.bat :server:run --args='-config=application-local.yaml'
 ```
+
+Gradle 的 `:server:run` 工作目录为 `server`；IDEA 直接运行 `ApplicationKt` 时，可将工作目录设为 `server`，或通过 `-config` 传入配置文件的绝对路径。相对数据目录和旧凭据文件路径均基于进程工作目录。未指定 `-config` 时使用随服务打包的默认 YAML；首次部署必须提供登记摘要或旧凭据文件，已有登记库可留空以关闭新的首次登记。
+
+| YAML 配置项 | 含义与默认值 | 可选环境变量覆盖 |
+| --- | --- | --- |
+| `ktor.deployment.host` | 监听地址，默认 `0.0.0.0` | `TAGLOOM_SYNC_HOST` |
+| `ktor.deployment.port` | 监听端口，默认 `8080` | `TAGLOOM_SYNC_PORT` |
+| `tagloom.sync.dataDir` | 密文数据目录，默认 `data` | `TAGLOOM_SYNC_DATA_DIR` |
+| `tagloom.sync.bootstrapTokenSha256` | 首次登记访问码摘要，无默认值 | `TAGLOOM_SYNC_BOOTSTRAP_TOKEN_SHA256` |
+| `tagloom.sync.credentialsFile` | 一次性导入的旧 JSON 凭据文件，可不配置 | `TAGLOOM_SYNC_CREDENTIALS_FILE` |
+| `tagloom.sync.maxRecoveryBytes` | 恢复归档上限，默认 `536870912` 字节（512 MiB），必须为正整数 | `TAGLOOM_SYNC_MAX_RECOVERY_BYTES` |
+
+环境变量覆盖由 YAML 中的 `$变量名:默认值` 或 `$?变量名` 声明，直接填写固定值后不再引用该变量。Ktor 命令行 `-host`、`-port` 和 `-P:tagloom.sync.maxRecoveryBytes=<bytes>` 的覆盖优先于文件配置。配置只保存登记摘要，不保存访问码明文或客户端恢复密钥；本地 YAML 不入库。YAML 加载使用与现有 Ktor 同版本、Apache 2.0 许可的官方 `ktor-server-config-yaml`，依赖仅加入 JVM server。
 
 客户端入口：
 
@@ -175,7 +188,7 @@ $env:TAGLOOM_SYNC_MAX_RECOVERY_BYTES = '<maximum-archive-bytes>'
 
 恢复只包含最近成功上传的内容。不同设备上传使用版本前置条件，过期设备不能覆盖较新的副本；遇到冲突时，请重新从服务器恢复为独立副本核对。主密钥轮换后需要在设置中输入新 Recovery Key 并再次上传；在新副本确认前，服务器旧副本仍使用旧密钥。新副本确认后，旧恢复定位凭据失效，历史归档保留但不再通过恢复入口提供。
 
-旧部署可保留 `TAGLOOM_SYNC_CREDENTIALS_FILE` 完成一次性迁移；格式仍是包含 `workspaceId`、`actorId`、`tokenSha256`、`signingPublicKeyHex` 的 JSON 数组。正式登记库建立后不再重读旧凭据文件；损坏或未知版本会拒绝启动，不能回退到旧凭据。登记库位于数据目录的 `.server/devices.json`，同一目录只能启动一个服务写入者；应与密文归档一起备份。
+旧部署可设置 `tagloom.sync.credentialsFile`（默认 YAML 也支持 `TAGLOOM_SYNC_CREDENTIALS_FILE`）完成一次性迁移；格式仍是包含 `workspaceId`、`actorId`、`tokenSha256`、`signingPublicKeyHex` 的 JSON 数组。正式登记库建立后不再重读旧凭据文件；损坏或未知版本会拒绝启动，不能回退到旧凭据。登记库位于数据目录的 `.server/devices.json`，同一目录只能启动一个服务写入者；应与密文归档一起备份。
 
 服务仅保存密文、随机身份、公钥与认证摘要。生产部署需在外层配置 HTTPS、数据目录最小权限、备份、认证限流和上传并发限制；客户端拒绝明文 HTTP 和自动重定向。单个客户端下载同样限制为 512 MiB，大于此值请使用本地备份。旧归档自动清理尚未实现，应监控磁盘容量。管理接口契约及错误码见 [OpenAPI 3.1](./server/openapi-device-management.yaml)。
 
