@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import com.oruke.tagloom.editor.search.NoteSearchField
 import com.oruke.tagloom.editor.search.NoteSearchTarget
 import com.oruke.tagloom.ui.search.rememberNoteSearchDecoration
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.PopupProperties
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
@@ -72,6 +74,7 @@ import tagloom.app.shared.generated.resources.editor_block_no_matching_commands
  * @param databaseCreationAvailable 当前平台是否装配 Database 写入入口。
  * @param onCreateDatabaseBlock 请求异步创建并绑定 Database Block。
  * @param onSaveRequest 保存快捷键动作。
+ * @param onFirstLineCenterChanged 报告文字输入区中首行的真实垂直中心，单位 dp。
  * @param modifier 外部布局修饰符。
  */
 @Composable
@@ -88,8 +91,11 @@ internal fun EditorRichTextField(
     databaseCreationAvailable: Boolean,
     onCreateDatabaseBlock: (BlockId) -> Unit,
     onSaveRequest: () -> Unit,
+    onFirstLineCenterChanged: (Dp) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val density = LocalDensity.current
+    val linkController = LocalWorkspaceLinks.current
     val richText = block.editableRichText() ?: return
     val modelText = richText.toAnnotatedString()
     val initialSelection = state.selectedBlockRanges().firstOrNull { it.block.id == block.id }
@@ -125,6 +131,7 @@ internal fun EditorRichTextField(
     var dismissedSlashText by remember(block.id) { mutableStateOf<String?>(null) }
     var selectedCommandIndex by remember(block.id) { mutableIntStateOf(0) }
     var tablePickerOpen by remember(block.id) { mutableStateOf(false) }
+    var pastedLinkUrl by remember(block.id) { mutableStateOf<String?>(null) }
     val slashTrigger = findSlashCommandTrigger(fieldValue)
     val commands = filterEditorBlockCommands(
         query = slashTrigger?.query.orEmpty(),
@@ -167,11 +174,22 @@ internal fun EditorRichTextField(
             BasicTextField(
                 value = fieldValue,
                 visualTransformation = selection.transformation,
-                onTextLayout = { find.onTextLayout(it); selection.onTextLayout(it) },
+                onTextLayout = {
+                    find.onTextLayout(it)
+                    selection.onTextLayout(it)
+                    if (it.lineCount > 0) {
+                        onFirstLineCenterChanged(with(density) {
+                            ((it.getLineTop(0) + it.getLineBottom(0)) / 2).toDp()
+                        })
+                    }
+                },
                 onValueChange = onValueChange@{ incoming ->
                     selection.acceptInput(incoming)?.let { fieldValue = it; return@onValueChange }
                     val previous = fieldValue
                     val delta = TextEditDelta.between(previous, incoming)
+                    if (linkController?.available == true && block.type == BlockTypes.PARAGRAPH && previous.text.isBlank() && incoming.composition == null && delta.insertedText.length > 4) {
+                        com.oruke.tagloom.core.model.LinkUrl.parse(incoming.text)?.let { pastedLinkUrl = it.value }
+                    }
                     if (
                         incoming.composition == null &&
                         delta.insertedText.length > 1 &&
@@ -270,6 +288,7 @@ internal fun EditorRichTextField(
                                         slashTrigger = slashTrigger,
                                         onCursorRequest = onCursorRequest,
                                         onCreateDatabaseBlock = onCreateDatabaseBlock,
+                                        onCreateLink = linkController?.let { links -> { id -> links.begin(id) } },
                                     )
                                     onCommandMenuDismiss()
                                 }
@@ -334,8 +353,9 @@ internal fun EditorRichTextField(
                 },
             )
         }
+        pastedLinkUrl?.let { url -> LinkPasteChoices(state, block.id, url, { pastedLinkUrl = null }, onCursorRequest) }
         TagloomDropdownMenu(
-            expanded = showCommandMenu && !tablePickerOpen,
+            expanded = showCommandMenu && !tablePickerOpen && pastedLinkUrl == null,
             properties = PopupProperties(focusable = false),
             modifier = Modifier.widthIn(min = 260.dp),
             onDismissRequest = {
@@ -363,6 +383,7 @@ internal fun EditorRichTextField(
                                 slashTrigger = slashTrigger,
                                 onCursorRequest = onCursorRequest,
                                 onCreateDatabaseBlock = onCreateDatabaseBlock,
+                                onCreateLink = linkController?.let { links -> { id -> links.begin(id) } },
                             )
                             onCommandMenuDismiss()
                         }

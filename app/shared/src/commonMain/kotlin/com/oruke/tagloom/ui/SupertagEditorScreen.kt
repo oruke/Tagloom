@@ -262,8 +262,8 @@ internal fun SupertagEditorScreen(
         tagDefinitions = emptyList(),
         fixedDestination = PropertyDefinitionDestination.Workspace,
         onDismiss = { newProperty = false },
-        onConfirm = { propertyName, type, mode, options, _ ->
-            val property = state.buildPropertyDefinitionDraft(null, propertyName, type, mode, options)
+        onConfirm = { propertyName, type, mode, options, hierarchical, _ ->
+            val property = state.buildPropertyDefinitionDraft(null, propertyName, type, mode, options, hierarchical)
             newProperties += property
             bindings += TagPropertyBinding(
                 property.id,

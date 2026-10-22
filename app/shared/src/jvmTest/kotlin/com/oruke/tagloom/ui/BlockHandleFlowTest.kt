@@ -6,6 +6,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.text.TextLayoutResult
 import com.oruke.tagloom.App
 import com.oruke.tagloom.core.model.*
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
@@ -22,6 +23,67 @@ import kotlin.test.*
 /** 从真实 App 的指针事件到加密快照验证手柄命中、菜单迁移、拖动动画和取消。 */
 @OptIn(ExperimentalTestApi::class)
 class BlockHandleFlowTest {
+    /** 宽窄窗口从真实 App 核对不同文本块的首行对齐、完整命中区及菜单入口。 */
+    @Test
+    fun alignsHandlesWithActualFirstTextLineAcrossWindowSizes() {
+        val note = fixture().copy(blocks = listOf(
+            paragraph("empty", "", 0).copy(content = RichTextBlockContent(RichText())),
+            paragraph("plain", "Single paragraph", 1),
+            paragraph("multiline", "First line\nSecond line\nThird line", 2),
+            *listOf(1, 2, 3).map { level ->
+                paragraph("heading-$level", "Heading $level", level + 2).copy(
+                    type = BlockTypes.HEADING,
+                    content = HeadingBlockContent(level, RichText(listOf(InlineRun("Heading $level"))))
+                )
+            }.toTypedArray(),
+            paragraph("bulleted", "Bulleted item\nContinued item", 6).copy(type = BlockTypes.BULLETED_LIST),
+            paragraph("numbered", "Numbered item", 7).copy(type = BlockTypes.NUMBERED_LIST),
+            paragraph("todo", "Task item", 8).copy(
+                type = BlockTypes.TODO,
+                content = TodoBlockContent(false, RichText(listOf(InlineRun("Task item"))))
+            ),
+            paragraph("quote", "Quoted first line\nQuoted second line", 9).copy(type = BlockTypes.QUOTE),
+        ))
+        for (width in listOf(1280, 480)) {
+            withEnvironment(Locale.SIMPLIFIED_CHINESE) { environment ->
+                prepare(environment, note)
+                runDesktopComposeUiTest(width = width, height = 900) {
+                    setContent { App(capabilities = environment.capabilities) }
+                    waitForBlock("empty")
+                    note.blocks.forEachIndexed { index, block ->
+                        // 保留前一个列表项，避免手柄向上扩展的命中区被视口边缘裁切。
+                        onNodeWithTag("editor-block-list").performScrollToIndex(index)
+                        onNodeWithTag("text-input-${block.id.value}").performMouseInput {
+                            click(Offset(4f, 4f))
+                        }
+                        waitForIdle()
+                        val layout = assertFirstLineHandleAlignment(block.id.value)
+                        if (block.id.value in setOf("multiline", "bulleted", "quote")) {
+                            assertTrue(layout.lineCount > 1, "${block.id.value} must exercise a multiline field")
+                        }
+                        if (block.id.value in setOf("empty", "multiline")) {
+                            screenshot("first-line-$width-${block.id.value}.png")
+                        }
+                        val bounds = onNodeWithTag("block-handle-${block.id.value}")
+                            .fetchSemanticsNode().boundsInRoot
+                        root().performMouseInput { click(Offset(bounds.left + 2f, bounds.top + 2f)) }
+                        onNodeWithText("在下方插入").assertIsDisplayed()
+                        onNodeWithText("在下方插入").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+                            .performKeyInput { pressKey(Key.Escape) }
+                        onNodeWithText("在下方插入").assertDoesNotExist()
+                    }
+                    onNodeWithTag("editor-block-list").performScrollToIndex(0)
+                    save()
+                }
+                val saved = runBlocking {
+                    environment.gateway.lock()
+                    environment.gateway.openRecentWorkspace().notes.single().note
+                }
+                assertEquals(note.blocks, saved.blocks, "Focusing text and opening menus must preserve blocks")
+            }
+        }
+    }
+
     /** 不同高度的块可直接拖动，父子一起移动；Esc 恢复原位且重开仍保持确认顺序。 */
     @Test
     fun dragsSubtreesCancelsAndPersistsThroughProductionApp() =
@@ -247,6 +309,28 @@ class BlockHandleFlowTest {
 
     /** @param id 目标行的稳定 ID。 @return 未变换的行布局范围。 */
     private fun ComposeUiTest.row(id: String) = onNodeWithTag("block-row-$id").fetchSemanticsNode().boundsInRoot
+
+    /**
+     * 用原生输入框真实排版核对手柄首行中心，并确认按钮保持完整桌面命中尺寸。
+     * @param id 当前文本块的稳定 ID。
+     * @return 供调用方确认多行场景有效的实际文本排版。
+     */
+    private fun ComposeUiTest.assertFirstLineHandleAlignment(id: String): TextLayoutResult {
+        val field = onNodeWithTag("text-input-$id")
+        val layouts = mutableListOf<TextLayoutResult>()
+        field.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        val firstLineCenter = field.fetchSemanticsNode().boundsInRoot.top +
+            (layout.getLineTop(0) + layout.getLineBottom(0)) / 2f
+        val handle = onNodeWithTag("block-handle-$id")
+        val bounds = handle.fetchSemanticsNode().boundsInRoot
+        assertEquals(firstLineCenter, bounds.center.y, 1f, "$id handle must align to the actual first line")
+        val uncutBounds = handle.getUnclippedBoundsInRoot()
+        assertTrue((uncutBounds.right - uncutBounds.left).value >= 32f &&
+            (uncutBounds.bottom - uncutBounds.top).value >= 32f,
+            "$id must retain a 32 dp click and drag target")
+        return layout
+    }
 
     /**
      * 使用真实鼠标按压并越过触发阈值，不模拟长按。

@@ -94,7 +94,7 @@ data class WorkspaceManifestPublicHeader(
 ) {
     init {
         require(magic == MANIFEST_MAGIC) { "manifest 魔数不受支持" }
-        require(manifestFormatVersion == MANIFEST_FORMAT_VERSION) { "manifest 格式版本不受支持" }
+        require(manifestFormatVersion in 1..LATEST_MANIFEST_FORMAT_VERSION) { "manifest 格式版本不受支持" }
         require(unlockSlots.isNotEmpty()) { "manifest 至少需要一个解锁槽" }
         require(unlockSlots.map { slot -> slot.header.slotId }.distinct().size == unlockSlots.size) {
             "manifest 解锁槽 ID 重复"
@@ -114,8 +114,11 @@ data class WorkspaceManifestPublicHeader(
         /** manifest 与普通对象信封分离的固定魔数。 */
         const val MANIFEST_MAGIC: String = "TAGLOOM-MANIFEST"
 
-        /** 当前 manifest 文件格式版本。 */
+        /** 未使用扩展能力的新工作区默认使用 v1，避免无关的兼容性升级。 */
         const val MANIFEST_FORMAT_VERSION: Int = 1
+
+        /** 层级属性和网页字段来源要求 v2；v1 客户端会拒绝打开，避免丢失新字段。 */
+        const val LATEST_MANIFEST_FORMAT_VERSION: Int = 2
     }
 }
 

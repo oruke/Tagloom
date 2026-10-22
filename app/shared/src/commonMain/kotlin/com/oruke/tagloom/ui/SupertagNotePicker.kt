@@ -80,7 +80,11 @@ private fun SupertagPickerContent(
 ) {
     var query by remember { mutableStateOf("") }
     var selected by remember(query) { mutableStateOf(0) }
-    val matches = state.findSupertags(query)
+    val preset = if (LocalWorkspaceLinks.current?.available == true && state.tagDefinitions.none { it.id == com.oruke.tagloom.core.workspace.LinkNoteSchemas.TYPE_ID }) {
+        listOf(com.oruke.tagloom.core.workspace.LinkNoteSchemas.tag(stringResource(Res.string.link_type)))
+            .filter { query.isBlank() || it.name.contains(query, true) || "link".contains(query, true) }
+    } else emptyList()
+    val matches = state.findSupertags(query) + preset
     val focus = remember { FocusRequester() }
     val list = rememberLazyListState()
     LaunchedEffect(Unit) { focus.requestFocus() }

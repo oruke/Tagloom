@@ -11,11 +11,22 @@ dependencies {
     implementation(projects.app.automation)
 
     implementation(compose.desktop.currentOs)
+
+    testImplementation(libs.kotlin.testJunit)
+    testImplementation(libs.ktor.clientCio)
+}
+
+// Hot Reload 独立使用 JavaExec 启动，不继承发行包参数，必须在 JDK 初始化前启用代理。
+tasks.withType<JavaExec>().configureEach {
+    systemProperty("java.net.useSystemProxies", "true")
 }
 
 compose.desktop {
     application {
         mainClass = "com.oruke.tagloom.MainKt"
+
+        // 代理选择器只在首次初始化时读取开关，开发启动和发行包都必须提前配置。
+        jvmArgs += "-Djava.net.useSystemProxies=true"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)

@@ -37,7 +37,11 @@ object NoteIndexDocumentFactory {
         require(snapshot.header.objectType == ObjectType.NOTE) { "索引文档只能从 Note 快照生成" }
 
         val activeBlocks = snapshot.payload.blocks.filterNot(Block::deleted)
-        val bodyText = activeBlocks.mapNotNull(Block::extractPlainText).joinToString(separator = "\n")
+        val linkFields = if (com.oruke.tagloom.core.workspace.LinkNoteSchemas.TYPE_ID in snapshot.payload.directTagIds) {
+            listOfNotNull(com.oruke.tagloom.core.model.LinkNotePolicy.address(snapshot.payload)?.value,
+                com.oruke.tagloom.core.model.LinkNotePolicy.description(snapshot.payload).ifBlank { null })
+        } else emptyList()
+        val bodyText = (activeBlocks.mapNotNull(Block::extractPlainText) + linkFields).joinToString(separator = "\n")
         val blockLinks = activeBlocks.flatMap(::linksFromBlock)
         val relationLinks = relationPropertyIds.flatMap { propertyId ->
             val value = snapshot.payload.propertyValues[propertyId]?.value

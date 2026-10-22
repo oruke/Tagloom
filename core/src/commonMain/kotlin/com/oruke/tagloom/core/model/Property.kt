@@ -55,6 +55,8 @@ data class PropertyOption(
     val label: String,
     /** 选项使用的语义色 token。 */
     val colorToken: String? = null,
+    /** 层级单选的父项稳定 ID；根项和平铺选项为空。 */
+    val parentOptionId: String? = null,
 ) {
     init {
         require(id.isNotBlank()) { "属性选项 ID 不能为空" }
@@ -126,6 +128,8 @@ data class PropertyDefinition(
     val defaultStyle: PropertyStyle = PropertyStyle(),
     /** formula 属性使用的表达式；其他类型为空。 */
     val formulaExpression: String? = null,
+    /** 单选目录是否按父子关系展示；旧定义保持平铺。 */
+    val hierarchical: Boolean = false,
 ) {
     init {
         require(name.isNotBlank()) { "属性名称不能为空" }
@@ -133,9 +137,8 @@ data class PropertyDefinition(
         require(options.map(PropertyOption::id).distinct().size == options.size) {
             "属性选项 ID 不能重复"
         }
-        require(options.map { option -> option.label.trim().lowercase() }.distinct().size == options.size) {
-            "属性选项名称不能重复"
-        }
+        PropertyOptionTree.validate(options, hierarchical)
+        require(!hierarchical || type == PropertyTypes.SELECT) { "只有单选属性支持层级目录" }
         require(type == PropertyTypes.SELECT || type == PropertyTypes.MULTI_SELECT || optionInputMode == PropertyOptionInputMode.FIXED) {
             "只有单选和多选属性可以启用自由选项"
         }

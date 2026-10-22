@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.BlockId
 import org.jetbrains.compose.resources.stringResource
@@ -41,6 +42,7 @@ internal val BLOCK_GUTTER_WIDTH get() = if (PlatformUsesTouchTargets) 52.dp else
  * 统一点击菜单与直接拖动的六点手柄，隐藏时仍保留布局和键盘可达性。
  * @param blockId 该手柄对应的 Block。
  * @param visible 正文是否悬停、聚焦或已打开菜单。
+ * @param firstLineCenter 文字首行相对块顶部的实际中心；非文本块为空。
  * @param onOpenActions 点击或键盘激活时打开 Block 菜单。
  * @param menu 锚定到完整按钮区域的操作菜单。
  */
@@ -48,6 +50,7 @@ internal val BLOCK_GUTTER_WIDTH get() = if (PlatformUsesTouchTargets) 52.dp else
 internal fun BlockGutter(
     blockId: BlockId,
     visible: Boolean,
+    firstLineCenter: Dp?,
     onOpenActions: () -> Unit,
     menu: @Composable () -> Unit,
 ) {
@@ -63,9 +66,15 @@ internal fun BlockGutter(
     val shape = RoundedCornerShape(6.dp)
     val accent = MaterialTheme.colorScheme.primary
     val ink = MaterialTheme.colorScheme.onSurfaceVariant
-    Box(Modifier.width(BLOCK_GUTTER_WIDTH), contentAlignment = Alignment.TopStart) {
+    val handleSize = if (PlatformUsesTouchTargets) 48.dp else 32.dp
+    // 整个按钮与首行对齐，命中、焦点、悬停和拖动坐标随图标一起移动，原行占位保持稳定。
+    Box(
+        Modifier.width(BLOCK_GUTTER_WIDTH)
+            .offset(y = firstLineCenter?.let { it - handleSize / 2 } ?: 0.dp),
+        contentAlignment = Alignment.TopStart,
+    ) {
         Box(
-            Modifier.size(if (PlatformUsesTouchTargets) 48.dp else 32.dp)
+            Modifier.size(handleSize)
                 .onGloballyPositioned { top = it.positionInRoot().y }
                 .testTag("block-handle-${blockId.value}")
                 .alpha(opacity).clip(shape)

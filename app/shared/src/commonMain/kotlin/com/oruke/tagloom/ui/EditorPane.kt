@@ -42,6 +42,7 @@ import com.oruke.tagloom.editor.visibleBlockDepth
 import com.oruke.tagloom.editor.visibleEditorBlocks
 import com.oruke.tagloom.editor.visibleRootEditorBlocks
 import com.oruke.tagloom.editor.selectTab
+import com.oruke.tagloom.editor.revealLinkBlock
 import com.oruke.tagloom.platform.DocumentExportFormat
 
 /**
@@ -93,6 +94,13 @@ internal fun EditorPane(
         block.editableRichText() != null || block.content is CodeBlockContent
     }
     val listState = rememberLazyListState()
+    val links = LocalWorkspaceLinks.current
+    LaunchedEffect(links?.revealBlockId, document.id) {
+        val target = links?.revealBlockId ?: return@LaunchedEffect
+        val root = state.revealLinkBlock(target) ?: return@LaunchedEffect
+        val position = state.visibleRootEditorBlocks(document.note).indexOfFirst { it.id == root }
+        if (position >= 0) { listState.scrollToItem(position + 1); links.revealBlockId = null }
+    }
     LaunchedEffect(search.active, search.navigationVersion) {
         val text = search.activeText ?: return@LaunchedEffect
         search.revealTabs()

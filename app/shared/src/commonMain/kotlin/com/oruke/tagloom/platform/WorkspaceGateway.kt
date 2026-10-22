@@ -188,6 +188,8 @@ data class WorkspaceSearchHit(
  * 平台实现负责位置选择和真实能力组装；无实现的平台不得在 UI 中展示这些能力。
  */
 interface WorkspaceGateway {
+    /** 当前平台已装配的链接创建与网页信息获取应用服务；缺少实现时不展示录入入口。 */
+    val links: WorkspaceLinkGateway? get() = null
     /** 外部确认写入后的刷新通知，不携带笔记内容；未实现平台不产生通知。 */
     val externalChanges: kotlinx.coroutines.flow.Flow<Unit> get() = kotlinx.coroutines.flow.emptyFlow()
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -67,6 +68,7 @@ internal fun PropertyDefinitionDialog(
         String,
         PropertyOptionInputMode,
         List<PropertyOptionDraft>,
+        Boolean,
         PropertyDefinitionDestination,
     ) -> Unit,
 ) {
@@ -79,10 +81,12 @@ internal fun PropertyDefinitionDialog(
         mutableStateOf(request.existing?.optionInputMode ?: PropertyOptionInputMode.FIXED)
     }
     var typeMenuOpen by remember(request) { mutableStateOf(false) }
+    var hierarchical by remember(request) { mutableStateOf(request.existing?.hierarchical == true) }
+    var draftSequence by remember(request) { mutableStateOf(0) }
     var creationScope by remember(request) { mutableStateOf(PropertyCreationScope.CURRENT_NOTE) }
     var selectedTagId by remember(request, tagDefinitions) { mutableStateOf(tagDefinitions.firstOrNull()?.id) }
-    val normalizedLabels = optionDrafts.map { option -> option.label.trim().lowercase() }
-    val hasBlankOption = normalizedLabels.any(String::isEmpty)
+    val normalizedLabels = optionDrafts.map { option -> (if (hierarchical) option.parentOptionId.orEmpty() + "\u0000" else "") + option.label.trim().lowercase() }
+    val hasBlankOption = optionDrafts.any { it.label.trim().isEmpty() }
     val hasDuplicateOption = normalizedLabels.distinct().size != normalizedLabels.size
     val optionsValid = !type.requiresPropertyOptions() || (
         (optionInputMode == PropertyOptionInputMode.FREE || optionDrafts.isNotEmpty()) &&
@@ -128,6 +132,10 @@ internal fun PropertyDefinitionDialog(
                     )
                 }
                 if (type.requiresPropertyOptions()) {
+                    if (type == PropertyTypes.SELECT) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(hierarchical, { checked -> hierarchical = checked; if (!checked) optionDrafts = optionDrafts.map { it.copy(parentOptionId = null) } }, enabled = request.existing?.id != com.oruke.tagloom.core.workspace.LinkNoteSchemas.GROUP_ID)
+                        Text(stringResource(Res.string.option_hierarchical), style = MaterialTheme.typography.bodyMedium)
+                    }
                     PropertyOptionInputModePicker(
                         mode = optionInputMode,
                         onModeChange = { selected -> optionInputMode = selected },
@@ -137,6 +145,9 @@ internal fun PropertyDefinitionDialog(
                         inputMode = optionInputMode,
                         hasBlankOption = hasBlankOption,
                         hasDuplicateOption = hasDuplicateOption,
+                        hierarchical = hierarchical && type == PropertyTypes.SELECT,
+                        onParentChange = { index, parent -> optionDrafts = optionDrafts.mapIndexed { position, option -> if (position == index) option.copy(parentOptionId = parent) else option } },
+                        usedOptionIds = request.existing?.let { LocalPropertyOptionCatalog.current?.used(it.id) }.orEmpty(),
                         onLabelChange = { index, label ->
                             optionDrafts = optionDrafts.mapIndexed { currentIndex, option ->
                                 if (currentIndex == index) option.copy(label = label) else option
@@ -149,6 +160,7 @@ internal fun PropertyDefinitionDialog(
                             optionDrafts += PropertyOptionDraft(
                                 id = null,
                                 label = nextOptionLabel,
+                                draftId = "draft-${draftSequence++}",
                             )
                         },
                     )
@@ -173,7 +185,7 @@ internal fun PropertyDefinitionDialog(
             }
             Button(
                 onClick = {
-                    onConfirm(name, type, optionInputMode, optionDrafts, requireNotNull(destination))
+                    onConfirm(name, type, optionInputMode, optionDrafts, hierarchical && type == PropertyTypes.SELECT, requireNotNull(destination))
                 },
                 enabled = name.isNotBlank() && optionsValid && destination != null,
             ) {
@@ -418,90 +430,6 @@ private fun PropertyTypePicker(
             }
         }
     }
-}
-
-/**
- * 渲染 select 类属性的有序选项草稿列表与校验反馈。
- *
- * @param options 当前有序选项草稿。
- * @param inputMode 固定模式要求至少一个选项，自由模式允许从空目录开始。
- * @param hasBlankOption 是否存在空名称。
- * @param hasDuplicateOption 是否存在不区分大小写的重复名称。
- * @param onLabelChange 更新一个选项名称。
- * @param onRemove 移除一个选项。
- * @param onAdd 追加新选项。
- */
-@Composable
-private fun PropertyOptionDraftList(
-    options: List<PropertyOptionDraft>,
-    inputMode: PropertyOptionInputMode,
-    hasBlankOption: Boolean,
-    hasDuplicateOption: Boolean,
-    onLabelChange: (Int, String) -> Unit,
-    onRemove: (Int) -> Unit,
-    onAdd: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(Res.string.editor_property_options), style = MaterialTheme.typography.titleSmall)
-        options.forEachIndexed { index, option ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                OutlinedTextField(
-                    value = option.label,
-                    onValueChange = { label -> onLabelChange(index, label) },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(Res.string.editor_property_option_name)) },
-                    singleLine = true,
-                )
-                TextButton(onClick = { onRemove(index) }) {
-                    Text(stringResource(Res.string.editor_action_remove))
-                }
-            }
-        }
-        OutlinedButton(onClick = onAdd) { Text(stringResource(Res.string.editor_property_add_option)) }
-        when {
-            options.isEmpty() && inputMode == PropertyOptionInputMode.FIXED -> {
-                PropertyOptionError(stringResource(Res.string.editor_property_option_required))
-            }
-            hasBlankOption -> PropertyOptionError(stringResource(Res.string.editor_property_option_name_required))
-            hasDuplicateOption -> PropertyOptionError(stringResource(Res.string.editor_property_option_name_duplicate))
-        }
-    }
-}
-
-/**
- * 渲染不会占据输入控件位置的选项校验提示。
- *
- * @param message 面向用户的校验原因。
- */
-@Composable
-private fun PropertyOptionError(message: String) {
-    Text(
-        message,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.error,
-    )
-}
-
-/**
- * 返回不与现有选项重名的本地化默认名称。
- *
- * @param options 当前选项草稿。
- * @return 当前 Locale 下最小可用的“选项 N”名称。
- */
-@Composable
-private fun nextOptionLabel(options: List<PropertyOptionDraft>): String {
-    val existing = options.map { option -> option.label.trim() }.toSet()
-    var number = 1
-    var candidate = stringResource(Res.string.editor_property_option_default_name, number)
-    while (candidate in existing) {
-        number += 1
-        candidate = stringResource(Res.string.editor_property_option_default_name, number)
-    }
-    return candidate
 }
 
 /** 编辑器当前提供完整值输入的属性类型。 */

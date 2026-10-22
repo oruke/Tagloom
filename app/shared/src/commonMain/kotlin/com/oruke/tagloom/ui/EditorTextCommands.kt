@@ -37,6 +37,7 @@ internal fun toggleMark(
  * @param slashTrigger 当前输入触发范围；由手柄菜单打开时为空。
  * @param onCursorRequest 转换后的焦点请求。
  * @param onCreateDatabaseBlock 请求异步创建并绑定 Database Block。
+ * @param onCreateLink 请求进入空段落的原位链接录入，未装配平台时为空。
  */
 internal fun applyCommand(
     state: TagloomEditorState,
@@ -45,6 +46,7 @@ internal fun applyCommand(
     slashTrigger: SlashCommandTrigger?,
     onCursorRequest: (EditorCursorTarget) -> Unit,
     onCreateDatabaseBlock: (BlockId) -> Unit,
+    onCreateLink: ((BlockId) -> Unit)? = null,
 ) {
     if (slashTrigger != null) {
         val currentText = block.editableRichText()?.plainText.orEmpty()
@@ -52,6 +54,10 @@ internal fun applyCommand(
             block.id,
             currentText.removeRange(slashTrigger.start, slashTrigger.endExclusive),
         )
+    }
+    if (command.captureLink) {
+        onCreateLink?.invoke(block.id)
+        return
     }
     if (command.type == com.oruke.tagloom.editor.EditorBlockType.DATABASE) {
         onCreateDatabaseBlock(block.id)

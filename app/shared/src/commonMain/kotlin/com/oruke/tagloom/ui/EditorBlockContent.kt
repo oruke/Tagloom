@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.alpha
@@ -55,6 +56,7 @@ import tagloom.app.shared.generated.resources.editor_block_unknown_uneditable
  *
  * @param state 编辑器状态。
  * @param block 当前文本 Block。
+ * @param onFirstLineCenterChanged 报告包含引用内边距的实际文字首行中心。
  * @param cursorRequest 外部光标请求。
  * @param commandMenuRequested 是否强制打开 Slash 菜单。
  * @param onCursorRequest 请求光标移动。
@@ -68,6 +70,7 @@ import tagloom.app.shared.generated.resources.editor_block_unknown_uneditable
 internal fun TextBlockContent(
     state: TagloomEditorState,
     block: Block,
+    onFirstLineCenterChanged: (Dp) -> Unit,
     cursorRequest: EditorCursorTarget?,
     commandMenuRequested: Boolean,
     onCursorRequest: (EditorCursorTarget) -> Unit,
@@ -77,6 +80,7 @@ internal fun TextBlockContent(
     onCreateDatabaseBlock: (BlockId) -> Unit,
     onSaveRequest: () -> Unit,
 ) {
+    val quoteVerticalPadding = if (block.type == BlockTypes.QUOTE) 6.dp else 0.dp
     Row(Modifier.fillMaxWidth(), verticalAlignment = blockVerticalAlignment(block)) {
         when (val content = block.content) {
             is TodoBlockContent -> {
@@ -164,7 +168,7 @@ internal fun TextBlockContent(
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
                     )
                 }
-                .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 8.dp)
+                .padding(start = 12.dp, top = quoteVerticalPadding, bottom = quoteVerticalPadding, end = 8.dp)
         } else {
             Modifier.weight(1f).let {
                 if (block.type == BlockTypes.TODO && (block.content as? TodoBlockContent)?.checked == true) {
@@ -195,6 +199,7 @@ internal fun TextBlockContent(
             databaseCreationAvailable = databaseCreationAvailable,
             onCreateDatabaseBlock = onCreateDatabaseBlock,
             onSaveRequest = onSaveRequest,
+            onFirstLineCenterChanged = { onFirstLineCenterChanged(it + quoteVerticalPadding) },
             modifier = quoteModifier,
         )
     }

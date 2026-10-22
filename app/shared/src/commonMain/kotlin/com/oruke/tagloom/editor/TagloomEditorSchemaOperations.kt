@@ -44,6 +44,10 @@ internal data class PropertyOptionDraft(
     val label: String,
     /** 既有语义色 token；重命名时原样保留。 */
     val colorToken: String? = null,
+    /** 父项身份，草稿新项可暂时引用 draftId。 */
+    val parentOptionId: String? = null,
+    /** 仅在表单内用于组织新项层级的身份，确认时替换为平台生成的稳定 ID。 */
+    val draftId: String? = null,
 )
 
 /**
@@ -66,7 +70,7 @@ internal data class FreePropertyOptionPlan(
  *
  * @return 允许 UI 暂时编辑为空的选项草稿。
  */
-internal fun PropertyOption.toEditorDraft(): PropertyOptionDraft = PropertyOptionDraft(id, label, colorToken)
+internal fun PropertyOption.toEditorDraft(): PropertyOptionDraft = PropertyOptionDraft(id, label, colorToken, parentOptionId)
 
 /**
  * 构造或更新一个尚未持久化的属性定义。
@@ -79,6 +83,7 @@ internal fun PropertyOption.toEditorDraft(): PropertyOptionDraft = PropertyOptio
  * @param type 属性协议类型。
  * @param optionInputMode select 类属性的固定或自由输入模式。
  * @param optionDrafts select 类属性的有序选项草稿。
+ * @param hierarchical 是否启用单选层级，已有定义默认保留。
  * @return 已规范化且可交给工作区事务确认的完整定义。
  */
 internal fun TagloomEditorState.buildPropertyDefinitionDraft(
@@ -87,6 +92,7 @@ internal fun TagloomEditorState.buildPropertyDefinitionDraft(
     type: String,
     optionInputMode: PropertyOptionInputMode = existing?.optionInputMode ?: PropertyOptionInputMode.FIXED,
     optionDrafts: List<PropertyOptionDraft>,
+    hierarchical: Boolean = existing?.hierarchical ?: false,
 ): PropertyDefinition {
     val normalizedName = name.trim()
     require(normalizedName.isNotEmpty()) { "属性名称不能为空" }
@@ -94,7 +100,7 @@ internal fun TagloomEditorState.buildPropertyDefinitionDraft(
 
     val normalizedMode = if (type.requiresPropertyOptions()) optionInputMode else PropertyOptionInputMode.FIXED
     val normalizedOptions = if (type.requiresPropertyOptions()) {
-        normalizePropertyOptionDrafts(optionDrafts, normalizedMode)
+        normalizePropertyOptionDrafts(optionDrafts, normalizedMode, hierarchical)
     } else {
         emptyList()
     }
@@ -102,6 +108,7 @@ internal fun TagloomEditorState.buildPropertyDefinitionDraft(
         name = normalizedName,
         options = normalizedOptions,
         optionInputMode = normalizedMode,
+        hierarchical = hierarchical,
     )
         ?: PropertyDefinition(
             id = PropertyId(createEditorId("property")),
@@ -109,6 +116,7 @@ internal fun TagloomEditorState.buildPropertyDefinitionDraft(
             type = type,
             options = normalizedOptions,
             optionInputMode = normalizedMode,
+            hierarchical = hierarchical,
         )
 }
 
@@ -127,23 +135,29 @@ internal fun String.requiresPropertyOptions(): Boolean =
  *
  * @param drafts 当前有序草稿。
  * @param inputMode 固定模式要求至少一个选项，自由模式允许从空目录开始。
+ * @param hierarchical 是否校验同级唯一和父子目录。
  * @return 保留既有 ID、为新增项分配稳定 ID 的协议选项。
  */
 private fun TagloomEditorState.normalizePropertyOptionDrafts(
     drafts: List<PropertyOptionDraft>,
     inputMode: PropertyOptionInputMode,
+    hierarchical: Boolean,
 ): List<PropertyOption> {
     require(inputMode == PropertyOptionInputMode.FREE || drafts.isNotEmpty()) {
         "固定单选和多选属性至少需要一个选项"
     }
     val labels = drafts.map { draft -> draft.label.trim() }
     require(labels.all(String::isNotEmpty)) { "属性选项名称不能为空" }
-    require(labels.map(String::lowercase).distinct().size == labels.size) { "属性选项名称不能重复" }
+    val names = drafts.mapIndexed { index, draft -> (if (hierarchical) draft.parentOptionId else null) to labels[index].lowercase() }
+    require(names.distinct().size == names.size) { "属性选项名称不能重复" }
+    val ids = drafts.map { it.id ?: createEditorId("option") }
+    val draftIds = drafts.mapIndexedNotNull { index, draft -> (draft.id ?: draft.draftId)?.let { it to ids[index] } }.toMap()
     return drafts.mapIndexed { index, draft ->
         PropertyOption(
-            id = draft.id ?: createEditorId("option"),
+            id = ids[index],
             label = labels[index],
             colorToken = draft.colorToken,
+            parentOptionId = if (hierarchical) draft.parentOptionId?.let { draftIds[it] ?: it } else null,
         )
     }
 }

@@ -115,7 +115,7 @@ class WorkspaceSchemaSnapshotTransactionService(
         )
         val snapshot = ObjectSnapshot(
             header = SnapshotHeader(
-                schemaVersion = previousSnapshot?.header?.schemaVersion ?: SCHEMA_VERSION,
+                schemaVersion = maxOf(previousSnapshot?.header?.schemaVersion ?: SCHEMA_VERSION, if ((payload as? PropertyDefinition)?.hierarchical == true) 2 else 1),
                 objectId = objectId,
                 objectType = descriptor.objectType,
                 revision = revision,
@@ -160,6 +160,7 @@ class WorkspaceSchemaSnapshotTransactionService(
             transactionId = context.transactionId,
             upserts = listOf(snapshotArtifact.record, changeArtifact.record),
             removedPaths = emptySet(),
+            minimumFormatVersion = if ((payload as? PropertyDefinition)?.hierarchical == true) 2 else 1,
         )
 
         // 步骤 3：协调器发布密文并以 manifest 原子替换确认业务状态。

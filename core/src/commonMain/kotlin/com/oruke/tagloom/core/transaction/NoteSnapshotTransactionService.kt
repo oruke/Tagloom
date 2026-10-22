@@ -52,6 +52,40 @@ class NoteSnapshotTransactionService(
         unlocked: UnlockedWorkspaceManifest,
         request: NoteSnapshotTransactionRequest,
     ): NoteSnapshotTransactionResult {
+        val result = commitBatch(unlocked, listOf(request))
+        return NoteSnapshotTransactionResult(result.snapshots.single(), result.changes.single(), result.encryptedManifest, result.commit)
+    }
+
+    /**
+     * 将多个 Note 的快照与 Change 放入同一 manifest 确认点，任一校验失败均不发布。
+     * @param unlocked 当前已认证 manifest。
+     * @param requests 共享事务 ID、对象身份不重复的完整写入请求。
+     * @return 同时确认的全部快照、Change 和事务结果。
+     */
+    suspend fun commitBatch(unlocked: UnlockedWorkspaceManifest, requests: List<NoteSnapshotTransactionRequest>): NoteBatchTransactionResult {
+        require(requests.isNotEmpty() && requests.map { it.objectId }.distinct().size == requests.size) { "note-batch-identities-invalid" }
+        val transactionId = requests.first().transactionId
+        require(requests.all { it.transactionId == transactionId }) { "note-batch-transaction-mismatch" }
+        // 先在内存校验并加密全部对象；创建链接和来源引用永远不会各自确认半次。
+        val prepared = requests.map { prepare(unlocked, it) }
+        val nextManifest = workspaceManifestService.confirmTransaction(
+            unlocked, transactionId, prepared.flatMap { it.records }, emptySet(),
+            minimumFormatVersion = if (requests.any { it.note.linkMetadata != null }) 2 else 1,
+        )
+        val commit = transactionCoordinator.commit(EncryptedTransactionPlan(
+            transactionId, unlocked.payload.revision, unlocked.payload.revision + 1L,
+            prepared.flatMap { it.artifacts }, nextManifest, sha256(nextManifest),
+        ))
+        return NoteBatchTransactionResult(prepared.map { it.snapshot }, prepared.map { it.change }, nextManifest, commit)
+    }
+
+    /**
+     * 校验并加密一个 Note，不发布文件，供单对象和跨对象事务共同使用。
+     * @param unlocked 当前认证状态。
+     * @param request 完整 Note 写入请求。
+     * @return 尚未确认的密文和对象记录。
+     */
+    private suspend fun prepare(unlocked: UnlockedWorkspaceManifest, request: NoteSnapshotTransactionRequest): PreparedNoteSnapshot {
         cryptoProvider.initialize()
         val normalizedNote = NoteNormalizer.normalize(request.note)
         require(NoteValidator.validate(normalizedNote).isEmpty()) { "Note 结构校验失败" }
@@ -62,7 +96,7 @@ class NoteSnapshotTransactionService(
         val change = createChange(unlocked, request, normalizedNote, noteSha256, revisionText)
         val snapshot = ObjectSnapshot(
             header = SnapshotHeader(
-                schemaVersion = request.previousSnapshot?.header?.schemaVersion ?: NOTE_SCHEMA_VERSION,
+                schemaVersion = maxOf(request.previousSnapshot?.header?.schemaVersion ?: NOTE_SCHEMA_VERSION, if (normalizedNote.linkMetadata != null) 2 else 1),
                 objectId = request.objectId,
                 objectType = ObjectType.NOTE,
                 revision = revision,
@@ -111,25 +145,7 @@ class NoteSnapshotTransactionService(
         val records = listOf(snapshotArtifact.record, changeArtifact.record) + listOfNotNull(audit?.record)
         val artifacts = listOf(snapshotArtifact.artifact, changeArtifact.artifact) + listOfNotNull(audit?.artifact)
 
-        // 步骤 2：下一 manifest 同时引用新快照、Change 与可选审计；原 manifest 仍是当前权威状态。
-        val nextManifest = workspaceManifestService.confirmTransaction(
-            unlocked = unlocked,
-            transactionId = request.transactionId,
-            upserts = records,
-            removedPaths = emptySet(),
-        )
-        val plan = EncryptedTransactionPlan(
-            transactionId = request.transactionId,
-            baseManifestRevision = unlocked.payload.revision,
-            targetManifestRevision = unlocked.payload.revision + 1L,
-            artifacts = artifacts,
-            encryptedManifest = nextManifest,
-            manifestSha256 = sha256(nextManifest),
-        )
-
-        // 步骤 3：协调器以 manifest 原子替换为确认点，索引失败不会回滚已确认快照。
-        val commit = transactionCoordinator.commit(plan)
-        return NoteSnapshotTransactionResult(snapshot, change, nextManifest, commit)
+        return PreparedNoteSnapshot(snapshot, change, records, artifacts)
     }
 
     /**

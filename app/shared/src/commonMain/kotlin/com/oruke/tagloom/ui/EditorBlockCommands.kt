@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.EditorBlockType
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.*
 import tagloom.app.shared.generated.resources.Res
 import tagloom.app.shared.generated.resources.editor_block_command_base_table_description
 import tagloom.app.shared.generated.resources.editor_block_command_base_table_keywords
@@ -71,10 +73,15 @@ internal data class EditorBlockCommand(
     val symbol: String,
     /** 是否允许从现有普通 Block 无损转换；结构化 Block 仅在创建菜单中出现。 */
     val convertible: Boolean = true,
+    /** 是否进入链接原位录入；确认前仍保持普通空段落。 */
+    val captureLink: Boolean = false,
 )
 
 /** 编辑器 v0.2 支持的 Block 创建与转换命令。 */
 internal val EditorBlockCommands: List<EditorBlockCommand> = listOf(
+    EditorBlockCommand(EditorBlockType.TEXT, tagloom.app.shared.generated.resources.Res.string.link_type,
+        tagloom.app.shared.generated.resources.Res.string.link_command_description,
+        tagloom.app.shared.generated.resources.Res.string.link_command_keywords, "", convertible = false, captureLink = true),
     EditorBlockCommand(
         EditorBlockType.TEXT,
         Res.string.editor_block_command_text_label,
@@ -184,11 +191,11 @@ internal fun filterEditorBlockCommands(
     databaseAvailable: Boolean,
 ): List<EditorBlockCommand> {
     val normalized = query.trim().lowercase()
-    val availableCommands = if (databaseAvailable) {
+    val availableCommands = (if (databaseAvailable) {
         EditorBlockCommands
     } else {
         EditorBlockCommands.filterNot { command -> command.type == EditorBlockType.DATABASE }
-    }
+    }).filterNot { it.captureLink && LocalWorkspaceLinks.current?.available != true }
     if (normalized.isEmpty()) {
         return availableCommands
     }
@@ -245,7 +252,11 @@ internal fun EditorBlockCommandItem(
         description = command.localizedDescription(),
         selected = selected,
         leadingIcon = {
-            Text(
+            if (command.captureLink) androidx.compose.material3.Icon(
+                org.jetbrains.compose.resources.painterResource(tagloom.app.shared.generated.resources.Res.drawable.ic_link), null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            ) else Text(
                 text = command.symbol,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,

@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.editor.search.NoteSearchField
@@ -40,7 +41,7 @@ internal fun DocumentDescription(
         visualTransformation = find.transformation(),
         onTextLayout = find.onTextLayout,
         onValueChange = { next -> state.propertyEditor.updateText(propertyId, next) },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).then(find.modifier),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).then(find.modifier).testTag("note-description-input"),
         minLines = 1,
         maxLines = if (LocalNoteSearch.current?.isOpen == true) Int.MAX_VALUE else 3,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),

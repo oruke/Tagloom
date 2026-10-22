@@ -24,12 +24,17 @@ internal suspend fun DesktopWorkspaceSession.saveNoteLocked(
     if (expectedRevision != null && previous?.header?.revision != expectedRevision) {
         throw ExternalCallException("revision_conflict")
     }
-    val withRootType = if (previous == null && WorkspaceDefaults.DEFAULT_NOTE_TAG_ID !in note.directTagIds) {
-        note.copy(directTagIds = note.directTagIds + WorkspaceDefaults.DEFAULT_NOTE_TAG_ID)
-    } else note
+    val cleared = note.copy(propertyValues = note.propertyValues.filterValues { it.value != kotlinx.serialization.json.JsonNull })
+    val withRootType = if (previous == null && WorkspaceDefaults.DEFAULT_NOTE_TAG_ID !in cleared.directTagIds) {
+        cleared.copy(directTagIds = cleared.directTagIds + WorkspaceDefaults.DEFAULT_NOTE_TAG_ID)
+    } else cleared
+    if (com.oruke.tagloom.core.workspace.LinkNoteSchemas.TYPE_ID in withRootType.directTagIds) {
+        val catalog = schemaStore.load(unlocked)
+        LinkNotePolicy.validate(withRootType, catalog.properties.firstOrNull { it.payload.id == com.oruke.tagloom.core.workspace.LinkNoteSchemas.GROUP_ID }?.payload)
+    }
     val result = try {
         noteTransactionService.commit(unlocked, NoteSnapshotTransactionRequest(
-            objectId = targetId, note = withRootType, previousSnapshot = previous,
+            objectId = targetId, note = LinkNotePolicy.protectManualEdits(previous?.payload, withRootType), previousSnapshot = previous,
             actorId = actorId, actorSequence = nextActorSequence++, transactionId = TransactionId(idFactory()),
             hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId), committedAt = timestampProvider(),
             auditEvent = auditEvent?.copy(targetNoteIds = setOf(targetId)),

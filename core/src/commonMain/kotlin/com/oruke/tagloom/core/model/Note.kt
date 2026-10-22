@@ -23,6 +23,8 @@ data class Note(
     val defaultTabId: BlockId? = null,
     /** 由 InlineRun 引用的独立加注。 */
     val annotations: Map<AnnotationId, Annotation> = emptyMap(),
+    /** 网页自动字段的加密来源记录；旧笔记没有来源，视为手动内容。 */
+    val linkMetadata: LinkMetadataProvenance? = null,
 ) {
     init {
         require(directTagIds.distinct().size == directTagIds.size) { "笔记直接标签不能重复" }

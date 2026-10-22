@@ -73,6 +73,8 @@ object NoteThreeWayMergeService {
                 encode = ::encodeString,
             ),
             directTagIds = mergeTagMembership(base.directTagIds, local.note.directTagIds, remote.note.directTagIds),
+            // 来源记录与自动值绑定，发生并发时沿用确定性胜者；后续回填仍校验实际字段值。
+            linkMetadata = if (context.defaultWinner == MergeSide.LOCAL) local.note.linkMetadata else remote.note.linkMetadata,
             propertyValues = mergeMap(
                 base = base.propertyValues,
                 local = local.note.propertyValues,

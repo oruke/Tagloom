@@ -37,6 +37,9 @@ private val TagloomLightColors = lightColorScheme(
     surfaceContainerHighest = Color(0xFFE1E5E3),
     outline = Color(0xFF737C79),
     outlineVariant = Color(0xFFD7DEDB),
+    inverseSurface = Color(0xFF25312F),
+    inverseOnSurface = Color(0xFFE4E8E6),
+    inversePrimary = Color(0xFF87D5C9),
     error = Color(0xFFB3261E),
 )
 
@@ -63,6 +66,9 @@ private val TagloomDarkColors = darkColorScheme(
     surfaceContainerHighest = Color(0xFF333936),
     outline = Color(0xFF929C98),
     outlineVariant = Color(0xFF3C4441),
+    inverseSurface = Color(0xFFE4E8E6),
+    inverseOnSurface = Color(0xFF191C1B),
+    inversePrimary = Color(0xFF006B5F),
     error = Color(0xFFFFB4AB),
 )
 

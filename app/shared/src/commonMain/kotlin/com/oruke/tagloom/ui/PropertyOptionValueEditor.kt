@@ -51,6 +51,10 @@ internal fun MetadataSelectProperty(
     multiple: Boolean,
     onCreateOption: (PropertyId, String) -> Unit,
 ) {
+    if (definition.hierarchical) {
+        HierarchicalPropertyValue(state, document, definition, effectiveValue.stringContent().ifBlank { null }, editable)
+        return
+    }
     var menuOpen by remember(document.id, definition.id) { mutableStateOf(false) }
     var query by remember(document.id, definition.id) { mutableStateOf("") }
     val selectedIds = if (multiple) {

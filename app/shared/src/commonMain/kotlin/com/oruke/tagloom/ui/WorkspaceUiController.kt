@@ -114,7 +114,13 @@ internal class WorkspaceUiController(
     val databaseController: WorkspaceDatabaseController = WorkspaceDatabaseController(gateway, editorState)
 
     /** 统一编排 Note 保存与自动保存版本去重。 */
-    private val noteSaveDelegate = WorkspaceNoteSaveDelegate(gateway, editorState)
+    private val noteSaveDelegate = WorkspaceNoteSaveDelegate(gateway, editorState) { links.onNoteSaved(it) }
+
+    /** 链接录入与网络任务独立于文件保存，仍复用同一网关与编辑草稿。 */
+    val links = WorkspaceLinkController(gateway, editorState) { while (busy) kotlinx.coroutines.delay(10) }
+
+    /** 所有层级属性共用的选项目录维护入口。 */
+    val propertyOptions = PropertyOptionCatalogController(gateway, editorState)
 
     /** 服务器恢复页面状态与操作，独立于编辑器写入和查询职责。 */
     val serverRecovery = WorkspaceServerRecoveryController(this)
@@ -385,6 +391,8 @@ internal class WorkspaceUiController(
      */
     suspend fun lock() = runOperation {
         workspaceSessionMarker = Any()
+        links.clear()
+        propertyOptions.clear()
         gateway.lock()
         serverRecovery.clear()
         editorState.clearWorkspace()
@@ -408,6 +416,8 @@ internal class WorkspaceUiController(
      */
     private fun open(result: WorkspaceOpenResult) {
         workspaceSessionMarker = Any()
+        links.clear()
+        propertyOptions.clear()
         noteSaveDelegate.resetAutoSaveAttempt()
         recoveryMessages = result.recoveryMessages
         if (result.readOnly) {

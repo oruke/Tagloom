@@ -1,5 +1,12 @@
 package com.oruke.tagloom.ui
 
+import tagloom.app.shared.generated.resources.link_library
+import tagloom.app.shared.generated.resources.link_saved
+import tagloom.app.shared.generated.resources.link_reused
+import tagloom.app.shared.generated.resources.link_undo
+import tagloom.app.shared.generated.resources.link_undo_failed
+import androidx.compose.runtime.LaunchedEffect
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.focusRequester
@@ -111,9 +118,19 @@ internal fun TagloomWorkspaceScreen(
     settingsContent: (@Composable (() -> Unit) -> Unit)? = null,
     storageMode: com.oruke.tagloom.platform.WorkspaceStorageMode = com.oruke.tagloom.platform.WorkspaceStorageMode.LOCAL,
 ) {
+    val linkController = LocalWorkspaceLinks.current
+    val linkSavedMessage = stringResource(Res.string.link_saved)
+    val linkReusedMessage = stringResource(Res.string.link_reused)
+    val linkUndoLabel = stringResource(Res.string.link_undo)
+    val linkUndoFailed = stringResource(Res.string.link_undo_failed)
     ConfigureEditorContentNames(state)
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(linkController?.undoCreation) {
+        if (linkController?.undoCreation == null) return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(if (linkController.reused) linkReusedMessage else linkSavedMessage, linkUndoLabel, duration = androidx.compose.material3.SnackbarDuration.Short)
+        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && !linkController.undoLastCreation()) snackbarHostState.showSnackbar(linkUndoFailed)
+    }
     val searchFocusRequester = remember { FocusRequester() }
     // 页面选择随会话保存；编辑器对象继续保留草稿，锁定后整个会话 UI 会被销毁。
     var settingsSelected by rememberSaveable { mutableStateOf(false) }
@@ -135,8 +152,13 @@ internal fun TagloomWorkspaceScreen(
         librarySelected = false
         settingsSelected = false
         tagRequest = null
-        state.createDocumentWithSupertag(definition.id)
-        state.newNoteTitleFocusId = state.selectedDocumentId
+        linkController?.collection?.close()
+        if (definition.id == com.oruke.tagloom.core.workspace.LinkNoteSchemas.TYPE_ID && linkController?.available == true) {
+            linkController.begin()
+        } else {
+            state.createDocumentWithSupertag(definition.id)
+            state.newNoteTitleFocusId = state.selectedDocumentId
+        }
     }
     val exportUnavailableMessage = stringResource(Res.string.editor_export_unavailable)
     val exportFailedMessage = stringResource(Res.string.editor_export_failed)
@@ -236,6 +258,7 @@ internal fun TagloomWorkspaceScreen(
                             searchFocusRequester = searchFocusRequester,
                             onCreateDocument = createDocument,
                             onSelectDocument = { documentId ->
+                                linkController?.collection?.close()
                                 if (!tagController.busy) {
                                     state.selectDocument(documentId)
                                     settingsSelected = false
@@ -246,6 +269,7 @@ internal fun TagloomWorkspaceScreen(
                             },
                             onOpenSettings = settingsContent?.let {
                                 {
+                                    linkController?.collection?.close()
                                     if (!tagController.busy) {
                                         settingsSelected = true; librarySelected = false; tagRequest = null
                                     }
@@ -253,6 +277,7 @@ internal fun TagloomWorkspaceScreen(
                             },
                             settingsSelected = settingsSelected,
                             onOpenSupertags = {
+                                linkController?.collection?.close()
                                 if (!tagController.busy) {
                                     settingsSelected = false; tagRequest = null; librarySelected =
                                         true; createAfterTag = false; tagController.clearError()
@@ -261,6 +286,11 @@ internal fun TagloomWorkspaceScreen(
                             supertagsSelected = librarySelected || tagRequest != null,
                             modifier = Modifier.width(232.dp),
                             storageMode = storageMode,
+                            onOpenLinks = if (linkController?.available == true) ({
+                                settingsSelected = false; librarySelected = false; tagRequest = null
+                                linkController.collection.showAll()
+                            }) else null,
+                            linksSelected = linkController?.collection?.visible == true,
                         )
                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
@@ -271,6 +301,7 @@ internal fun TagloomWorkspaceScreen(
                                     Text(stringResource(Res.string.editor_action_new_note))
                                 }
                                 Box(Modifier.weight(1f))
+                                if (linkController?.available == true) TextButton(onClick = { linkController.collection.showAll() }) { Text(stringResource(tagloom.app.shared.generated.resources.Res.string.link_library)) }
                                 TextButton(onClick = {
                                     librarySelected = true
                                 }) { Text(org.jetbrains.compose.resources.stringResource(tagloom.app.shared.generated.resources.Res.string.supertag_library)) }
@@ -280,7 +311,9 @@ internal fun TagloomWorkspaceScreen(
                             }
                         }
                         val editing = tagRequest
-                        if (editing != null) {
+                        if (linkController?.collection?.visible == true) {
+                            LinkCollectionPane(state, linkController) { id -> linkController.collection.close(); state.selectDocument(id) }
+                        } else if (editing != null) {
                             SupertagEditorScreen(
                                 state, editing, tagController,
                                 onBack = { tagRequest = null; createAfterTag = false },
@@ -381,6 +414,7 @@ internal fun TagloomWorkspaceScreen(
                         null; createAfterTag = false
                     },
                     onDismiss = { pickerOpen = false })
+                if (linkController != null) StandaloneLinkEntry(state, linkController)
             }
             SnackbarHost(
                 hostState = snackbarHostState,

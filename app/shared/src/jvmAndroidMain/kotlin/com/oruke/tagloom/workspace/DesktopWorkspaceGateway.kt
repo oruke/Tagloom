@@ -88,6 +88,9 @@ class DesktopWorkspaceGateway(
      */
     internal fun sessionOrNull(): DesktopWorkspaceSession? = manager.sessionOrNull()
 
+    /** 链接功能与其他入口共用当前唯一会话，不另开工作区。 */
+    override val links: com.oruke.tagloom.platform.WorkspaceLinkGateway = DesktopLinkNoteGateway(this)
+
     /**
      * 生成不含业务语义的 UUID 文本。
      *

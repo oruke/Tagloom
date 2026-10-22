@@ -44,7 +44,8 @@ internal fun DatabaseSelectCell(
     onCommit: (JsonElement?) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    val selectedOption = property.options.firstOrNull { option -> option.id == (value as? JsonPrimitive)?.contentOrNull }
+    val selectedOption =
+        property.options.firstOrNull { option -> option.id == (value as? JsonPrimitive)?.contentOrNull }
     val colors = optionChipColors(selectedOption?.colorToken)
     Box {
         Box(
@@ -53,13 +54,19 @@ internal fun DatabaseSelectCell(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                selectedOption?.label ?: stringResource(Res.string.database_group_empty),
+                (if (property.hierarchical) com.oruke.tagloom.core.model.PropertyOptionTree.label(
+                    property.options,
+                    selectedOption?.id
+                ).ifBlank { null } else selectedOption?.label) ?: stringResource(Res.string.database_group_empty),
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.second,
             )
         }
+        if (open && property.hierarchical) HierarchicalOptionPicker(
+            null, property, selectedOption?.id,
+            { id -> onCommit(id?.let(::JsonPrimitive)); open = false }, { open = false })
         TagloomDropdownMenu(
-            expanded = open,
+            expanded = open && !property.hierarchical,
             onDismissRequest = { open = false },
         ) {
             TagloomMenuItem(
@@ -76,7 +83,13 @@ internal fun DatabaseSelectCell(
                     text = option.label,
                     selected = selected,
                     trailingIcon = if (selected) {
-                        { Text("✓", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                        {
+                            Text(
+                                "✓",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     } else null,
                     onClick = { onCommit(JsonPrimitive(option.id)); open = false },
                 )
@@ -103,7 +116,8 @@ internal fun DatabaseMultiSelectCell(
         ?.mapNotNull { element -> (element as? JsonPrimitive)?.contentOrNull }
         ?.toSet()
         .orEmpty()
-    val label = property.options.filter { option -> option.id in selectedIds }.joinToString(", ") { option -> option.label }
+    val label =
+        property.options.filter { option -> option.id in selectedIds }.joinToString(", ") { option -> option.label }
     Box {
         Box(
             modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(4.dp))

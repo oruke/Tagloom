@@ -50,6 +50,8 @@ import tagloom.app.shared.generated.resources.*
  * @param supertagsSelected 当前是否显示超级标签维护页。
  * @param modifier 外部布局修饰符。
  * @param storageMode 当前设备已实际启用的工作区模式。
+ * @param onOpenLinks 打开链接集合，平台未装配该能力时为空。
+ * @param linksSelected 是否正在显示链接集合。
  */
 @Composable
 internal fun WorkspaceSidebar(
@@ -63,6 +65,8 @@ internal fun WorkspaceSidebar(
     supertagsSelected: Boolean = false,
     modifier: Modifier = Modifier,
     storageMode: WorkspaceStorageMode = WorkspaceStorageMode.LOCAL,
+    onOpenLinks: (() -> Unit)? = null,
+    linksSelected: Boolean = false,
 ) {
     Surface(
         modifier = modifier.fillMaxHeight(),
@@ -76,6 +80,16 @@ internal fun WorkspaceSidebar(
             ) {
                 SidebarSearchField(state, searchFocusRequester)
                 NewDocumentAction(onCreateDocument)
+                if (onOpenLinks != null) Surface(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenLinks).testTag("link-navigation"),
+                    shape = MaterialTheme.shapes.small,
+                    color = if (linksSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Row(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(painterResource(Res.drawable.ic_link), null, Modifier.size(18.dp))
+                        Text(stringResource(Res.string.link_library), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSupertags).testTag("supertag-navigation"),
                     shape = MaterialTheme.shapes.small,
@@ -112,7 +126,7 @@ internal fun WorkspaceSidebar(
                 items(state.visibleDocuments, key = { document -> document.id.value }) { document ->
                     SidebarDocumentItem(
                         document = document,
-                        selected = !settingsSelected && !supertagsSelected && document.id == state.selectedDocumentId,
+                        selected = !settingsSelected && !supertagsSelected && !linksSelected && document.id == state.selectedDocumentId,
                         onClick = { onSelectDocument(document.id) },
                     )
                 }

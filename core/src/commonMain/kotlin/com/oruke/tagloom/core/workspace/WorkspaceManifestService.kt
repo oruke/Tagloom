@@ -250,6 +250,7 @@ class WorkspaceManifestService(
             workspaceMasterKey = newWorkspaceMasterKey,
         )
         val newHeader = WorkspaceManifestPublicHeader(
+            manifestFormatVersion = unlocked.file.publicHeader.manifestFormatVersion,
             workspaceId = workspaceId,
             activeKeyId = newKeyId,
             unlockSlots = listOf(passwordSlot, recoverySlot),
@@ -275,6 +276,7 @@ class WorkspaceManifestService(
      * @param transactionId 本次被确认的事务标识。
      * @param upserts 新增或替换的对象摘要。
      * @param removedPaths 本次删除的对象路径。
+     * @param minimumFormatVersion 本次 payload 所需的最低读取版本；升级和对象发布原子确认，永不降级。
      * @return revision 增一并记录确认事务的加密 manifest 字节。
      */
     suspend fun confirmTransaction(
@@ -282,6 +284,7 @@ class WorkspaceManifestService(
         transactionId: TransactionId,
         upserts: List<ManifestObjectRecord>,
         removedPaths: Set<WorkspaceRelativePath>,
+        minimumFormatVersion: Int = 1,
     ): ByteArray {
         require(upserts.map(ManifestObjectRecord::path).distinct().size == upserts.size) {
             "同一事务不能重复更新对象路径"
@@ -298,15 +301,18 @@ class WorkspaceManifestService(
             unlocked.payload.committedTransactionIds.filterNot { committed -> committed == transactionId } +
                 transactionId
             ).takeLast(WorkspaceManifestPayload.MAX_COMMITTED_TRANSACTION_HISTORY)
+        val nextHeader = unlocked.file.publicHeader.copy(
+            manifestFormatVersion = maxOf(unlocked.file.publicHeader.manifestFormatVersion, minimumFormatVersion),
+        )
         val nextPayload = unlocked.payload.copy(
-            publicHeaderSha256 = publicHeaderSha256(unlocked.file.publicHeader),
+            publicHeaderSha256 = publicHeaderSha256(nextHeader),
             revision = unlocked.payload.revision + 1L,
             lastCommittedTransactionId = transactionId,
             committedTransactionIds = transactionHistory,
             objects = byPath.values.sortedBy { record -> record.path.value },
         )
         return encryptManifest(
-            publicHeader = unlocked.file.publicHeader,
+            publicHeader = nextHeader,
             payload = nextPayload,
             workspaceMasterKey = unlocked.workspaceMasterKey,
         )

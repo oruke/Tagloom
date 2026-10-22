@@ -33,7 +33,7 @@ internal class DesktopAgentNoteSchemaService(
         if (direct.count { it != WorkspaceDefaults.DEFAULT_NOTE_TAG_ID } > 1) throw ExternalCallException("note_type_invalid")
         val resolution = TagResolver(WorkspaceDefaults.DEFAULT_NOTE_TAG_ID).resolve(direct, tags) as? TagResolution.Success
             ?: throw ExternalCallException("schema_invalid")
-        val normalized = note.copy(directTagIds = direct)
+        val normalized = note.copy(directTagIds = direct, propertyValues = note.propertyValues.filterValues { it.value != kotlinx.serialization.json.JsonNull })
         val resolver = EffectivePropertyResolver()
         val effective = resolver.resolve(normalized, resolution, tags, properties)
         if (effective.conflicts.isNotEmpty() || effective.missingPropertyIds.isNotEmpty()) throw ExternalCallException("schema_invalid")

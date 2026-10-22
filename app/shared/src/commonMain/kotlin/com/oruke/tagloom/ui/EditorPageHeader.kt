@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -181,6 +182,7 @@ internal fun PageHeader(
                 onTextLayout = find.onTextLayout,
                 onValueChange = state::updateTitle,
                 modifier = fieldModifier
+                    .testTag("note-title-input")
                     .focusRequester(titleFocus)
                     .then(find.modifier)
                     .onPreviewKeyEvent { event ->

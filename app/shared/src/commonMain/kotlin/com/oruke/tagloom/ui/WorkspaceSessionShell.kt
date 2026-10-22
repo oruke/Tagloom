@@ -86,8 +86,8 @@ internal fun WorkspaceSessionShell(
     LaunchedEffect(controller) { controller.serverRecovery.observeAutomaticUpdates() }
     LaunchedEffect(controller) { controller.observeExternalChanges() }
 
-    LaunchedEffect(selectedDocument?.id, selectedDocument?.draftVersion, selectedDocument?.dirty, controller.busy) {
-        if (selectedDocument?.dirty == true && !controller.busy) {
+    LaunchedEffect(selectedDocument?.id, selectedDocument?.draftVersion, selectedDocument?.dirty, controller.busy, controller.links.creating) {
+        if (selectedDocument?.dirty == true && !controller.busy && !controller.links.creating) {
             delay(AUTO_SAVE_DELAY_MILLIS)
             if (controller.canAutoSaveSelected()) {
                 onSave()
@@ -95,7 +95,10 @@ internal fun WorkspaceSessionShell(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalWorkspaceLinks provides controller.links,
+        LocalPropertyOptionCatalog provides controller.propertyOptions,
+    ) { Box(Modifier.fillMaxSize()) {
         TagloomWorkspaceScreen(
             state = controller.editorState,
             storageMode = controller.serverRecovery.status?.mode ?: com.oruke.tagloom.platform.WorkspaceStorageMode.LOCAL,
@@ -189,6 +192,7 @@ internal fun WorkspaceSessionShell(
         }
     }
 
+    }
     if (saveQueryDialog) {
         AlertDialog(
             onDismissRequest = { saveQueryDialog = false },

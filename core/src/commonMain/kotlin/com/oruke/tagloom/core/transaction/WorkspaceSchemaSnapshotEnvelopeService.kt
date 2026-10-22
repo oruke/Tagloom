@@ -126,6 +126,7 @@ class WorkspaceSchemaSnapshotEnvelopeService(
                 plaintext.decodeToString(),
             )
             require(snapshot.header.objectId == objectId) { "Schema 快照对象 ID 不一致" }
+            require(snapshot.header.schemaVersion in 1..2) { "schema-version-unsupported" }
             require(snapshot.header.objectType == expectedObjectType) { "Schema 快照类型不一致" }
             require("${snapshot.header.revision.actorId.value}:${snapshot.header.revision.sequence}" == revision) {
                 "Schema 快照 revision 不一致"

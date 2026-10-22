@@ -105,6 +105,10 @@ class DesktopWorkspaceSchemaStore(
         definition: TagDefinition,
         context: WorkspaceSchemaWriteContext,
     ): WorkspaceSchemaSnapshotTransactionResult<TagDefinition> {
+        if (definition.id == com.oruke.tagloom.core.workspace.LinkNoteSchemas.TYPE_ID) {
+            require(WorkspaceDefaults.DEFAULT_NOTE_TAG_ID in definition.parentTagIds && definition.propertyBindings.any { it.propertyId == com.oruke.tagloom.core.workspace.LinkNoteSchemas.URL_ID && it.required } &&
+                definition.propertyBindings.any { it.propertyId == com.oruke.tagloom.core.workspace.LinkNoteSchemas.GROUP_ID && !it.required && it.defaultPolicy == com.oruke.tagloom.core.model.DefaultValuePolicy.NONE && it.defaultValue == null }) { "link-schema-incompatible" }
+        }
         val catalog = inspect(unlocked)
         require(catalog.issues.isEmpty()) { "schema-integrity-failure" }
         val definitions = catalog.tags.map { it.payload }.associateBy { it.id } + (definition.id to definition)

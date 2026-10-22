@@ -27,6 +27,7 @@ internal data class SupertagIconChoice(
 
 /** 用户可明确选择的内置矢量目录，不依赖外部服务。 */
 internal val supertagIcons = listOf(
+    SupertagIconChoice("link", Res.string.link_type, Res.drawable.ic_link),
     SupertagIconChoice("folder", Res.string.supertag_icon_folder, Res.drawable.ic_folder),
     SupertagIconChoice("book", Res.string.supertag_icon_book, Res.drawable.ic_book),
     SupertagIconChoice("code", Res.string.supertag_icon_code, Res.drawable.ic_code),

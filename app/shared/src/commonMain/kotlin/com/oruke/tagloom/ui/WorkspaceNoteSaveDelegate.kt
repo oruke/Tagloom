@@ -17,6 +17,8 @@ internal class WorkspaceNoteSaveDelegate(
     private val gateway: WorkspaceGateway,
     /** 仅在解锁会话内持有 Note 明文的编辑器状态。 */
     private val editorState: TagloomEditorState,
+    /** 已确认 URL 变化后通知链接获取编排，不在保存事务中执行网络。 */
+    private val onSaved: (com.oruke.tagloom.platform.WorkspaceNote) -> Unit = {},
 ) {
     /** 记录当前会话最近一次实际提交的草稿版本。 */
     private val autoSaveCoordinator = WorkspaceAutoSaveCoordinator()
@@ -78,6 +80,7 @@ internal class WorkspaceNoteSaveDelegate(
                 draftVersion = current?.draftVersion ?: submitted.draftVersion,
             ),
         )
+        onSaved(saved)
     }
 
     /**

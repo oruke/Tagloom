@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.BaseTableBlockContent
 import com.oruke.tagloom.core.model.Block
@@ -63,9 +64,13 @@ internal fun EditorBlockRow(
     onOpenNote: (ObjectId) -> Unit,
     onSaveRequest: () -> Unit,
 ) {
+    val links = LocalWorkspaceLinks.current
     val interactionSource = remember(block.id) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     val active = state.selection.blockId == block.id
+    val linkEntryVisible = links?.entry?.let { it.blockId == block.id && it.sourceId == state.selectedDocumentId } == true
+    // 用实际文字排版度量，空行、标题及平台字体的首行高度不能由按钮尺寸推断。
+    var firstLineCenter by remember(block.id, block.type, linkEntryVisible) { mutableStateOf<Dp?>(null) }
     var actionMenuOpen by remember(block.id) { mutableStateOf(false) }
     var typeMenuOpen by remember(block.id) { mutableStateOf(false) }
     BlockDragFrame(block) {
@@ -78,6 +83,7 @@ internal fun EditorBlockRow(
             BlockGutter(
                 blockId = block.id,
                 visible = hovered || active || actionMenuOpen || typeMenuOpen,
+                firstLineCenter = firstLineCenter,
                 onOpenActions = { actionMenuOpen = true },
                 menu = {
                     BlockActionMenus(
@@ -98,7 +104,9 @@ internal fun EditorBlockRow(
                 },
             )
             Box(Modifier.weight(1f)) {
-                if (databaseController?.isCreatingBlock(block.id) == true) {
+                if (linkEntryVisible) {
+                    LinkEntryForm(links, state, onCursorRequest)
+                } else if (databaseController?.isCreatingBlock(block.id) == true) {
                     DatabaseBlockCreatingPlaceholder()
                 } else when (val content = block.content) {
                     is BaseTableBlockContent -> BaseTableBlockEditor(
@@ -128,6 +136,8 @@ internal fun EditorBlockRow(
                         onOpenNote = onOpenNote,
                     )
 
+                    is com.oruke.tagloom.core.model.NoteReferenceBlockContent -> LinkReferenceBlock(state, block, onOpenNote)
+
                     is CodeBlockContent -> EditorCodeField(
                         state = state,
                         block = block,
@@ -147,6 +157,7 @@ internal fun EditorBlockRow(
                         TextBlockContent(
                             state = state,
                             block = block,
+                            onFirstLineCenterChanged = { firstLineCenter = it },
                             cursorRequest = cursorRequest,
                             commandMenuRequested = commandMenuBlockId == block.id,
                             onCursorRequest = onCursorRequest,

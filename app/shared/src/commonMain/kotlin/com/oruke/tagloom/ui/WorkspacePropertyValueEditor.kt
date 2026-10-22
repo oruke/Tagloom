@@ -153,9 +153,17 @@ private fun PropertyValueControl(
     val editable = property.binding?.readonly != true
     when (definition.type) {
         PropertyTypes.TEXT,
-        PropertyTypes.URL,
         PropertyTypes.EMAIL,
         -> MetadataTextProperty(state, document, definition, property.value, editable)
+
+        PropertyTypes.URL -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { MetadataTextProperty(state, document, definition, property.value, editable) }
+            val address = com.oruke.tagloom.core.model.LinkUrl.parse(property.value.stringContent())
+            val uri = androidx.compose.ui.platform.LocalUriHandler.current
+            if (address != null) androidx.compose.material3.IconButton(onClick = { runCatching { uri.openUri(address.value) } }, modifier = Modifier.width(28.dp)) {
+                androidx.compose.material3.Icon(org.jetbrains.compose.resources.painterResource(Res.drawable.ic_open_external), stringResource(Res.string.link_open_web), Modifier.width(16.dp))
+            }
+        }
 
         PropertyTypes.NUMBER -> MetadataNumberProperty(
             state, document, definition, property.value, editable,

@@ -442,7 +442,7 @@ class TagloomEditorState(
         val index = documents.indexOfFirst { document -> document.id == documentId }
         if (index >= 0) {
             val current = documents[index]
-            val updated = transform(current.note)
+            val updated = com.oruke.tagloom.core.model.LinkNotePolicy.protectManualEdits(current.note, transform(current.note))
             if (updated != current.note) {
                 documents[index] = current.copy(
                     note = updated,

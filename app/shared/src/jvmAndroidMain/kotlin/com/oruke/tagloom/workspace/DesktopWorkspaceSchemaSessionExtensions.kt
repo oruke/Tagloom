@@ -15,7 +15,7 @@ import kotlinx.coroutines.sync.withLock
  */
 suspend fun DesktopWorkspaceSession.deleteTagDefinition(tagId: TagId) = sessionMutex.withLock {
     requireWritable()
-    require(tagId != WorkspaceDefaults.DEFAULT_NOTE_TAG_ID) { "builtin-supertag-readonly" }
+    require(tagId != WorkspaceDefaults.DEFAULT_NOTE_TAG_ID && tagId != com.oruke.tagloom.core.workspace.LinkNoteSchemas.TYPE_ID) { "builtin-supertag-readonly" }
     // 先读取权威快照；损坏目录无法证明无引用，因此拒绝删除。
     val schema = schemaStore.inspect(unlocked)
     val queries = savedQueryLoader.inspect(unlocked)
@@ -63,6 +63,16 @@ suspend fun DesktopWorkspaceSession.saveTagDefinition(definition: TagDefinition)
 suspend fun DesktopWorkspaceSession.savePropertyDefinition(definition: PropertyDefinition): DesktopStoredPropertyDefinition =
     sessionMutex.withLock {
         requireWritable()
+        val catalog = schemaStore.load(unlocked)
+        require(catalog.issues.isEmpty()) { "schema-integrity-failure" }
+        when (definition.id) {
+            com.oruke.tagloom.core.workspace.LinkNoteSchemas.GROUP_ID -> require(definition.type == com.oruke.tagloom.core.model.PropertyTypes.SELECT && definition.hierarchical) { "link-schema-incompatible" }
+            com.oruke.tagloom.core.workspace.LinkNoteSchemas.URL_ID -> require(definition.type == com.oruke.tagloom.core.model.PropertyTypes.URL) { "link-schema-incompatible" }
+        }
+        com.oruke.tagloom.core.domain.property.PropertyOptionChangePolicy.requireSafeUpdate(
+            catalog.properties.firstOrNull { it.payload.id == definition.id }?.payload, definition,
+            loadActiveNotes().map { it.snapshot.payload }, catalog.tags.map { it.payload },
+        )
         val result = try {
             schemaStore.saveProperty(unlocked, definition, nextSchemaWriteContext())
         } catch (error: Throwable) {

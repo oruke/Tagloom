@@ -116,13 +116,14 @@ internal fun DocumentMetadataPanel(
                 definition.id == WorkspaceDefaults.DEFAULT_NOTE_TAG_ID
             },
             onDismiss = { propertyDialog = null },
-            onConfirm = { name, type, optionInputMode, options, destination ->
+            onConfirm = { name, type, optionInputMode, options, hierarchical, destination ->
                 val definition = state.buildPropertyDefinitionDraft(
                     existing = request.existing,
                     name = name,
                     type = type,
                     optionInputMode = optionInputMode,
                     optionDrafts = options,
+                    hierarchical = hierarchical,
                 )
                 onSavePropertyDefinition(definition, destination)
                 propertyDialog = null

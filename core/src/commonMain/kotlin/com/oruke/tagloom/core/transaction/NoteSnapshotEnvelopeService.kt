@@ -63,6 +63,7 @@ class NoteSnapshotEnvelopeService(
                 plaintext.decodeToString(),
             )
             require(snapshot.header.objectType == ObjectType.NOTE) { "快照对象类型不是 Note" }
+            require(snapshot.header.schemaVersion in 1..2) { "note-schema-version-unsupported" }
             require(snapshot.header.objectId == objectId) { "Note 快照对象身份不一致" }
             require(snapshot.header.revision.toProtocolRevision() == revision) { "Note 快照 revision 不一致" }
             require(NoteValidator.validate(snapshot.payload).isEmpty()) { "Note 快照结构无效" }
