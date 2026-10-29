@@ -50,19 +50,19 @@ import java.nio.file.Path
  */
 class DesktopWorkspaceSession internal constructor(
     /** 工作区受控路径，不允许外部调用直接访问。 */
-    private val paths: JvmWorkspacePaths,
+    internal val paths: JvmWorkspacePaths,
     /** 当前工作区绑定的 JVM 文件能力。 */
     internal val fileSystem: JvmWorkspaceFileSystem,
     /** 当前会话持有的跨进程单写入者租约。 */
     private val writeLease: WorkspaceWriteLease,
     /** manifest 认证与更新服务。 */
-    private val manifestService: WorkspaceManifestService,
+    internal val manifestService: WorkspaceManifestService,
     /** 当前已解锁 manifest；会话取得主密钥所有权。 */
     internal var unlocked: UnlockedWorkspaceManifest,
     /** 权威快照到加密索引的投影器。 */
     internal val projection: DesktopIndexProjection,
     /** 工作区唯一文件写入协调器。 */
-    private val transactionCoordinator: TransactionCoordinator,
+    internal val transactionCoordinator: TransactionCoordinator,
     /** 桌面与外部调用复用的 Note 统一事务入口。 */
     internal val noteTransactionService: NoteSnapshotTransactionService,
     /** 外部读取和失败调用的加密审计事务入口。 */
@@ -98,15 +98,21 @@ class DesktopWorkspaceSession internal constructor(
     /** 当前 Actor 下一个对象 revision 序号。 */
     internal var nextActorSequence: Long = 1L
 
+    /** 观察远端父节点后继续单调递增的业务逻辑时钟，只在会话锁内推进。 */
+    internal val hybridClock = WorkspaceHybridClock(actorId, currentTimeMillis)
+
     /** 锁定后立即拒绝全部读取和写入。 */
     @Volatile
     internal var closed: Boolean = false
+
+    /** 已连接服务器的工作区保留共同祖先，设备确认协议完成前禁止压缩 Change。 */
+    internal var syncHistoryRequired: Boolean = false
 
     /** 锁定前同步清理外部明文缓存的生命周期订阅；回调不得读写工作区。 */
     internal val externalCloseListeners = mutableListOf<() -> Unit>()
 
     /** 恢复无法证明完整状态时进入只读模式。 */
-    private var readOnly: Boolean = false
+    internal var readOnly: Boolean = false
 
     /** 最近一次启动恢复报告。 */
     private var recoveryReport: TransactionRecoveryReport = TransactionRecoveryReport(emptyList(), false)
@@ -138,7 +144,7 @@ class DesktopWorkspaceSession internal constructor(
                 actorId = actorId,
                 actorSequence = nextActorSequence,
                 transactionId = TransactionId(idFactory()),
-                hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
+                hybridLogicalTime = hybridClock.next(),
                 committedAt = timestampProvider(),
                 labels = localizedWorkspaceSchemaLabels(),
             )
@@ -149,6 +155,7 @@ class DesktopWorkspaceSession internal constructor(
             savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
             databaseStore.inspect(unlocked).issues).distinct()
         if (!readOnly && integrityIssues.isEmpty()) {
+            DesktopReplicaCodec(this).observeClock()
             DesktopNoteTagSchemaMigration.migrate(schemaStore, unlocked, ::nextSchemaWriteContext)?.let { manifest ->
                 refreshManifest(manifest)
             }
@@ -283,6 +290,7 @@ class DesktopWorkspaceSession internal constructor(
     suspend fun compactChangeLog(policy: ChangeLogCompactionPolicy): ChangeLogCompactionResult =
         sessionMutex.withLock {
             requireWritable()
+            check(!syncHistoryRequired) { "sync_history_required" }
             val result = try {
                 compactionService.compact(
                     unlocked = unlocked,
@@ -321,7 +329,7 @@ class DesktopWorkspaceSession internal constructor(
                     actorId = actorId,
                     actorSequence = nextActorSequence++,
                     transactionId = TransactionId(idFactory()),
-                    hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
+                    hybridLogicalTime = hybridClock.next(),
                     committedAt = timestampProvider(),
                 ),
             )

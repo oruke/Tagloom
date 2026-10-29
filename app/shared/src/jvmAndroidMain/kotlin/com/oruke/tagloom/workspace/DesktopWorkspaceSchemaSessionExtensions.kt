@@ -4,7 +4,6 @@ import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.core.model.TagId
 import com.oruke.tagloom.core.model.TransactionId
-import com.oruke.tagloom.core.sync.HybridLogicalTime
 import com.oruke.tagloom.core.transaction.WorkspaceSchemaWriteContext
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import kotlinx.coroutines.sync.withLock
@@ -96,6 +95,6 @@ internal fun DesktopWorkspaceSession.nextSchemaWriteContext(): WorkspaceSchemaWr
         actorId = actorId,
         actorSequence = nextActorSequence++,
         transactionId = TransactionId(idFactory()),
-        hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
+        hybridLogicalTime = hybridClock.next(),
         committedAt = timestampProvider(),
     )

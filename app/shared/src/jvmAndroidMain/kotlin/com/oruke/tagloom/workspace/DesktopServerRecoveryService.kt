@@ -16,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -37,11 +38,22 @@ internal class DesktopServerRecoveryService(
     private val store: ServerRecoveryAccessStore,
     /** HTTPS 传输工厂；隔离测试可明确注入回环适配器。 */
     private val clientFactory: (String) -> ServerRecoveryClient,
+    /** 同步确认后只发送无正文事件，由 UI 协程刷新并保留未保存草稿。 */
+    private val onWorkspaceChanged: () -> Unit = {},
 ) : WorkspaceServerRecoveryGateway {
     /** 防止并行恢复、首次登记或上传造成凭据及副本版本竞争。 */
     private val mutex = Mutex()
     /** 当前传输的子任务；锁定时取消并等待清理完成。 */
     @Volatile private var activeTransfer: Job? = null
+
+    /** 取消操作同时使所有已经排队的传输失效，防止它们在锁定后重新开始。 */
+    private val transferGeneration = java.util.concurrent.atomic.AtomicLong()
+
+    /** 原子协调任务登记与取消状态，锁内只操作内存，网络和等待始终在锁外。 */
+    private val transferStateLock = Any()
+
+    /** 锁定或切本地后暂停同一会话的自动传输，只允许显式启用服务器模式恢复。 */
+    @Volatile private var blockedSession: DesktopWorkspaceSession? = null
 
     /** 与现有工作区格式相同的密码实现。 */
     private val crypto = LibsodiumCryptoProvider()
@@ -75,7 +87,7 @@ internal class DesktopServerRecoveryService(
      * @return 完整上传并确认后的状态。
      */
     override suspend fun publish(serverUrl: String, bootstrapToken: String, recoveryKeyText: String): WorkspaceServerRecoveryStatus =
-        transfer {
+        transfer(resume = true) {
             crypto.initialize()
             val session = requireNotNull(manager.sessionOrNull())
             val root = requireNotNull(manager.rootOrNull())
@@ -106,25 +118,30 @@ internal class DesktopServerRecoveryService(
                         access.recoveryTokenSha256 = it.tokenSha256
                         access.keyId = session.unlocked.file.publicHeader.activeKeyId.value
                     }
-                    publishServerRecoveryCopy(session, root, access, client, store)
+                    synchronizeServerCopy(session, root, access, client, store, onWorkspaceChanged)
                     access.status(session)
                 }
             } finally { access.destroy() }
         }
 
-    /** @return 仅上传服务器模式中尚未确认的新版本；本地模式不会创建网络客户端。 */
-    override suspend fun updateIfChanged(): WorkspaceServerRecoveryStatus? = transfer {
-        val session = manager.sessionOrNull() ?: return@transfer null
-        val root = requireNotNull(manager.rootOrNull())
-        val access = store.read(root, session.workspaceId) ?: return@transfer null
-        try {
-            val state = access.status(session)
-            if (state.mode == WorkspaceStorageMode.SERVER && state.pendingChanges) {
-                if (state.requiresRecoveryKey) throw ServerRecoveryException("recovery_key_required")
-                clientFactory(access.serverUrl).use { client -> publishServerRecoveryCopy(session, root, access, client, store) }
-            }
-            access.status(session)
-        } finally { access.destroy() }
+    /** @return 在服务器模式检查双方变更并同步；本地模式只返回本机状态，不创建网络客户端。 */
+    override suspend fun updateIfChanged(): WorkspaceServerRecoveryStatus? {
+        if (manager.sessionOrNull() == null) return null
+        val current = status() ?: return null
+        if (current.mode == WorkspaceStorageMode.LOCAL) return current
+        return transfer {
+            val session = manager.sessionOrNull() ?: return@transfer null
+            val root = requireNotNull(manager.rootOrNull())
+            val access = store.read(root, session.workspaceId) ?: return@transfer null
+            try {
+                val state = access.status(session)
+                if (state.mode == WorkspaceStorageMode.SERVER) {
+                    if (state.requiresRecoveryKey) throw ServerRecoveryException("recovery_key_required")
+                    clientFactory(access.serverUrl).use { client -> synchronizeServerCopy(session, root, access, client, store, onWorkspaceChanged) }
+                }
+                access.status(session)
+            } finally { access.destroy() }
+        }
     }
 
     /** @return 停止传输并保存本地模式；连接材料及原服务器副本继续保留以支持切回。 */
@@ -152,7 +169,7 @@ internal class DesktopServerRecoveryService(
      * @return 已打开的原工作区，服务器模式自动启用。
      */
     override suspend fun restore(serverUrl: String, recoveryKeyText: String, pin: String?): WorkspaceOpenResult? =
-        transfer {
+        transfer(resume = true) {
             check(manager.sessionOrNull() == null)
             crypto.initialize()
             val credentials = recoveryCredentials(recoveryKeyText)
@@ -191,17 +208,44 @@ internal class DesktopServerRecoveryService(
         }
 
     /** 取消正在进行的上传或恢复，并等待临时密文及密钥引用清理后再锁定。 */
-    suspend fun cancelTransfer() { activeTransfer?.cancelAndJoin() }
+    suspend fun cancelTransfer() {
+        val running = synchronized(transferStateLock) {
+            blockedSession = manager.sessionOrNull()
+            transferGeneration.incrementAndGet()
+            activeTransfer
+        }
+        running?.cancelAndJoin()
+    }
 
     /**
      * 将传输限制在可取消的子任务内，避免锁定后仍保留会话或执行登记。
+     * @param resume 显式启用服务器或恢复时允许解除同会话传输暂停。
      * @param block 本次上传或恢复的完整流程。
      * @return 此次流程的结果。
      */
-    private suspend fun <T> transfer(block: suspend () -> T): T = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            activeTransfer = currentCoroutineContext().job
-            try { block() } finally { activeTransfer = null }
+    private suspend fun <T> transfer(resume: Boolean = false, block: suspend () -> T): T {
+        val generation = transferGeneration.get()
+        val startingSession = manager.sessionOrNull()
+        return withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val transferJob = currentCoroutineContext().job
+                synchronized(transferStateLock) {
+                    if (generation != transferGeneration.get() || startingSession !== manager.sessionOrNull() ||
+                        startingSession != null && blockedSession === startingSession && !resume) {
+                        throw kotlinx.coroutines.CancellationException("sync_session_changed")
+                    }
+                    if (resume || startingSession !== blockedSession) blockedSession = null
+                    activeTransfer = transferJob
+                }
+                try {
+                    currentCoroutineContext().ensureActive()
+                    block()
+                } finally {
+                    synchronized(transferStateLock) {
+                        if (activeTransfer === transferJob) activeTransfer = null
+                    }
+                }
+            }
         }
     }
 
@@ -258,7 +302,35 @@ internal class DesktopServerRecoveryService(
     private suspend fun ServerRecoveryAccess.status(session: DesktopWorkspaceSession) = WorkspaceServerRecoveryStatus(
         serverUrl, snapshot?.createdAt, !registered || keyId != session.unlocked.file.publicHeader.activeKeyId.value,
         mode, uploadedManifestRevision != session.serverRecoveryRevision(), registered,
+        session.sessionMutex.withLock {
+            session.syncHistoryRequired = true
+            loadReplicaConflicts(session).count { it.status == com.oruke.tagloom.core.sync.ConflictStatus.UNRESOLVED }
+        },
     )
+
+    /** @return 当前解锁会话可审阅的全部完整双版本；锁定后不保留明文。 */
+    override suspend fun conflicts(): List<WorkspaceSyncConflict> = withContext(Dispatchers.IO) {
+        val session = requireNotNull(manager.sessionOrNull())
+        session.sessionMutex.withLock { replicaConflictViews(session) }
+    }
+
+    /**
+     * 重新核对审阅 revision，并把选择和已处理标记放入同一事务。
+     * @param conflictId 当前认证历史中的冲突身份。
+     * @param useRemote 是否选择第二份历史版本。
+     * @param expectedRevision 审阅时的对象 revision，变化后拒绝旧选择。
+     * @param fieldId 指定冲突字段；为空时处理全部未处理字段或旧格式完整版本。
+     */
+    override suspend fun resolveConflict(conflictId: String, useRemote: Boolean, expectedRevision: com.oruke.tagloom.core.model.ObjectRevision,
+        fieldId: String?) = withContext(Dispatchers.IO) {
+        val session = requireNotNull(manager.sessionOrNull())
+        session.sessionMutex.withLock {
+            session.requireWritable()
+            val conflict = loadReplicaConflicts(session).single { it.conflictId == conflictId }
+            DesktopReplicaTransaction(session).restore(conflict, if (useRemote) conflict.remoteSnapshot else conflict.localSnapshot, expectedRevision, fieldId)
+        }
+        onWorkspaceChanged()
+    }
 
     /**
      * 计算服务器登记要求的访问文本摘要。

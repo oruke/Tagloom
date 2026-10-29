@@ -39,4 +39,5 @@ dependencies {
     implementation(libs.kotlinx.serializationJson)
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
+    testImplementation(projects.app.sync)
 }

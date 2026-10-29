@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 enum class WorkspaceStorageMode {
     /** 仅在本地保存，不向服务器传输。 */
     LOCAL,
-    /** 本地保存后自动更新服务器密文副本。 */
+    /** 自动合并其他设备确认内容并发布服务器密文副本。 */
     SERVER,
 }
 
@@ -25,10 +25,30 @@ data class WorkspaceServerRecoveryStatus(
     val pendingChanges: Boolean = false,
     /** 服务器已确认此设备登记，不再需要登记访问码。 */
     val registered: Boolean = false,
+    /** 已加密保留、尚未由用户处理的同步冲突数量。 */
+    val conflictsCount: Int = 0,
 )
 
 /** 把服务器备份传输与本机认证流程封装为共享 UI 可调用的能力。 */
 interface WorkspaceServerRecoveryGateway {
+    /** @return 当前会话认证的完整冲突历史，锁定后拒绝读取。 */
+    suspend fun conflicts(): List<WorkspaceSyncConflict> = emptyList()
+
+    /**
+     * 将所选冲突内容作为新业务变更恢复，并原子标记所处理字段。
+     * @param conflictId 待处理冲突的不透明身份。
+     * @param useRemote 是否使用第二份版本；否则使用第一份版本。
+     * @param expectedRevision 审阅时的当前对象 revision，变化后拒绝旧选择。
+     * @param fieldId 仅处理此字段；为空时处理全部未处理字段，旧历史则恢复完整版本。
+     */
+    suspend fun resolveConflict(
+        conflictId: String,
+        useRemote: Boolean,
+        expectedRevision: com.oruke.tagloom.core.model.ObjectRevision,
+        fieldId: String? = null,
+    ) {
+        error("sync_conflict_unavailable")
+    }
     /**
      * 在应用私有目录准备服务器模式的新工作区，等待用户确认保存恢复密钥。
      * @param serverUrl 用于提前校验的服务器地址，此阶段不发送请求。
@@ -49,7 +69,7 @@ interface WorkspaceServerRecoveryGateway {
      */
     suspend fun publish(serverUrl: String, bootstrapToken: String, recoveryKeyText: String): WorkspaceServerRecoveryStatus
 
-    /** @return 检查本地确认版本，仅在服务器模式且有变更时上传；未配置时为空。 */
+    /** @return 服务器模式检查并合并双方确认版本，按需发布；本地模式无网络，未配置时为空。 */
     suspend fun updateIfChanged(): WorkspaceServerRecoveryStatus?
 
     /** @return 取消传输并持久化本地模式后的状态；未配置服务器时为空。 */

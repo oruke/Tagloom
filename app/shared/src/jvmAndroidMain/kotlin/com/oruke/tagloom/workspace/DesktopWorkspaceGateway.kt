@@ -76,6 +76,7 @@ class DesktopWorkspaceGateway(
     private val serverRecoveryService = DesktopServerRecoveryService(
         manager, localAccessService, ServerWorkspaceDirectoryStore(recoveryAccessDirectory.resolveSibling("server-workspaces")),
         ServerRecoveryAccessStore(recoveryAccessDirectory), recoveryClientFactory,
+        onWorkspaceChanged = { externalChangeNotifications.tryEmit(Unit) },
     )
 
     /** 只向共享 UI 暴露受控恢复能力。 */

@@ -108,7 +108,7 @@ internal class WorkspaceUiController(
 
     /** 当前工作区已确认保存查询。 */
     var savedQueries: List<WorkspaceSavedQuery> by mutableStateOf(emptyList())
-        private set
+        internal set
 
     /** Database/View 目录、投影和单元格写入控制器。 */
     val databaseController: WorkspaceDatabaseController = WorkspaceDatabaseController(gateway, editorState)

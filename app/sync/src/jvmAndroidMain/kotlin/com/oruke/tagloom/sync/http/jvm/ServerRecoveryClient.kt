@@ -69,6 +69,28 @@ class ServerRecoveryClient(serverUrl: String, allowLoopbackHttp: Boolean = false
     }
 
     /**
+     * 读取当前已确认的远端副本描述，不下载归档，也不改变客户端已合并的版本边界。
+     * @param workspaceId 当前已解锁工作区身份。
+     * @param actorId 已登记且仍有效的设备身份。
+     * @param token 当前设备访问凭据。
+     * @return 通过身份及容量校验的确认点；已认证工作区尚未发布副本时为空。
+     */
+    suspend fun latestSnapshot(workspaceId: WorkspaceId, actorId: ActorId, token: String): SyncRecoverySnapshot? =
+        client.prepareGet("$base/v1/workspaces/${workspaceId.value}/recovery-snapshot/metadata") {
+            bearerAuth(token)
+            header("X-Tagloom-Actor", actorId.value)
+        }.execute { response ->
+            if (response.status == HttpStatusCode.NotFound) return@execute null
+            decode(response, SyncRecoverySnapshot.serializer()).also { snapshot ->
+                if (snapshot.workspaceId != workspaceId || snapshot.revision <= 0 ||
+                    snapshot.size !in 1..MAXIMUM_DOWNLOAD_BYTES || !snapshot.sha256.matches(Regex("[a-f0-9]{64}")) ||
+                    runCatching { java.time.Instant.parse(snapshot.createdAt) }.isFailure) {
+                    throw ServerRecoveryException("invalid_response")
+                }
+            }
+        }
+
+    /**
      * 流式上传密文并以旧版本为前置条件确认，冲突时不重试覆盖。
      * @param workspaceId 工作区身份。
      * @param actorId 当前设备身份。

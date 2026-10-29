@@ -51,6 +51,12 @@ internal fun Application.installSyncDeviceRoutes(registry: DeviceRegistryService
             }
         }
         route("/v1/workspaces/{workspaceId}/recovery-snapshot") {
+            get("/metadata") {
+                // 先验权再读取确认点，未发布与不存在工作区不能成为匿名枚举入口。
+                val workspace = registry.recoverySnapshot(call.syncAccess(registry))
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                call.respond(requireNotNull(workspace.snapshot))
+            }
             put {
                 val access = call.syncAccess(registry)
                 val expected = call.request.headers["X-Tagloom-Recovery-Revision"]?.toLongOrNull()

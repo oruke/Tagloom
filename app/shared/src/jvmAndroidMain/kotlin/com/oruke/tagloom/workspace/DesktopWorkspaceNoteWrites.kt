@@ -3,7 +3,6 @@ package com.oruke.tagloom.workspace
 import com.oruke.tagloom.core.agent.AgentAuditEvent
 import com.oruke.tagloom.core.external.ExternalCallException
 import com.oruke.tagloom.core.model.*
-import com.oruke.tagloom.core.sync.HybridLogicalTime
 import com.oruke.tagloom.core.transaction.NoteSnapshotTransactionRequest
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 
@@ -36,7 +35,7 @@ internal suspend fun DesktopWorkspaceSession.saveNoteLocked(
         noteTransactionService.commit(unlocked, NoteSnapshotTransactionRequest(
             objectId = targetId, note = LinkNotePolicy.protectManualEdits(previous?.payload, withRootType), previousSnapshot = previous,
             actorId = actorId, actorSequence = nextActorSequence++, transactionId = TransactionId(idFactory()),
-            hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId), committedAt = timestampProvider(),
+            hybridLogicalTime = hybridClock.next(), committedAt = timestampProvider(),
             auditEvent = auditEvent?.copy(targetNoteIds = setOf(targetId)),
         ))
     } catch (error: Throwable) {
@@ -65,7 +64,7 @@ internal suspend fun DesktopWorkspaceSession.deleteNoteLocked(
         noteTransactionService.commit(unlocked, NoteSnapshotTransactionRequest(
             objectId = objectId, note = previous.payload, previousSnapshot = previous,
             actorId = actorId, actorSequence = nextActorSequence++, transactionId = TransactionId(idFactory()),
-            hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId), committedAt = timestampProvider(),
+            hybridLogicalTime = hybridClock.next(), committedAt = timestampProvider(),
             deleted = true, auditEvent = auditEvent,
         ))
     } catch (error: Throwable) {

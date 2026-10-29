@@ -233,6 +233,42 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CredentialUpdate'
+  /v1/workspaces/{workspaceId}/recovery-snapshot/metadata:
+    parameters:
+    - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: getRecoverySnapshotMetadata
+      summary: Read the latest confirmed archive descriptor without downloading it
+      description: >-
+        Requires an active device in the workspace. Returns the persisted confirmed descriptor,
+        without archive paths or credentials. Reading metadata does not authorize an unconditional
+        upload: publishing must still use the revision of the snapshot the client actually merged.
+      tags:
+      - Recovery
+      security:
+      - DeviceBearer: []
+        DeviceActor: []
+      responses:
+        '200':
+          description: Current confirmed descriptor; response uses Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoverySnapshot'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          description: The authenticated workspace has no published recovery archive yet.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/500'
   /v1/workspaces/{workspaceId}/recovery-snapshot:
     parameters:
     - $ref: '#/components/parameters/workspaceId'

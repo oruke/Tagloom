@@ -53,7 +53,7 @@ class WorkspaceModeUiFlowTest {
             onNodeWithTag("server-recovery-key").assertDoesNotExist()
             onNodeWithTag("server-recovery-bootstrap").assertDoesNotExist()
             onNodeWithTag("server-recovery-publish").performScrollTo().performClick()
-            waitForModeText("恢复副本已上传，可以在新设备上恢复。")
+            waitForModeText("同步完成，可以在其他设备上继续使用。")
             assertEquals(id, source.manager.sessionOrNull()!!.workspaceId)
             assertEquals(WorkspaceStorageMode.SERVER, source.gateway.serverRecovery.status()?.mode)
         }

@@ -46,7 +46,7 @@ class ServerRecoveryUiFlowTest {
                 onNodeWithTag("server-recovery-bootstrap").performTextReplacement(env.bootstrap)
                 onNodeWithTag("server-recovery-key").performTextReplacement(recoveryKey)
                 onNodeWithTag("server-recovery-publish").performScrollTo().performClick()
-                waitForRecoveryText("恢复副本已上传，可以在新设备上恢复。")
+                waitForRecoveryText("同步完成，可以在其他设备上继续使用。")
                 onNodeWithTag("server-recovery-key").assertDoesNotExist()
                 onNodeWithText("已解锁 · 服务器模式").assertIsDisplayed()
                 recoveryScreenshot("server-recovery-settings-desktop.png")

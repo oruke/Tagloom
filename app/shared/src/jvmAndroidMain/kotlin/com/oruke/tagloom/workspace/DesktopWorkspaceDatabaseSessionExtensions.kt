@@ -3,7 +3,6 @@ package com.oruke.tagloom.workspace
 import com.oruke.tagloom.core.model.DatabaseDefinition
 import com.oruke.tagloom.core.model.TransactionId
 import com.oruke.tagloom.core.model.ViewDefinition
-import com.oruke.tagloom.core.sync.HybridLogicalTime
 import com.oruke.tagloom.core.transaction.WorkspaceDatabaseWriteContext
 import kotlinx.coroutines.sync.withLock
 
@@ -104,7 +103,7 @@ private fun DesktopWorkspaceSession.reserveDatabaseWriteContext(sequenceCount: L
         actorId = actorId,
         actorSequenceStart = start,
         transactionId = TransactionId(idFactory()),
-        hybridLogicalTime = HybridLogicalTime(currentTimeMillis(), 0, actorId),
+        hybridLogicalTime = hybridClock.next(),
         committedAt = timestampProvider(),
     )
 }

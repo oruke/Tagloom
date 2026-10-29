@@ -2,7 +2,6 @@ package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.external.ExternalCallException
 import com.oruke.tagloom.core.model.*
-import com.oruke.tagloom.core.sync.HybridLogicalTime
 import com.oruke.tagloom.core.transaction.NoteSnapshotTransactionRequest
 import com.oruke.tagloom.core.workspace.LinkNoteSchemas
 import com.oruke.tagloom.platform.*
@@ -158,7 +157,7 @@ private fun DesktopWorkspaceSession.linkWriteRequest(
         actorId,
         nextActorSequence++,
         transactionId,
-        HybridLogicalTime(currentTimeMillis(), 0, actorId),
+        hybridClock.next(),
         now
     )
 

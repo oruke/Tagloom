@@ -16,7 +16,7 @@ import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
 
 /**
- * 设置当前设备的工作区模式，首次连接确认后自动更新服务器副本。
+ * 设置当前设备的工作区模式，连接后自动合并双方修改并提供保留版本的审阅入口。
  * @param workspace 当前已解锁工作区控制器。
  * @param scope 跟随宿主的操作作用域。
  * @param onBack 返回设置列表。
@@ -30,7 +30,7 @@ internal fun ServerRecoverySettingsPane(workspace: WorkspaceUiController, scope:
     var selectedMode by remember { mutableStateOf(WorkspaceStorageMode.LOCAL) }
     val status = controller.status
     val needsKey = status == null || status.requiresRecoveryKey
-    LaunchedEffect(controller) { scope.launch { controller.refresh() } }
+    LaunchedEffect(controller) { controller.refresh() }
     LaunchedEffect(status) { status?.let { address = it.serverUrl } }
     LaunchedEffect(controller.loaded, status?.mode) {
         if (controller.loaded) selectedMode = status?.mode ?: WorkspaceStorageMode.LOCAL
@@ -44,7 +44,8 @@ internal fun ServerRecoverySettingsPane(workspace: WorkspaceUiController, scope:
             Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(Res.string.workspace_mode_title), style = MaterialTheme.typography.headlineMedium)
                 Text(stringResource(Res.string.workspace_mode_settings_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (workspace.busy || controller.updating) LinearProgressIndicator(Modifier.fillMaxWidth())
+                // 后台轮询已有同步状态文案；不反复插入进度条推动审阅位置，手动操作才阻塞页面。
+                if (workspace.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (controller.loaded) {
                     WorkspaceModeSelector(selectedMode, { mode ->
                         if (mode == WorkspaceStorageMode.SERVER || status?.mode != WorkspaceStorageMode.SERVER) selectedMode = mode
@@ -87,6 +88,10 @@ internal fun ServerRecoverySettingsPane(workspace: WorkspaceUiController, scope:
                     OutlinedButton(onClick = { scope.launch { controller.refresh() } }) { Text(stringResource(Res.string.server_recovery_retry)) }
                 }
                 if (controller.published && selectedMode == WorkspaceStorageMode.SERVER) Text(stringResource(Res.string.server_recovery_success), color = MaterialTheme.colorScheme.primary)
+                if (controller.loaded && status?.registered == true) {
+                    // 同步网络等待不阻止审阅；正式恢复在唯一写入锁中重验 revision，变化时重新审阅。
+                    SyncConflictPanel(controller, scope, !workspace.busy)
+                }
                 controller.errorCode?.let { ServerRecoveryError(it) }
             }
         }
@@ -138,6 +143,11 @@ internal fun ServerRecoveryError(code: String) {
         "recovery_key_required" -> Res.string.server_recovery_key_rotated
         "registration_required" -> Res.string.workspace_mode_registration_required
         "recovery_revision_changed" -> Res.string.server_recovery_conflict
+        "sync_integrity_failed" -> Res.string.sync_integrity_failed
+        "sync_key_changed" -> Res.string.sync_key_changed
+        "sync_schema_invalid" -> Res.string.sync_schema_invalid
+        "sync_retry_required" -> Res.string.sync_retry_required
+        "revision_conflict" -> Res.string.sync_revision_conflict
         "recovery_archive_too_large" -> Res.string.server_recovery_too_large
         "recovery_archive_integrity_failed" -> Res.string.server_recovery_integrity_failed
         else -> Res.string.server_recovery_failed

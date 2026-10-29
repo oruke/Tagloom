@@ -10,6 +10,10 @@ import com.oruke.tagloom.sync.server.SyncServerConfiguration
 import com.oruke.tagloom.sync.server.configureSyncServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.application.install
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.path
 import kotlinx.coroutines.runBlocking
 import java.net.InetAddress
 import java.nio.file.Files
@@ -25,6 +29,8 @@ internal class ServerRecoveryTestEnvironment : AutoCloseable {
     val serverRoot: Path = root.resolve("server")
     /** 测试时动态生成的登记访问码，禁止写入报告。 */
     val bootstrap: String = UUID.randomUUID().toString()
+    /** 仅测试使用的真实 HTTP 请求计数与单次阻塞点，默认不阻塞任何请求。 */
+    val requests = ServerRecoveryRequestProbe()
     /** 随机端口服务实例，使用正式装配入口。 */
     private var server = startServer(0)
     /** 实际绑定的回环地址；生产客户端仍要求 HTTPS。 */
@@ -47,19 +53,25 @@ internal class ServerRecoveryTestEnvironment : AutoCloseable {
      * @return 已启动的真实服务。
      */
     private fun startServer(port: Int) = embeddedServer(Netty, host = InetAddress.getLoopbackAddress().hostAddress, port = port) {
+        install(createApplicationPlugin("ServerRecoveryTestProbe") {
+            onCall { call -> requests.observe(call.request.httpMethod.value, call.request.path()) }
+        })
         configureSyncServer(SyncServerConfiguration(serverRoot, MessageDigest.getInstance("SHA-256").digest(bootstrap.encodeToByteArray()).serverRecoveryHex()))
     }.start(wait = false)
 
     /**
      * 创建与其他设备完全隔离的本机登记和工作区目录。
      * @param name 脱敏设备代号。
+     * @param currentTimeMillis 当前设备的物理时钟，默认使用系统；可验证恢复后的时钟回拨。
      * @return 使用正式网关、DPAPI、libsodium、SQLite 和 HTTP 传输的客户端。
      */
-    fun device(name: String): ServerRecoveryTestDevice = ServerRecoveryTestDevice(Files.createDirectory(root.resolve(name)))
+    fun device(name: String, currentTimeMillis: () -> Long = System::currentTimeMillis): ServerRecoveryTestDevice =
+        ServerRecoveryTestDevice(Files.createDirectory(root.resolve(name)), currentTimeMillis)
         .also { devices += it }
 
     /** 关闭客户端、网络和数据库后只删除本测试明确创建的目录。 */
     override fun close() {
+        requests.releaseAll()
         devices.forEach { it.close() }
         server.stop(100, 2000)
         check(root.parent == Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize())
@@ -68,10 +80,15 @@ internal class ServerRecoveryTestEnvironment : AutoCloseable {
     }
 }
 
-/** 真实独立设备装配；只有目录选择和低成本测试 KDF 与产品默认不同。 */
+/**
+ * 真实独立设备装配；仅目录选择、测试 KDF 与可控物理时钟允许注入。
+ * @param root 当前设备独占的测试目录。
+ * @param currentTimeMillis HLC 使用的物理时间，不影响实际网关、密码学和存储路径。
+ */
 internal class ServerRecoveryTestDevice(
     /** 当前设备私有的测试数据根目录。 */
     val root: Path,
+    currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : AutoCloseable {
     /** 新建或恢复目标，始终从空目录开始。 */
     val workspaceRoot: Path = root.resolve("workspace")
@@ -84,7 +101,7 @@ internal class ServerRecoveryTestDevice(
     /** 正式密码学实现。 */
     private val crypto = LibsodiumCryptoProvider()
     /** 与正式入口相同的会话管理器。 */
-    val manager = DesktopWorkspaceManager(cryptoProvider = crypto, argon2idFactory = ::testRecoveryKdf)
+    val manager = DesktopWorkspaceManager(cryptoProvider = crypto, currentTimeMillis = currentTimeMillis, argon2idFactory = ::testRecoveryKdf)
     /** 真实受保护的本机登记。 */
     private val access = DesktopWorkspaceAccessStore(root.resolve("access.json"), cryptoProvider = crypto, argon2idFactory = ::testRecoveryKdf)
     /** 复用生产恢复路径；测试只放开字面回环 HTTP。 */

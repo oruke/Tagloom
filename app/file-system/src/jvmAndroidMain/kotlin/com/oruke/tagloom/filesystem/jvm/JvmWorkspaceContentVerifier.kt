@@ -10,6 +10,8 @@ import com.oruke.tagloom.core.crypto.SecretKeyMaterial
 import com.oruke.tagloom.core.crypto.WrappingKeyPurpose
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.NoteValidator
+import com.oruke.tagloom.core.model.DatabaseDefinition
+import com.oruke.tagloom.core.model.DatabaseProtocolValidator
 import com.oruke.tagloom.core.model.KeyId
 import com.oruke.tagloom.core.model.ObjectRevision
 import com.oruke.tagloom.core.model.ObjectSnapshot
@@ -18,6 +20,7 @@ import com.oruke.tagloom.core.model.PropertyDefinition
 import com.oruke.tagloom.core.model.SavedQuery
 import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.core.model.TransactionId
+import com.oruke.tagloom.core.model.ViewDefinition
 import com.oruke.tagloom.core.model.WorkspaceId
 import com.oruke.tagloom.core.protocol.CanonicalJson
 import com.oruke.tagloom.core.sync.ConflictRecord
@@ -259,6 +262,26 @@ class JvmWorkspaceContentVerifier(
             expectedType = ObjectType.SAVED_QUERY,
         ) { true }
 
+        // 单个 staging 的恢复顺序不能假定其他目录对象已经发布；跨对象引用由事务规划阶段统一校验。
+        ArtifactSchemaKind.DATABASE -> validateSnapshot(
+            role = role,
+            envelope = envelope,
+            plaintext = plaintext,
+            serializer = ObjectSnapshot.serializer(DatabaseDefinition.serializer()),
+            expectedType = ObjectType.DATABASE,
+        ) { snapshot -> snapshot.payload.id.value == role.objectId }
+
+        ArtifactSchemaKind.VIEW -> validateSnapshot(
+            role = role,
+            envelope = envelope,
+            plaintext = plaintext,
+            serializer = ObjectSnapshot.serializer(ViewDefinition.serializer()),
+            expectedType = ObjectType.VIEW,
+        ) { snapshot ->
+            snapshot.payload.id.value == role.objectId &&
+                DatabaseProtocolValidator.validate(snapshot.payload).none { !it.readOnlyCompatibility }
+        }
+
         ArtifactSchemaKind.CHANGE -> {
             val change = CanonicalJson.decodeFromString(ObjectChange.serializer(), plaintext.decodeToString())
             change.changeId.value == role.objectId
@@ -303,6 +326,7 @@ class JvmWorkspaceContentVerifier(
         val snapshot = CanonicalJson.decodeFromString(serializer, plaintext.decodeToString())
         return snapshot.header.objectId.value == role.objectId &&
             snapshot.header.objectType == expectedType &&
+            snapshot.header.schemaVersion in 1..2 &&
             snapshot.header.revision.toProtocolRevision() == envelope.header.revision &&
             validatePayload(snapshot)
     }
@@ -348,6 +372,12 @@ private enum class ArtifactSchemaKind {
 
     /** SavedQuery 对象快照。 */
     SAVED_QUERY,
+
+    /** Database 权威定义快照。 */
+    DATABASE,
+
+    /** View 权威定义快照，未知查询或展示版本仍可按只读兼容保留。 */
+    VIEW,
 
     /** Change DAG 单节点。 */
     CHANGE,
@@ -397,6 +427,8 @@ private data class ArtifactRole(
                 "saved-query-snapshot",
                 ArtifactSchemaKind.SAVED_QUERY,
             )
+            path.startsWith("databases/") -> snapshotRole(path, ".database.enc", "database-snapshot", ArtifactSchemaKind.DATABASE)
+            path.startsWith("views/") -> snapshotRole(path, ".view.enc", "view-snapshot", ArtifactSchemaKind.VIEW)
             path.startsWith("changes/") -> ArtifactRole(
                 envelopeObjectType = "object-change",
                 objectId = extractFileId(path, ".change.enc"),

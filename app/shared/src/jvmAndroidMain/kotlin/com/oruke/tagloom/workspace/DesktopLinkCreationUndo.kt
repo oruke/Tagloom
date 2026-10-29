@@ -1,7 +1,6 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.model.*
-import com.oruke.tagloom.core.sync.HybridLogicalTime
 import com.oruke.tagloom.core.transaction.NoteSnapshotTransactionRequest
 import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import com.oruke.tagloom.platform.*
@@ -45,7 +44,7 @@ internal suspend fun DesktopWorkspaceSession.undoLinkCreation(context: LinkCreat
                     actorId,
                     nextActorSequence++,
                     transactionId,
-                    HybridLogicalTime(currentTimeMillis(), 0, actorId),
+                    hybridClock.next(),
                     now,
                 )
             )
@@ -57,7 +56,7 @@ internal suspend fun DesktopWorkspaceSession.undoLinkCreation(context: LinkCreat
                     actorId,
                     nextActorSequence++,
                     transactionId,
-                    HybridLogicalTime(currentTimeMillis(), 0, actorId),
+                    hybridClock.next(),
                     now,
                     deleted = true
                 )

@@ -13,7 +13,7 @@ import kotlin.test.*
 
 /** 从正式网关走真实 TCP 服务，验证完整密文副本能在没有原本机材料的设备上恢复。 */
 class ServerRecoveryIntegrationTest {
-    /** 验证笔记、类型、属性、查询和身份保留，恢复后可重新解锁编辑，并拒绝旧副本覆盖。 */
+    /** 验证笔记、类型、属性、查询和身份保留，恢复后并发编辑经同步保留双版本。 */
     @Test
     fun restoresOriginalWorkspaceOnFreshDeviceAndPreservesConcurrentCopy() = ServerRecoveryTestEnvironment().use { env -> runBlocking {
         val first = env.device("first")
@@ -46,11 +46,18 @@ class ServerRecoveryIntegrationTest {
         val updated = second.gateway.saveNote(note.id, note.note.copy(title = "新设备编辑样例"), note.revision)
         second.gateway.serverRecovery.publish(env.address, "", "")
 
-        first.gateway.saveNote(note.id, note.note.copy(title = "旧设备离线编辑样例"), note.revision)
-        val conflict = assertFailsWith<ServerRecoveryException> { first.gateway.serverRecovery.publish(env.address, "", "") }
-        assertEquals("recovery_revision_changed", conflict.code)
+        val local = first.gateway.saveNote(note.id, note.note.copy(title = "旧设备离线编辑样例"), note.revision)
+        assertFalse(first.gateway.serverRecovery.publish(env.address, "", "").pendingChanges)
+        val conflicts = first.gateway.serverRecovery.conflicts().filter { it.objectId == note.id && !it.resolved }
+        assertTrue(conflicts.isNotEmpty(), "并发标题编辑必须保留双方版本供核对")
+        val retainedTitles = conflicts.flatMap { listOf(it.localTitle, it.remoteTitle) }.toSet()
+        assertTrue(retainedTitles.containsAll(listOf(local.note.title, updated.note.title)))
+        val merged = requireNotNull(first.gateway.reload()).notes.single()
         val third = env.device("third")
-        assertEquals(updated, third.gateway.serverRecovery.restore(env.address, key, null)?.notes?.single())
+        assertEquals(merged.note, third.gateway.serverRecovery.restore(env.address, key, null)?.notes?.single()?.note)
+        second.gateway.serverRecovery.updateIfChanged()
+        assertEquals(merged.note, requireNotNull(second.gateway.reload()).notes.single().note)
+        assertTrue(second.gateway.recentWorkspaceOrNull()?.requiresPin == true)
 
         // 人工可核对：服务器文件及本机配置中没有原 Recovery Key、标题、属性值或恢复 Bearer。
         val crypto = LibsodiumCryptoProvider().also { it.initialize() }

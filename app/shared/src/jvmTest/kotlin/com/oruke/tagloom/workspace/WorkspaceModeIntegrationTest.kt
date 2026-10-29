@@ -82,7 +82,7 @@ class WorkspaceModeIntegrationTest {
         assertEquals(note, target.gateway.openRecentWorkspace().notes.single())
     } }
 
-    /** 真实断网后本地笔记继续保存，重连可自动补传；远端较新时拒绝覆盖。 */
+    /** 真实断网后本地笔记继续保存，重连合并远端变更，并保留并发编辑的两个版本。 */
     @Test
     fun retriesAfterDisconnectAndPreservesConflictingCopies() = ServerRecoveryTestEnvironment().use { env -> runBlocking {
         val source = env.device("network-source")
@@ -101,10 +101,15 @@ class WorkspaceModeIntegrationTest {
         assertEquals(offline, other.gateway.serverRecovery.restore(env.address, key, null)?.notes?.single())
         val remote = other.gateway.saveNote(note.id, offline.note.copy(title = "另一设备确认样例"), offline.revision)
         other.gateway.serverRecovery.updateIfChanged()
-        source.gateway.saveNote(note.id, offline.note.copy(title = "原设备离线样例"), offline.revision)
-        val conflict = assertFailsWith<ServerRecoveryException> { source.gateway.serverRecovery.updateIfChanged() }
-        assertEquals("recovery_revision_changed", conflict.code)
-        assertEquals(remote, env.device("network-final").gateway.serverRecovery.restore(env.address, key, null)?.notes?.single())
+        val local = source.gateway.saveNote(note.id, offline.note.copy(title = "原设备离线样例"), offline.revision)
+        assertFalse(source.gateway.serverRecovery.updateIfChanged()!!.pendingChanges)
+        val conflicts = source.gateway.serverRecovery.conflicts().filter { it.objectId == note.id && !it.resolved }
+        assertTrue(conflicts.isNotEmpty())
+        assertTrue(conflicts.flatMap { listOf(it.localTitle, it.remoteTitle) }.containsAll(listOf(local.note.title, remote.note.title)))
+        val merged = requireNotNull(source.gateway.reload()).notes.single().note
+        other.gateway.serverRecovery.updateIfChanged()
+        assertEquals(merged, requireNotNull(other.gateway.reload()).notes.single().note)
+        assertEquals(merged, env.device("network-final").gateway.serverRecovery.restore(env.address, key, null)?.notes?.single()?.note)
     } }
 
     /** 首次登记失败不撤销已确认本地创建，用户可继续本地使用并在设置中重试。 */
@@ -140,15 +145,42 @@ class WorkspaceModeIntegrationTest {
         assertEquals(WorkspaceStorageMode.SERVER, joined.mode)
         folderDevice.gateway.lock()
 
-        // 另一台全新设备从相同文件夹恢复后离线修改，没有共同远端版本证明，不能覆盖服务器。
+        // 文件夹副本与服务器分别离线修改；首次接入必须先认证并合并，不能把最新版本号当作覆盖许可。
         val diverged = env.device("rejoin-diverged").also { it.recoveryRoot = original.workspaceRoot }
         diverged.gateway.unlockWithRecovery(key, null)
         val local = diverged.gateway.saveNote(saved.id, saved.note.copy(title = "尚未核对的本地修改"), saved.revision)
-        val conflict = assertFailsWith<ServerRecoveryException> { diverged.gateway.serverRecovery.publish(env.address, "", key) }
-        assertEquals("recovery_revision_changed", conflict.code)
-        assertEquals(WorkspaceStorageMode.LOCAL, diverged.gateway.serverRecovery.status()?.mode)
+        val remoteDevice = env.device("rejoin-remote")
+        val remoteBase = requireNotNull(remoteDevice.gateway.serverRecovery.restore(env.address, key, null)).notes.single()
+        val remote = remoteDevice.gateway.saveNote(saved.id, remoteBase.note.copy(title = "服务器独立修改样例"), remoteBase.revision)
+        remoteDevice.gateway.serverRecovery.updateIfChanged()
+
+        // 格式错误和属于另一工作区的有效恢复密钥均不能改变当前副本或加入服务器。
+        assertFailsWith<Exception> { diverged.gateway.serverRecovery.publish(env.address, "", "invalid-recovery-key") }
+        val unrelated = env.device("rejoin-unrelated")
+        val unrelatedKey = requireNotNull(unrelated.gateway.prepareCreation(null)).recoveryKeyText
+        unrelated.gateway.confirmCreation()
+        assertFailsWith<Exception> { diverged.gateway.serverRecovery.publish(env.address, "", unrelatedKey) }
+        assertEquals(WorkspaceStorageMode.LOCAL, diverged.gateway.serverRecovery.status()?.mode ?: WorkspaceStorageMode.LOCAL)
+        assertEquals(local.note, requireNotNull(diverged.gateway.reload()).notes.single().note)
+
+        val connected = diverged.gateway.serverRecovery.publish(env.address, "", key)
+        assertEquals(WorkspaceStorageMode.SERVER, connected.mode)
+        assertFalse(connected.pendingChanges)
+        val conflicts = diverged.gateway.serverRecovery.conflicts().filter { it.objectId == saved.id && !it.resolved }
+        assertTrue(conflicts.isNotEmpty())
+        assertTrue(conflicts.flatMap { listOf(it.localTitle, it.remoteTitle) }.containsAll(listOf(local.note.title, remote.note.title)))
+        val merged = requireNotNull(diverged.gateway.reload()).notes.single().note
+        remoteDevice.gateway.serverRecovery.updateIfChanged()
+        assertEquals(merged, requireNotNull(remoteDevice.gateway.reload()).notes.single().note)
         diverged.gateway.lock()
-        assertEquals(local, diverged.gateway.openRecentWorkspace().notes.single())
-        assertEquals(saved, env.device("rejoin-verify").gateway.serverRecovery.restore(env.address, key, null)?.notes?.single())
+        remoteDevice.gateway.lock()
+        assertEquals(merged, diverged.gateway.openRecentWorkspace().notes.single().note)
+        assertEquals(merged, remoteDevice.gateway.openRecentWorkspace().notes.single().note)
+        assertTrue(diverged.gateway.serverRecovery.conflicts().flatMap { listOf(it.localTitle, it.remoteTitle) }
+            .containsAll(listOf(local.note.title, remote.note.title)))
+        val verification = env.device("rejoin-verify")
+        assertEquals(merged, verification.gateway.serverRecovery.restore(env.address, key, null)?.notes?.single()?.note)
+        assertTrue(verification.gateway.serverRecovery.conflicts().flatMap { listOf(it.localTitle, it.remoteTitle) }
+            .containsAll(listOf(local.note.title, remote.note.title)))
     } }
 }
