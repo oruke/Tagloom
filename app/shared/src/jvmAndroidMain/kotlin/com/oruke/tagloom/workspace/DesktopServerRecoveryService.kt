@@ -8,6 +8,7 @@ import com.oruke.tagloom.core.model.WorkspaceId
 import com.oruke.tagloom.core.sync.SyncDeviceRegistration
 import com.oruke.tagloom.core.workspace.WorkspaceManifestCodec
 import com.oruke.tagloom.core.workspace.WorkspaceManifestService
+import com.oruke.tagloom.filesystem.jvm.createEncryptedTemporaryArchive
 import com.oruke.tagloom.filesystem.jvm.crypto.LibsodiumCryptoProvider
 import com.oruke.tagloom.platform.*
 import com.oruke.tagloom.sync.http.ServerRecoveryException
@@ -71,7 +72,7 @@ internal class DesktopServerRecoveryService(
         WorkspacePreparedCreation(prepared.recoveryKeyText)
     }
 
-    /** @return 当前解锁工作区的非敏感远端状态；尚未配置时为空。 */
+    /** 读取当前已解锁工作区的远端同步与恢复状态。 @return 当前解锁工作区的非敏感远端状态；尚未配置时为空。 */
     override suspend fun status(): WorkspaceServerRecoveryStatus? = withContext(Dispatchers.IO) {
         // 配置本身原子替换，读取无需等待整个网络传输；用户才能在上传期间切换到本地模式。
         val session = requireNotNull(manager.sessionOrNull())
@@ -124,7 +125,7 @@ internal class DesktopServerRecoveryService(
             } finally { access.destroy() }
         }
 
-    /** @return 在服务器模式检查双方变更并同步；本地模式只返回本机状态，不创建网络客户端。 */
+    /** 检查远端与本地确认点并在服务器模式下执行双向同步。 @return 在服务器模式检查双方变更并同步；本地模式只返回本机状态，不创建网络客户端。 */
     override suspend fun updateIfChanged(): WorkspaceServerRecoveryStatus? {
         if (manager.sessionOrNull() == null) return null
         val current = status() ?: return null
@@ -144,7 +145,7 @@ internal class DesktopServerRecoveryService(
         }
     }
 
-    /** @return 停止传输并保存本地模式；连接材料及原服务器副本继续保留以支持切回。 */
+    /** 取消在途传输并将当前设备工作区切换为本地模式。 @return 停止传输并保存本地模式；连接材料及原服务器副本继续保留以支持切回。 */
     override suspend fun useLocalMode(): WorkspaceServerRecoveryStatus? {
         cancelTransfer()
         return withContext(Dispatchers.IO) {
@@ -176,7 +177,7 @@ internal class DesktopServerRecoveryService(
             val root = directories.allocate()
             // 恢复身份先随机生成；服务器返回的工作区身份仍需与本机 AEAD 认证结果交叉检查。
             val pending = newAccess(WorkspaceId(UUID.randomUUID().toString()), serverUrl.trim().trimEnd('/'), credentials, "")
-            val archive = Files.createTempFile("tagloom-server-restore-", ".zip")
+            val archive = createEncryptedTemporaryArchive("tagloom-server-restore-")
             var completed = false
             try {
                 clientFactory(pending.serverUrl).use { client ->
@@ -308,7 +309,7 @@ internal class DesktopServerRecoveryService(
         },
     )
 
-    /** @return 当前解锁会话可审阅的全部完整双版本；锁定后不保留明文。 */
+    /** 读取当前解锁会话内待处理与已处理的同步冲突历史。 @return 当前解锁会话可审阅的全部完整双版本；锁定后不保留明文。 */
     override suspend fun conflicts(): List<WorkspaceSyncConflict> = withContext(Dispatchers.IO) {
         val session = requireNotNull(manager.sessionOrNull())
         session.sessionMutex.withLock { replicaConflictViews(session) }

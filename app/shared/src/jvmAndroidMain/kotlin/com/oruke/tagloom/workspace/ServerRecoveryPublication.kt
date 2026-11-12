@@ -1,6 +1,7 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.platform.WorkspaceStorageMode
+import com.oruke.tagloom.filesystem.jvm.createEncryptedTemporaryArchive
 import com.oruke.tagloom.sync.http.jvm.ServerRecoveryClient
 import kotlinx.coroutines.sync.withLock
 import java.nio.file.Files
@@ -32,7 +33,7 @@ internal suspend fun publishServerRecoveryCopy(
 ) {
     // 先记录版本再生成备份：期间新增写入最多导致下次重复上传，绝不会误标为已经上传。
     val revision = session.serverRecoveryRevision()
-    val archive = Files.createTempFile("tagloom-server-backup-", ".zip")
+    val archive = createEncryptedTemporaryArchive("tagloom-server-backup-")
     try {
         session.createBackup(archive)
         access.snapshot = client.upload(access.workspaceId, access.actorId, access.token, access.snapshot?.revision ?: 0,

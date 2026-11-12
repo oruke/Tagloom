@@ -1,6 +1,7 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.platform.WorkspaceStorageMode
+import com.oruke.tagloom.filesystem.jvm.createEncryptedTemporaryArchive
 import com.oruke.tagloom.sync.http.ServerRecoveryException
 import com.oruke.tagloom.sync.http.jvm.ServerRecoveryClient
 import kotlinx.coroutines.currentCoroutineContext
@@ -37,7 +38,7 @@ internal suspend fun synchronizeServerCopy(
                 (latest.revision != observed.revision || latest.sha256 == observed.sha256)) { "sync_integrity_failed" }
         }
         if (latest != null && latest.sha256 != access.snapshot?.sha256) {
-            val archive = Files.createTempFile("tagloom-sync-download-", ".zip")
+            val archive = createEncryptedTemporaryArchive("tagloom-sync-download-")
             try {
                 client.download(latest, access.actorId, access.token, archive)
                 val changed = try {

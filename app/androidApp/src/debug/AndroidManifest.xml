@@ -3,5 +3,12 @@
     <application>
         <!-- 仅供调试构建的 Compose 交互测试装配隔离 App，不进入 release，也不打开用户会话。 -->
         <activity android:name="androidx.activity.ComponentActivity" android:exported="false" />
+        <!-- 仅允许已持有平台 DUMP 权限的调用者打开空测试宿主；不为应用申请或授予该权限。 -->
+        <activity
+                android:name=".NasAcceptanceActivity"
+                android:exported="true"
+                android:permission="android.permission.DUMP"
+                android:excludeFromRecents="true"
+                android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>
