@@ -6,7 +6,7 @@
 
 - 产品与架构基线以 [`Tagloom_产品与技术设计草案.md`](./Tagloom_产品与技术设计草案.md) 为准。
 - `README.md` 是面向开发者的项目入口，只描述已经确认的方向和当前真实实现状态。
-- 当前仓库已完成 v0.2 Windows MVP 的核心实现：桌面工作区生命周期、加密快照与事务、派生索引、Block/RichText 编辑、Markdown、备份恢复、主密钥轮换和 Change checkpoint 均已有自动化验证，Windows 分发包也已完成真实启动与界面渲染检查。后续本机 API、可执行 CLI 与 stdio MCP 已提供独立受控入口，详见 `docs/local-automation.md`；远端 Change 自动合并、Android/iOS 功能对等、AI Provider 和向量数据库仍未提供完整可用入口。除非代码、测试和真实运行结果已经证明，不得把预留协议写成终端用户可用功能。
+- 当前仓库已完成 v0.2 Windows MVP 核心闭环，并将文件系统、派生索引和同步拆分为 `app:file-system`、`app:index`、`app:sync` 三个 KMP 能力模块：JVM Desktop 与 Android 共用工作区生命周期、加密快照与事务、可重建索引、连续 Block/RichText 编辑、Markdown、备份恢复、主密钥轮换、Change checkpoint 以及服务器模式的双向密文快照同步与字段/Block 级冲突恢复（详见 `docs/workspace-sync-design.md`，Windows 与实体 Android 对自部署 HTTPS 服务的双端同步已验收）。本机 API、可执行 CLI 与 stdio MCP 已提供独立受控入口，详见 `docs/local-automation.md`。按 artifact 差集的增量同步装配、WebDAV、iOS 平台能力实现、内置 Agent 执行器/AI Provider 和向量数据库仍未提供完整可用入口。除非代码、测试和真实运行结果已经证明，不得把预留协议写成终端用户可用功能。
 - 架构决策发生变化时，先更新设计文档中的对应章节和 ADR，再实现代码；不得让代码与文档长期维持两套事实。
 - 设计文档中的示例 ID、路径、版本和性能指标是协议说明或设计预算，不得直接当成生产默认值。
 
@@ -26,14 +26,17 @@
 | 模块 | 职责 | 禁止事项 |
 |---|---|---|
 | `core` | KMP 领域模型、用例、端口、确定性解析器和跨平台协议 | 不依赖 Compose、Android API、SQLite、Ktor Server、具体加密 SDK或本地绝对路径 |
-| `app/shared` | 跨平台 Compose UI、页面状态、交互编排和资源 | 不直接操作加密文件、数据库或同步协议；不复制领域规则 |
+| `app/file-system` | 文件读写、原子替换、目录落盘、版本化信封加解密、崩溃恢复与单写入者租约能力契约及平台适配 | 不承载 UI 状态或业务规则；不向临时目录写入明文 JSON 或附件 |
+| `app/index` | 可重建派生索引与全文、类型、属性、双链查询能力契约及 SQLite/SQLCipher 适配 | 不作为权威业务存储，不参与业务事务回滚 |
+| `app/sync` | 盲同步传输、服务器恢复客户端与同步会话能力契约及平台适配 | 不绕过应用服务覆盖本地权威快照；生产入口不默认允许明文 HTTP |
+| `app/shared` | 跨平台 Compose UI、页面状态、工作区应用编排和资源 | 不在 `commonMain` 直接绑定具体文件、SQLite 驱动或平台加密实现；不复制领域规则 |
 | `app/desktopApp` | JVM Desktop 入口、窗口和桌面平台装配、发行包配置 | 不承载可复用业务规则 |
 | `app/automation` | JVM 回环 API、可执行 CLI、stdio MCP 和外部授权/审批适配 | 不另开工作区、不持有主密钥、不绕过客户端应用服务直接读写文件 |
 | `app/androidApp` | Android 入口、生命周期和 Android 平台装配 | 不把 Android 类型泄漏到 `commonMain` |
 | `app/iosApp` | iOS 入口、SwiftUI 宿主和 Apple 平台装配 | 不在 Swift 层重复 Kotlin 领域逻辑 |
 | `server` | Ktor 密文同步与后续 AI Gateway 的服务端入口 | 不复用客户端文件存储实现，不读取工作区明文，不把服务端实体放入共享领域层 |
 
-项目早期采用模块化单体。`tag-engine`、`property-engine`、`block-engine`、`crypto`、`file-store`、`query-engine` 等先作为职责清晰的 package、接口或实现存在；只有出现稳定公共 API、平台依赖隔离、独立复用或明显构建瓶颈时才拆分 Gradle 模块。
+文件系统、派生索引和同步已按 ADR-006 拆分为独立 KMP 能力模块；`tag-engine`、`property-engine`、`block-engine`、`query-engine` 等领域规则继续在 `core` 内保持职责清晰的 package 与接口边界，只有出现稳定公共 API、平台依赖隔离、独立复用或明显构建瓶颈时才继续拆分 Gradle 模块。
 
 ## 4. KMP 与依赖方向
 

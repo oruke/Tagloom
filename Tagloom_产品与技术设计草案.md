@@ -1136,7 +1136,7 @@ Sync Server
 
 初次上传须在本机用 Recovery Key 认证当前工作区；后续更新使用设备凭据。缺少原本机服务器配置时，优先通过恢复证明加入已有服务器工作区，并认证远端 manifest、核对两端权威对象目录；内容不一致时保留两端并报告冲突，不把获取到的最新版本当作覆盖许可。服务器没有该恢复身份时，才使用部署者访问码首次登记。设备凭据及签名 seed 通过设备保护器加密保存在本机私有配置，不随备份上传。主密钥轮换后须提供新 Recovery Key 重新发布副本，旧恢复身份只有在新副本确认后失效；这期间旧副本仍可用旧密钥恢复。版本冲突要求保留当前本地数据，并从服务器恢复为独立副本核对，不自动覆盖远端。
 
-该切片提供自动更新的密文恢复副本与设备管理，不把全量备份称为双向自动同步。新产生的本地修改只有上传成功后才能从服务器恢复，另一设备的新变更不会自动合并进当前工作区。生产入口只接受 HTTPS，测试可显式注入仅回环 HTTP 的适配器。
+本小节定义最初的密文恢复副本与设备接入基线；后续已由第 16.8 节与 ADR-016/017 扩展为客户端双向密文快照同步与局部冲突恢复。新产生的本地修改仍须成功发布后才能供其他设备拉取或恢复；生产入口只接受 HTTPS，测试可显式注入仅回环 HTTP 的适配器。
 
 ## 16.2 WebDAV 等文件同步
 
@@ -1278,7 +1278,7 @@ Anytype 使用 AnySync。其官方协议说明将同步对象组织为 Conflict-
 
 客户端服务器模式在已解锁会话中自动读取远端确认点，下载并认证完整密文归档，以对象 Change DAG 判断因果；Note 使用真实共同祖先执行三方合并，类型与属性等目录对象按字段和稳定集合身份组合独立修改。无法自动处理的差异保留完整双版本。快照、导入 Change、新 Merge Change 和冲突历史经同一 TransactionCoordinator 确认，本机 manifest 的 PIN 和解锁槽不由远端替换。设置页提供版本查看和按当前 revision 逐字段或 Block 恢复；无基线、旧历史及整体约束冲突保留整版本恢复，恢复结果继续同步。
 
-发布使用刚合并确认点的 CAS 版本，竞争后重新下载合并，不能盲目推进版本覆盖。此阶段传输完整密文确认点，不宣称已完成按 artifact 差集的增量应用或 WebDAV。有效设备确认与 checkpoint 协议落地前，已连接服务器的工作区保留合并所需 Change。完整决策、失败模式与实际验收边界见 [ADR-016 与双向同步设计](docs/workspace-sync-design.md)。
+发布使用刚合并确认点的 CAS 版本，竞争后重新下载合并，不能盲目推进版本覆盖。备份、同步下载与恢复刚分配的随机密文临时归档统一规范化其自身真实路径以兼容 Android 默认缓存别名，用户备份目标及工作区内部仍严格拒绝符号链接。此阶段传输完整密文确认点，已完成 Windows 桌面与实体 Android 对自部署 HTTPS 服务的跨设备现场验收，不宣称已完成按 artifact 差集的增量应用或 WebDAV。有效设备确认与 checkpoint 协议落地前，已连接服务器的工作区保留合并所需 Change。完整决策、失败模式与实际验收边界见 [ADR-016 与双向同步设计](docs/workspace-sync-design.md)。
 
 # 17. 加密设计
 
@@ -1451,6 +1451,16 @@ call_remote_ai
 - 写入需要用户确认。
 - 批量修改、删除、导出和远程发送需要二次确认。
 - 所有工具调用写入本地审计日志。
+
+## 18.1 单一 Tagloom Agent Harness（待评审设计）
+
+首版做 Tagloom 自有的一个 Agent Harness，统一模型流、工具循环、取消、预算、来源与修改提案。编辑器右侧的“Tagloom Agent”支持 `@` 引用指定笔记及显式开启的全部笔记检索；问答与编辑是同一执行器的工具许可模式。设置维护 API 连接、模型和运行偏好。外部 Codex、Pi、OpenCode 等继续使用自己的执行器，通过现有 CLI / MCP 访问统一业务工具。
+
+工作区存储、检索范围与模型运行位置独立。全库搜索在本机执行，不默认上传整库。远程调用前审阅问题、历史和必要摘录并确认冻结载荷；运行期间新增搜索结果与正文也按批预览确认。外部程序取得授权数据后的用途不能由 Tagloom 承诺受控。
+
+当前 API、CLI 与 stdio MCP 已有受控入口，笔记读取与全文查询可复用；`AiCompletionPort` 仍是单次完整文本端口。模型适配器、可取消流式工具循环、Agent UI 和 API/模型配置仍需实现，向量检索和 AI Gateway 不作为首版依赖。对话仅保留于本次解锁；持久历史另行设计加密快照与恢复边界。
+
+详细界面、交互状态、模块归属及验收依据见 [Agent 功能、UI 与交互设计](docs/agent-design.md)。本节和 ADR-014 为待评审提议，不改变已实现功能的事实边界。
 
 ---
 
@@ -1853,7 +1863,7 @@ flowchart LR
 
 ## 26.2 通用对象快照
 
-Note、Tag、PropertyDef、SavedQuery 等对象采用共同信封内的逻辑头（规划中的 DatabaseDefinition、ViewDefinition 同样遵守，见第 14.2 节）：
+Note、Tag、PropertyDef、SavedQuery、DatabaseDefinition、ViewDefinition 等对象采用共同信封内的逻辑头（见第 14.2 节）：
 
 ```json
 {
@@ -2041,17 +2051,17 @@ Markdown 管道表格粘贴在 `core/commonMain` 解析为现有 BaseTable 内�
 - Note 直接保存自由标签文本：实现快，但重命名、去重、颜色和跨笔记搜索缺少稳定身份。
 - 创建时间和更新时间建模为普通属性：可复用属性 UI，但会与快照头形成两套可能不一致的事实。
 
-## ADR-009：BaseTable Block 与 Database Table View 严格分离（规划）
+## ADR-009：BaseTable Block 与 Database Table View 严格分离
 
-**状态**：Proposed（规划中，尚未实现）
+**状态**：Accepted（首版协议、持久化与受限 UI 已实现，进阶能力继续迭代；边界见第 7.3 节、第 14 节与第 21 节阶段七）
 
-**背景**：产品规划需要两类外观都可能是网格的能力：Note 正文中的表格内容，以及按对象类型与属性聚合 Note 的集合式展示。若把 BaseTable 当作数据库、物理表或 Database Table View 的另一种表达，会产生第二权威数据、第二套写入路径和错误的用户心智，破坏“加密对象快照是唯一权威来源、索引可重建”的既有承诺；同时旧客户端无法解析新对象类型时可能造成数据损坏。
+**背景**：产品需要两类外观都可能是网格的能力：Note 正文中的表格内容，以及按对象类型与属性聚合 Note 的集合式展示。若把 BaseTable 当作数据库、物理表或 Database Table View 的另一种表达，会产生第二权威数据、第二套写入路径和错误的用户心智，破坏“加密对象快照是唯一权威来源、索引可重建”的既有承诺；同时旧客户端无法解析新对象类型时可能造成数据损坏。
 
 **决定**：
 
-- BaseTable 是 Note 内的叶子 Block（第 7.3 节），其权威数据是 Note Block 的 `content`：`rows` / `columns` / `cells` 全部保存在 Block 快照中，行、列、单元格不是子 Block，也绝不镜像到 `Note.propertyValues` 或 PropertyDefinition。编辑经 Note 应用服务与 TransactionCoordinator 提交；删除走外层 Block tombstone，行列采用内部 tombstone；上线前实现按 RowId / ColumnId / Cell 粒度的 `BaseTableMergeStrategy`，同文本单元格复用 RichText 三方合并。
+- BaseTable 是 Note 内的叶子 Block（第 7.3 节），其权威数据是 Note Block 的 `content`：`rows` / `columns` / `cells` 全部保存在 Block 快照中，行、列、单元格不是子 Block，也绝不镜像到 `Note.propertyValues` 或 PropertyDefinition。编辑经 Note 应用服务与 TransactionCoordinator 提交；删除走外层 Block tombstone，行列采用内部 tombstone；已实现按 RowId / ColumnId / Cell 粒度的 `BaseTableThreeWayMerge`，同文本单元格复用 RichText 三方合并。
 - Database Table View 是 `ViewDefinition.presentation.kind = table` 的派生展示（DatasetProjection，第 14.1 节）：行 = Note、列 = FieldRef / PropertyDefinition、单元格 = Note 字段或 propertyValues，结果从已确认快照重建。其权威配置是 `DatabaseDefinition` 与 `ViewDefinition`，结果为 `DatasetProjection`；不引用 BaseTableColumnId，不复用 BaseTable 的 `content`、局部列类型 / 选项或编辑命令。
-- 规划新增两类权威配置对象：`DatabaseDefinition`（稳定数据集身份、单一 `sourceTypeId`、`includeDescendants`、`creationTypeId`、`defaultViewId`）与独立 `ViewDefinition`（`databaseId`、name、orderKey、QuerySpec、presentation）；View 单向指向 Database，不保存反向 `viewIds`。
+- 新增两类权威配置对象：`DatabaseDefinition`（稳定数据集身份、单一 `sourceTypeId`、`includeDescendants`、`creationTypeId`、`defaultViewId`）与独立 `ViewDefinition`（`databaseId`、name、orderKey、QuerySpec、presentation）；View 单向指向 Database，不保存反向 `viewIds`。
 - Database/View 不保存 Note、属性 schema、结果或权限；创建 Database + 首个 View、删除默认 View 调整等跨对象操作必须在同一 TransactionCoordinator 事务内确认。
 - 新增对象类型前必须先具备 manifest / `objectType` 未知值安全拒绝与只读兼容策略，不能假定旧客户端可解析。
 - SavedQuery 只保存可复用 QuerySpec 且不携带布局，MVP 中 View 复制 QuerySpec 而不直接引用 SavedQuery。
@@ -2068,15 +2078,15 @@ Markdown 管道表格粘贴在 `core/commonMain` 解析为现有 BaseTable 内�
 - View 直接引用 SavedQuery 并携带布局：删除或修改保存查询会隐式影响视图。
 - 引入 Collection / Set 等同义实体：扩大概念面而不增加能力。
 
-## ADR-010：QuerySpec 与有效类型属性索引（规划）
+## ADR-010：QuerySpec 与有效类型属性索引
 
-**状态**：Proposed（规划中，尚未实现）
+**状态**：Accepted（QuerySpec 核心 AST 与有效类型/属性索引已实现，复杂谓词与多排序器 UI 继续迭代；见第 14.4 节与第 21 节阶段七）
 
 **背景**：SavedQuery、Database View 和工作区级 Note 查询需要可序列化、可同步、可版本化的查询表达；显示名查询不稳定，也无法表达类型继承与属性缺失语义。类型或属性定义变动时，实时迁移全部查询成本过高。
 
 **决定**：QuerySpec 是版本化、类型化的查询 AST，使用稳定 ID 而非显示名引用字段：`FilterExpr`（True/All/Any/Not/FullText/Predicate）、`FieldRef`（系统字段 / 对象类型 / 属性）、`SortSpec`。MVP 谓词为 `eq/ne/isEmpty/isNotEmpty`、文本 `contains`、数字 / 日期 `gt/gte/lt/lte`、单选 `in/notIn`、多选 `containsAny/containsAll`、类型 `isExact/isDescendantOf`。QuerySpec 与“有效类型 / 属性索引”只服务 SavedQuery、Database View 和工作区 Note 查询。用户界面只能显示当前对象类型的有效属性，`dynamic` / `snapshot`、继承与冲突语义与 EffectivePropertyResolver 保持一致。类型或属性定义变动时，允许先整体标记结构索引落后并重建；索引只能消费已确认快照，落后期间 UI 必须提示。
 
-BaseTable 边界（规划）：BaseTable 的局部过滤 / 排序与局部 RowId / ColumnId 不进入 QuerySpec，也不进入有效类型 / 属性索引；其单元格文本最多进入可重建的 Note / Block 全文索引，用于工作区搜索，不产生任何记录级查询语义。
+BaseTable 边界：BaseTable 的局部过滤 / 排序与局部 RowId / ColumnId 不进入 QuerySpec，也不进入有效类型 / 属性索引；其单元格文本最多进入可重建的 Note / Block 全文索引，用于工作区搜索，不产生任何记录级查询语义。
 
 **权衡**：类型化 AST 比字符串查询更难书写和调试，但跨平台序列化、同步和版本迁移更可靠；结构索引整体落后并重建比实时迁移更简单，代价是短暂的不完整查询结果必须有 UI 提示。
 
@@ -2087,9 +2097,9 @@ BaseTable 边界（规划）：BaseTable 的局部过滤 / 排序与局部 RowId
 - 结构变动时实时增量迁移全部查询：成本高、收益低，首版允许整体落后并重建。
 - 把 BaseTable 的局部列类型、局部过滤 / 排序提升为 QuerySpec 或有效属性索引的输入：会让文档内表格污染工作区属性与查询语义。
 
-## ADR-011：Tabs Block 结构与删除语义（规划）
+## ADR-011：Tabs Block 结构与删除语义
 
-**状态**：Proposed（规划中，尚未实现）
+**状态**：Accepted（首版已实现，跨 Note 引用与拖拽预览继续迭代；见第 7.4 节与第 21 节阶段七）
 
 **背景**：多页签编辑是常见需求，但把 Tab 建模为独立 workspace/tab 实体将引入新的对象类型、身份与同步边界，并可能与 Block 树产生多 parent 冲突。
 
@@ -2119,6 +2129,22 @@ BaseTable 边界（规划）：BaseTable 的局部过滤 / 排序与局部 RowId
 **原因**：仅设备目录与 Change DAG 不足以从空设备重建主密钥槽和全部权威快照；完整加密确认点复用已验证的备份与恢复边界，不要求用户另外保留工作区 ID 或旧设备 Token。
 
 **边界**：服务器不获得解密能力，只确认密文恢复点。客户端已按 ADR-016 扩展为双向快照同步，本地模式不产生网络传输；旧设备全部撤销后仍可凭独立恢复材料登记新设备。按 artifact 增量应用及跨主密钥自动合并尚未接入，详见[双向同步设计](docs/workspace-sync-design.md)。
+
+## ADR-014：单一 Agent Harness 复用业务工具，模型发送绑定显式载荷
+
+**状态**：Proposed，待评审；用户已明确单一 Harness 与 CLI/MCP 外部入口方向，尚未实现内置执行器。
+
+**背景**：已有 API/CLI/MCP 的统一工具、权限与事务边界，但缺少自有模型循环。用户需要在同一对话引用笔记或检索全库，并配置自己的 API 和模型；外部 Agent 托管目录不作为首版前置功能。
+
+**提议**：只提供一个内置 Harness，以范围明确的工具完成“模型 → 工具 → 模型”循环；CLI/MCP 共享业务工具而非内置运行器。API 连接、模型能力和偏好分开配置。全库搜索显式开启，结果仍受预算与远程许可约束；远程使用 `CALL_REMOTE_AI` 和二次确认。修改经 revision/schema 与持有者审批后由同一事务发布。
+
+**数据边界**：对话只保留于本次解锁；非敏感 API/模型配置拟用加密快照保存，凭据使用平台安全存储、设备环境变量引用或会话内存。恢复配置不恢复凭据或授权。锁定取消模型流并丢弃晚到结果；已发送内容无法撤回。
+
+**取舍**：直接复用工具比内置 Agent 绕行 MCP 简洁，但需补齐事件端口、能力检测、预算与循环状态。远程逐批确认保持新增结果边界，代价是检索过程中暂停待确认。首版不引入明文聊天库、任意命令执行、多 Agent 宿主或未验收 Gateway。
+
+**验证**：真实模型搜索读取未预选笔记、准确来源、API/模型配置与降级、流式取消、请求与许可一致、问答工具范围、批准后持久化及旧 revision 拒绝、锁定失效和 CLI/MCP 权限不回归。条件见 [Agent 设计方案](docs/agent-design.md)。
+
+---
 
 ## ADR-015：链接使用 Note 类型和通用引用，分组扩展层级单选
 

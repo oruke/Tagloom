@@ -34,3 +34,7 @@ application-local.yml
 # 日志与用户工作区备份
 *.log
 *.tagloom-backup.zip
+
+# 本地交互原型、评审产物与代理会话消息
+.impeccable/
+.yuki/
