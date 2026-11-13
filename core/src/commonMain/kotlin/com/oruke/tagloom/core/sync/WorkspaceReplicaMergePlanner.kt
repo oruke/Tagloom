@@ -1,11 +1,13 @@
 package com.oruke.tagloom.core.sync
 
+import com.oruke.tagloom.core.ai.WorkspaceConfig
 import com.oruke.tagloom.core.model.ChangeId
 import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.ObjectSnapshot
 import com.oruke.tagloom.core.model.ObjectType
 import com.oruke.tagloom.core.protocol.CanonicalJson
 import com.oruke.tagloom.core.workspace.ManifestObjectKind
+import com.oruke.tagloom.core.workspace.WorkspaceDefaults
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -73,6 +75,7 @@ object WorkspaceReplicaMergePlanner {
             ManifestObjectKind.SAVED_QUERY to ObjectType.SAVED_QUERY,
             ManifestObjectKind.DATABASE to ObjectType.DATABASE,
             ManifestObjectKind.VIEW to ObjectType.VIEW,
+            ManifestObjectKind.WORKSPACE_CONFIG to ObjectType.WORKSPACE_CONFIG,
         )
         val indexed = objects.associateBy { candidate ->
             require(candidate.snapshot.header.objectType == expectedTypes[candidate.kind]) { "同步对象类别与快照类型不一致" }
@@ -174,7 +177,10 @@ object WorkspaceReplicaMergePlanner {
         }
         val closest = common.filter { candidate ->
             common.none { other -> ObjectChangeDag.isAncestor(candidate.changeId, other.changeId, history) }
-        }.singleOrNull() ?: return null
+        }.singleOrNull()
+        if (closest == null) {
+            return implicitSingletonConfigBase(kind, localHead, remoteHead, history)
+        }
         val protocol = when (kind) {
             ManifestObjectKind.NOTE -> "note"
             ManifestObjectKind.TAG -> "tag-definition"
@@ -182,6 +188,7 @@ object WorkspaceReplicaMergePlanner {
             ManifestObjectKind.SAVED_QUERY -> "saved-query"
             ManifestObjectKind.DATABASE -> "database-definition"
             ManifestObjectKind.VIEW -> "view-definition"
+            ManifestObjectKind.WORKSPACE_CONFIG -> "workspace-config"
             else -> return null
         }
         val operation = closest.operations.singleOrNull { operation ->
@@ -189,6 +196,35 @@ object WorkspaceReplicaMergePlanner {
                 "create-default-note-tag", "create-default-property", "merge-note-heads")
         } ?: return null
         return if (operation.type == "merge-note-heads") (operation.payload as? JsonObject)?.get("mergedNote") else operation.payload
+    }
+
+    /**
+     * 当两台设备在尚未生成 `WORKSPACE_CONFIG` 的新工作区上各自首次创建单例配置、且完整因果链无缺失父节点时，
+     * 返回空 `WorkspaceConfig()` 作为逻辑共同祖先，使双端独立添加的连接和模型自动无损合并。
+     *
+     * @param kind 当前对象类别。
+     * @param localHead 本地非空 head Change ID。
+     * @param remoteHead 远端非空 head Change ID。
+     * @param history 同一对象的已知 Change 集合。
+     * @return 满足完整根创建条件时返回默认空配置 JSON，否则返回空（走保守冲突保留）。
+     */
+    private fun implicitSingletonConfigBase(
+        kind: ManifestObjectKind,
+        localHead: ChangeId,
+        remoteHead: ChangeId,
+        history: Collection<ObjectChange>,
+    ): JsonElement? {
+        if (kind != ManifestObjectKind.WORKSPACE_CONFIG) return null
+        val byId = history.associateBy(ObjectChange::changeId)
+        val localHeadChange = byId[localHead] ?: return null
+        val remoteHeadChange = byId[remoteHead] ?: return null
+        if (localHeadChange.objectId != WorkspaceDefaults.DEFAULT_WORKSPACE_CONFIG_ID ||
+            remoteHeadChange.objectId != WorkspaceDefaults.DEFAULT_WORKSPACE_CONFIG_ID
+        ) return null
+        if (ObjectChangeDag.analyze(history).errors.isNotEmpty()) return null
+        val allRootsAreCreate = history.filter { it.parentChangeIds.isEmpty() }.all { it.kind == ChangeKind.CREATE }
+        if (!allRootsAreCreate) return null
+        return CanonicalJson.format.encodeToJsonElement(WorkspaceConfig.serializer(), WorkspaceConfig())
     }
 
     /**

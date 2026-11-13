@@ -304,6 +304,7 @@ private data class RotationArtifactRole(
             ManifestObjectKind.SAVED_QUERY -> RotationArtifactRole("saved-query-snapshot", WrappingKeyPurpose.SNAPSHOT)
             ManifestObjectKind.DATABASE -> RotationArtifactRole("database-snapshot", WrappingKeyPurpose.SNAPSHOT)
             ManifestObjectKind.VIEW -> RotationArtifactRole("view-snapshot", WrappingKeyPurpose.SNAPSHOT)
+            ManifestObjectKind.WORKSPACE_CONFIG -> RotationArtifactRole("workspace-config-snapshot", WrappingKeyPurpose.SNAPSHOT)
             ManifestObjectKind.BLOB -> RotationArtifactRole("blob", WrappingKeyPurpose.BLOB)
             ManifestObjectKind.CHANGE -> RotationArtifactRole("object-change", WrappingKeyPurpose.CHANGE)
             ManifestObjectKind.HISTORY -> if (record.path.value.startsWith("history/checkpoints/")) {

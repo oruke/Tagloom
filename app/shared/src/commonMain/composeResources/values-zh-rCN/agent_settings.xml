@@ -1,0 +1,104 @@
+<resources>
+    <string name="workspace_recovery_object_workspace_config">工作区 Agent 配置</string>
+
+    <string name="agent_settings_title">Agent 与模型</string>
+    <string name="agent_settings_back">返回设置</string>
+    <string name="agent_settings_entry_description">配置 OpenAI 兼容连接、密钥分层保护、模型上下文窗口与 80% 自动压缩策略。</string>
+    <string name="agent_settings_entry_action">配置 Agent</string>
+    <string name="agent_settings_description">连接端点、模型目录与窗口偏好随工作区加密快照同步；API Key 默认仅保存在当前设备系统安全凭据库，除非你显式勾选加密信封同步。</string>
+
+    <string name="agent_connections_section_title">1. API 连接与密钥分层存储</string>
+    <string name="agent_connections_empty">尚未配置 API 连接。点击下方快捷预设即可接入云端或本机模型端点。</string>
+    <string name="agent_connection_add">新增连接</string>
+    <string name="agent_connection_edit_title">编辑 API 连接</string>
+    <string name="agent_connection_new_title">新建 API 连接</string>
+    <string name="agent_connection_presets_label">快捷预设</string>
+    <string name="agent_preset_openai">OpenAI</string>
+    <string name="agent_preset_compatible">OpenAI 兼容端点</string>
+    <string name="agent_preset_ollama">Ollama（本机免密）</string>
+    <string name="agent_preset_lm_studio">LM Studio（本机）</string>
+    <string name="agent_connection_name_label">连接名称</string>
+    <string name="agent_connection_base_url_label">Base URL</string>
+    <string name="agent_connection_protocol_label">协议类型</string>
+    <string name="agent_protocol_responses">OpenAI Responses (/responses)</string>
+    <string name="agent_protocol_chat_completions">Chat Completions (/chat/completions)</string>
+    <string name="agent_connection_auth_label">鉴权与密钥存储方式</string>
+    <string name="agent_auth_keychain">系统安全凭据库</string>
+    <string name="agent_auth_env_var">桌面环境变量</string>
+    <string name="agent_auth_none">本机免密</string>
+    <string name="agent_connection_api_key_label">API Key</string>
+    <string name="agent_connection_api_key_saved_placeholder">已安全保存密钥（留空保持不变，输入新值则覆盖）</string>
+    <string name="agent_connection_env_var_label">环境变量名</string>
+    <string name="agent_connection_env_var_hint">仅桌面端运行时实时读取系统环境变量，绝不落盘到工作区文件。</string>
+    <string name="agent_connection_none_hint">适用于无需 Bearer Key 的本机回环或受信局域网推理服务（如 Ollama / LM Studio）。</string>
+    <string name="agent_connection_sync_envelope_label">随工作区加密同步此 API Key</string>
+    <string name="agent_connection_sync_envelope_warning">默认关闭（仅保存在本机 Windows DPAPI / Android Keystore，绝不写入工作区目录或备份包）。开启后将使用工作区主密钥派生信封加密存入 WORKSPACE_CONFIG 以免其他设备重复填写；任何已解锁副本或导出备份均可解密使用该 Key。</string>
+    <string name="agent_connection_test">测试连接</string>
+    <string name="agent_connection_save">保存连接</string>
+    <string name="agent_connection_fetch_models">拉取 /models</string>
+    <string name="agent_action_edit">编辑</string>
+    <string name="agent_action_delete">删除</string>
+
+    <string name="agent_cred_ready_local">已就绪 · 本机安全存储</string>
+    <string name="agent_cred_ready_synced">已就绪 · 加密信封同步</string>
+    <string name="agent_cred_ready_env">已就绪 · 环境变量 %1$s</string>
+    <string name="agent_cred_ready_none">已就绪 · 本机免密</string>
+    <string name="agent_cred_missing_local">待补充此设备本机 API Key</string>
+    <string name="agent_cred_missing_env">当前设备未检测到环境变量 %1$s</string>
+
+    <string name="agent_models_section_title">2. 模型目录、上下文窗口与工具实测</string>
+    <string name="agent_models_need_connection">请先在上方保存至少一个 API 连接，随后即可拉取或手动添加模型。</string>
+    <string name="agent_models_empty">尚未添加模型。可点击连接上的「拉取 /models」一键导入，或手动填写模型 ID。</string>
+    <string name="agent_models_discovered_label">已从 /models 发现模型（点击即按默认 128K 窗口导入）：</string>
+    <string name="agent_model_add">手动添加模型</string>
+    <string name="agent_model_edit_title">编辑模型配置</string>
+    <string name="agent_model_new_title">添加模型配置</string>
+    <string name="agent_model_connection_label">所属连接</string>
+    <string name="agent_model_id_label">模型 ID (modelId)</string>
+    <string name="agent_model_display_name_label">显示名称</string>
+    <string name="agent_model_context_tokens_label">支持上下文窗口（Tokens，16384 – 1048576）</string>
+    <string name="agent_model_compaction_summary">上下文窗口: %1$s tok · %2$d% 自动压缩线: %3$s tok（保留近期约 %4$s tok）</string>
+    <string name="agent_model_supports_thinking">支持思考过程输出（Reasoning / Thinking）</string>
+    <string name="agent_model_tools_label">工具调用（Function Calling）能力</string>
+    <string name="agent_tools_verified">工具: 已实测</string>
+    <string name="agent_tools_declared">工具: 手动声明</string>
+    <string name="agent_tools_chat_only">仅对话</string>
+    <string name="agent_tools_unknown">工具: 未探测</string>
+    <string name="agent_badge_streaming">流式</string>
+    <string name="agent_badge_thinking">思考</string>
+    <string name="agent_model_probe_tools">工具调用实测</string>
+    <string name="agent_model_save">保存模型</string>
+
+    <string name="agent_preferences_section_title">3. 自动压缩与默认运行边界</string>
+    <string name="agent_pref_auto_compact_title">启用上下文自动压缩</string>
+    <string name="agent_pref_auto_compact_description">当会话输入达到所选模型上下文窗口的触发比例（默认 80%）时，自动将早期对话与工具观测压缩为结构化检查点摘要。</string>
+    <string name="agent_pref_auto_compact_percent_label">自动压缩触发比例（占模型窗口 %，50–95）</string>
+    <string name="agent_pref_retain_percent_label">压缩后保留近期原文比例（占模型窗口 %，8–40）</string>
+    <string name="agent_pref_default_model_label">默认选用模型</string>
+    <string name="agent_pref_default_model_none">自动（首个已启用模型）</string>
+    <string name="agent_pref_default_scope_label">默认检索范围</string>
+    <string name="agent_scope_referenced_only">仅引用上下文</string>
+    <string name="agent_scope_all_notes">全部工作区笔记</string>
+    <string name="agent_pref_max_tool_rounds_label">单轮最大工具调用步数（1–16）</string>
+    <string name="agent_pref_max_notes_label">单步最多精读笔记数（1–32）</string>
+    <string name="agent_pref_max_blocks_label">单步最多读取段落块数（4–128）</string>
+    <string name="agent_pref_save">保存自动压缩与偏好</string>
+
+    <string name="agent_status_connection_saved">API 连接已保存。</string>
+    <string name="agent_status_connection_deleted">已移除该 API 连接及关联模型。</string>
+    <string name="agent_status_connection_ok">连接连通性测试成功。</string>
+    <string name="agent_status_models_fetched">已成功从端点拉取模型列表。</string>
+    <string name="agent_status_models_empty">端点响应成功，但 /models 返回空列表，请手动填写模型 ID。</string>
+    <string name="agent_status_model_saved">模型与上下文窗口配置已保存。</string>
+    <string name="agent_status_model_deleted">已移除模型配置。</string>
+    <string name="agent_status_probe_verified">工具调用实测通过，已标记为「工具: 已实测」。</string>
+    <string name="agent_status_probe_chat_only">端点正常响应但未触发结构化工具调用，已标记为「仅对话」。</string>
+    <string name="agent_status_preferences_saved">自动压缩与运行边界偏好已保存。</string>
+
+    <string name="agent_error_auth">鉴权失败或尚未填写此连接的 API Key。</string>
+    <string name="agent_error_rate_limit">模型端点触发速率限制（HTTP 429），请稍后重试。</string>
+    <string name="agent_error_endpoint">模型端点拒绝请求或 Base URL 格式不正确。</string>
+    <string name="agent_error_network">无法连接模型端点，请检查 Base URL 与网络连通性。</string>
+    <string name="agent_error_validation">请检查输入项（需为合法 HTTPS 或本机地址、有效窗口范围及非空 ID）。</string>
+    <string name="agent_error_generic">Agent 配置操作未成功完成。</string>
+</resources>

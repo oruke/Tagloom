@@ -81,6 +81,7 @@ internal fun WorkspaceSessionShell(
     var workspaceMenuOpen by remember { mutableStateOf(false) }
     var searchPaletteOpen by remember { mutableStateOf(false) }
     var serverRecoveryOpen by remember { mutableStateOf(false) }
+    var agentSettingsOpen by remember { mutableStateOf(false) }
     val selectedDocument = controller.editorState.selectedDocument
 
     LaunchedEffect(controller) { controller.serverRecovery.observeAutomaticUpdates() }
@@ -108,6 +109,7 @@ internal fun WorkspaceSessionShell(
             onSaveRequest = onSave,
             settingsContent = { onBack ->
                 if (serverRecoveryOpen) ServerRecoverySettingsPane(controller, coroutineScope, onBack = { serverRecoveryOpen = false })
+                else if (agentSettingsOpen) AgentSettingsScreen(controller.agentSettings, coroutineScope, onBack = { agentSettingsOpen = false })
                 else WorkspaceSettingsScreen(
                     requiresPin = controller.recentWorkspace?.requiresPin == true,
                     busy = controller.busy,
@@ -118,6 +120,7 @@ internal fun WorkspaceSessionShell(
                     onRotateMasterKey = { rotateMasterKey = true },
                     onLock = onLock,
                     onServerRecovery = if (controller.serverRecovery.available) ({ serverRecoveryOpen = true }) else null,
+                    onAgentSettings = if (controller.agentSettings.available) ({ agentSettingsOpen = true }) else null,
                 )
             },
             onWorkspaceMenuRequest = {

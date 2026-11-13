@@ -146,6 +146,15 @@ internal class DesktopReplicaCodec(
                             val note = CanonicalJson.format.decodeFromJsonElement(Note.serializer(), snapshot.payload)
                             require(NoteValidator.validate(note).isEmpty()) { "sync_integrity_failed" }
                         }
+                        if (record.kind == ManifestObjectKind.WORKSPACE_CONFIG && !snapshot.header.deleted) {
+                            val config = CanonicalJson.format.decodeFromJsonElement(
+                                com.oruke.tagloom.core.ai.WorkspaceConfig.serializer(),
+                                snapshot.payload,
+                            )
+                            require(com.oruke.tagloom.core.ai.WorkspaceConfigValidator.validate(config).isEmpty()) {
+                                "sync_integrity_failed"
+                            }
+                        }
                         objects += WorkspaceReplicaObject(record.kind, snapshot)
                     }
                 }
@@ -175,6 +184,7 @@ internal fun replicaSnapshotType(kind: ManifestObjectKind): String = when (kind)
     ManifestObjectKind.SAVED_QUERY -> "saved-query-snapshot"
     ManifestObjectKind.DATABASE -> "database-snapshot"
     ManifestObjectKind.VIEW -> "view-snapshot"
+    ManifestObjectKind.WORKSPACE_CONFIG -> "workspace-config-snapshot"
     else -> error("sync_object_kind_invalid")
 }
 

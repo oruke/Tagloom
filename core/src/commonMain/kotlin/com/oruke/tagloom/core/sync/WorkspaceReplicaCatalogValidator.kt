@@ -1,5 +1,7 @@
 package com.oruke.tagloom.core.sync
 
+import com.oruke.tagloom.core.ai.WorkspaceConfig
+import com.oruke.tagloom.core.ai.WorkspaceConfigValidator
 import com.oruke.tagloom.core.domain.tag.TagResolution
 import com.oruke.tagloom.core.domain.tag.TagResolver
 import com.oruke.tagloom.core.model.*
@@ -29,8 +31,22 @@ object WorkspaceReplicaCatalogValidator {
         val queries = decode(objects, ManifestObjectKind.SAVED_QUERY, ObjectType.SAVED_QUERY, SavedQuery.serializer())
         val databases = decode(objects, ManifestObjectKind.DATABASE, ObjectType.DATABASE, DatabaseDefinition.serializer()) { it.id.value }
         val views = decode(objects, ManifestObjectKind.VIEW, ObjectType.VIEW, ViewDefinition.serializer()) { it.id.value }
-        require(notes.size + tags.size + properties.size + queries.size + databases.size + views.size == objects.size) {
+        val workspaceConfigs = decode(
+            objects,
+            ManifestObjectKind.WORKSPACE_CONFIG,
+            ObjectType.WORKSPACE_CONFIG,
+            WorkspaceConfig.serializer(),
+        ) { it.id.value }
+        require(
+            notes.size + tags.size + properties.size + queries.size +
+                databases.size + views.size + workspaceConfigs.size == objects.size,
+        ) {
             "同步目录包含不支持的对象类别"
+        }
+        workspaceConfigs.filterNot { it.header.deleted }.forEach { snapshot ->
+            require(WorkspaceConfigValidator.validate(snapshot.payload).isEmpty()) {
+                "同步工作区 Agent 配置结构无效"
+            }
         }
         val activeTags = tags.filterNot { it.header.deleted }.map { it.payload }.associateBy(TagDefinition::id)
         val allProperties = properties.map { it.payload }.associateBy(PropertyDefinition::id)

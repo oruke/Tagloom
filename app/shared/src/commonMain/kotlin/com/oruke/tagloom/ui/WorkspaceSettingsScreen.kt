@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
@@ -79,6 +80,7 @@ internal fun WorkspaceSettingsEntry(
  * @param onRotateMasterKey 打开主密钥轮换确认流程。
  * @param onLock 锁定当前工作区。
  * @param onServerRecovery 打开服务器恢复副本设置；平台未实现时为空。
+ * @param onAgentSettings 打开 Agent 与模型连接设置；平台未实现时为空。
  */
 @Composable
 internal fun WorkspaceSettingsScreen(
@@ -91,6 +93,7 @@ internal fun WorkspaceSettingsScreen(
     onRotateMasterKey: () -> Unit,
     onLock: () -> Unit,
     onServerRecovery: (() -> Unit)? = null,
+    onAgentSettings: (() -> Unit)? = null,
 ) {
     var dateTimeOpen by remember { mutableStateOf(false) }
     if (dateTimeOpen) {
@@ -141,6 +144,17 @@ internal fun WorkspaceSettingsScreen(
                     enabled = true,
                     onClick = { dateTimeOpen = true },
                 )
+                onAgentSettings?.let { openAgent ->
+                    SettingsActionRow(
+                        icon = Res.drawable.ic_bulb,
+                        title = stringResource(Res.string.agent_settings_title),
+                        description = stringResource(Res.string.agent_settings_entry_description),
+                        action = stringResource(Res.string.agent_settings_entry_action),
+                        enabled = !busy,
+                        actionTestTag = "settings_open_agent",
+                        onClick = openAgent,
+                    )
+                }
                 Text(
                     stringResource(Res.string.workspace_settings_device_section),
                     modifier = Modifier.padding(top = 16.dp),
@@ -210,6 +224,7 @@ internal fun WorkspaceSettingsScreen(
  * @param description 当前状态、作用范围或操作说明。
  * @param action 明确的操作名称。
  * @param enabled 是否允许触发操作。
+ * @param actionTestTag 可选自动化测试定位标签。
  * @param onClick 交给会话执行的动作。
  */
 @Composable
@@ -219,8 +234,10 @@ private fun SettingsActionRow(
     description: String,
     action: String,
     enabled: Boolean,
+    actionTestTag: String? = null,
     onClick: () -> Unit,
 ) {
+    val buttonTagModifier = if (actionTestTag != null) Modifier.testTag(actionTestTag) else Modifier
     Column {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
@@ -229,7 +246,7 @@ private fun SettingsActionRow(
                     SettingsActionDescription(icon, title, description)
                     OutlinedButton(
                         onClick = onClick, enabled = enabled,
-                        modifier = Modifier.padding(start = 32.dp).heightIn(min = 40.dp),
+                        modifier = buttonTagModifier.padding(start = 32.dp).heightIn(min = 40.dp),
                     ) {
                         Text(action)
                     }
@@ -240,7 +257,11 @@ private fun SettingsActionRow(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SettingsActionDescription(icon, title, description, Modifier.weight(1f))
-                    OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.heightIn(min = 40.dp)) {
+                    OutlinedButton(
+                        onClick = onClick,
+                        enabled = enabled,
+                        modifier = buttonTagModifier.heightIn(min = 40.dp),
+                    ) {
                         Text(action)
                     }
                 }

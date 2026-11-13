@@ -125,6 +125,9 @@ internal class WorkspaceUiController(
     /** 服务器恢复页面状态与操作，独立于编辑器写入和查询职责。 */
     val serverRecovery = WorkspaceServerRecoveryController(this)
 
+    /** Agent 与模型设置页面状态与探测控制器。 */
+    val agentSettings = WorkspaceAgentSettingsController(this)
+
     /** 在上传完整恢复副本前提交当前会话的全部草稿。 */
     internal suspend fun flushPendingNotes() = noteSaveDelegate.savePending()
 
@@ -393,6 +396,7 @@ internal class WorkspaceUiController(
         workspaceSessionMarker = Any()
         links.clear()
         propertyOptions.clear()
+        agentSettings.clear()
         gateway.lock()
         serverRecovery.clear()
         editorState.clearWorkspace()
@@ -418,6 +422,7 @@ internal class WorkspaceUiController(
         workspaceSessionMarker = Any()
         links.clear()
         propertyOptions.clear()
+        agentSettings.clear()
         noteSaveDelegate.resetAutoSaveAttempt()
         recoveryMessages = result.recoveryMessages
         if (result.readOnly) {

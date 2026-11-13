@@ -62,7 +62,7 @@ internal fun replicaFieldViews(conflict: WorkspaceReplicaConflict, propertyNames
         val localBlock = replicaFieldBlock(field.localValue, root)
         val remoteBlock = replicaFieldBlock(field.remoteValue, root)
         WorkspaceSyncConflictField(field.fieldId, label, detail,
-            replicaFieldContent(field.localValue, root), replicaFieldContent(field.remoteValue, root),
+            replicaFieldContent(field.localValue, root, last), replicaFieldContent(field.remoteValue, root, last),
             field.localValue == null, field.remoteValue == null, field.fieldId in resolved,
             localDeleted = localBlock?.deleted == true, remoteDeleted = remoteBlock?.deleted == true,
             localBlock = replicaBlockFieldView(localBlock, remoteBlock, conflict.localSnapshot.payload, root),
@@ -88,20 +88,25 @@ private fun optionLabel(conflict: WorkspaceReplicaConflict, field: WorkspaceRepl
 }
 
 /**
- * 使用原有 Markdown 导出展示完整 Block，其余字段保留实际值而不暴露 JSON 结构。
+ * 使用原有 Markdown 导出展示完整 Block，其余字段保留实际值而不暴露 JSON 结构；敏感密钥字段严格遮蔽。
  * @param value 字段值；为空表示不存在。
  * @param root 业务根字段，用于区分 Block 与普通结构。
- * @return 可供用户选择和复制的文本。
+ * @param leaf 冲突路径叶字段名，用于识别敏感凭据字段。
+ * @return 可供用户选择和复制的脱敏文本。
  */
-private fun replicaFieldContent(value: JsonElement?, root: String?): String {
+private fun replicaFieldContent(value: JsonElement?, root: String?, leaf: String? = null): String {
     if (value == null || value == JsonNull) return ""
+    if (leaf == "syncedApiKey") {
+        val content = (value as? JsonPrimitive)?.contentOrNull
+        return if (content.isNullOrBlank()) "" else "••••••••"
+    }
     val block = replicaFieldBlock(value, root)
     if (block != null) {
         // tombstone 的原正文仍属于可恢复历史；删除语义由独立标志明确展示。
         return MarkdownCodec.export(Note("", emptyList(), blocks = listOf(block.copy(parentId = null, deleted = false))),
             MarkdownExportMode.TAGLOOM_EXTENDED).markdown
     }
-    return replicaReadableValue(value)
+    return replicaReadableValue(redactSensitiveReplicaPayload(value))
 }
 
 /**

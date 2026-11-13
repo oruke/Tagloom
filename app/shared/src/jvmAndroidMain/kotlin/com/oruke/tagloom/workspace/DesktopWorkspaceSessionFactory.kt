@@ -10,6 +10,8 @@ import com.oruke.tagloom.core.transaction.NoteSnapshotTransactionService
 import com.oruke.tagloom.core.transaction.SavedQuerySnapshotEnvelopeService
 import com.oruke.tagloom.core.transaction.SavedQuerySnapshotTransactionService
 import com.oruke.tagloom.core.transaction.TransactionCoordinator
+import com.oruke.tagloom.core.transaction.WorkspaceConfigSnapshotEnvelopeService
+import com.oruke.tagloom.core.transaction.WorkspaceConfigSnapshotTransactionService
 import com.oruke.tagloom.core.transaction.WorkspaceSchemaSnapshotEnvelopeService
 import com.oruke.tagloom.core.transaction.WorkspaceSchemaSnapshotTransactionService
 import com.oruke.tagloom.core.workspace.UnlockedWorkspaceManifest
@@ -130,6 +132,17 @@ object DesktopWorkspaceSessionFactory {
                     cryptoProvider = cryptoProvider,
                     envelopeService = databaseEnvelopeService,
                     transactionService = DatabaseCatalogSnapshotTransactionService(
+                        cryptoProvider,
+                        envelopeService,
+                        manifestService,
+                        coordinator,
+                    ),
+                ),
+                configStore = DesktopWorkspaceConfigStore(
+                    paths = paths,
+                    cryptoProvider = cryptoProvider,
+                    envelopeService = WorkspaceConfigSnapshotEnvelopeService(envelopeService),
+                    transactionService = WorkspaceConfigSnapshotTransactionService(
                         cryptoProvider,
                         envelopeService,
                         manifestService,

@@ -43,6 +43,8 @@ kotlin {
         commonMain.dependencies {
             api(projects.core)
             implementation(libs.ktor.clientCore)
+            implementation(libs.kotlinx.coroutinesCore)
+            implementation(libs.kotlinx.serializationJson)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

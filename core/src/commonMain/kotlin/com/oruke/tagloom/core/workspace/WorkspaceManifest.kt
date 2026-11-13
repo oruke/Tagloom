@@ -39,6 +39,9 @@ enum class ManifestObjectKind {
     /** 独立于 Database 保存的 View 权威定义快照。 */
     VIEW,
 
+    /** 工作区级 Agent 连接、模型上下文窗口与偏好加密快照。 */
+    WORKSPACE_CONFIG,
+
     /** 冲突证据或审计历史。 */
     HISTORY,
 }

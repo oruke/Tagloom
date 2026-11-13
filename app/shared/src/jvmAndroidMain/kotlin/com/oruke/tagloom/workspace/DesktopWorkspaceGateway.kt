@@ -44,6 +44,8 @@ class DesktopWorkspaceGateway(
     private val recoveryAccessDirectory: Path = DesktopWorkspaceAccessPaths.defaultRegistryFile().parent.resolve("server-recovery"),
     /** 每次操作独立创建 HTTPS 客户端，允许隔离测试注入回环传输。 */
     private val recoveryClientFactory: (String) -> ServerRecoveryClient = { ServerRecoveryClient(it) },
+    /** 流式模型推理与连接探测端口，允许隔离测试注入假实现。 */
+    private val agentStreamPort: com.oruke.tagloom.core.ai.AiStreamPort = com.oruke.tagloom.sync.ai.JvmKtorAiStreamPortFactory.create(),
 ) : WorkspaceGateway {
     /** 外部写入只通知 UI 重新读取确认点，不通过事件携带明文。 */
     private val externalChangeNotifications = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -81,6 +83,17 @@ class DesktopWorkspaceGateway(
 
     /** 只向共享 UI 暴露受控恢复能力。 */
     override val serverRecovery: WorkspaceServerRecoveryGateway get() = serverRecoveryService
+
+    /** 与本机私有凭据隔离存储绑定的 Agent 配置网关。 */
+    private val agentConfigService = DesktopAgentConfigGateway(
+        gateway = this,
+        apiKeyStore = AgentApiKeyStore(recoveryAccessDirectory.resolveSibling("agent-credentials")),
+        streamPort = agentStreamPort,
+        onConfigCommitted = { externalChangeNotifications.tryEmit(Unit) },
+    )
+
+    /** 只向共享 UI 暴露脱敏的 Agent 与模型配置入口。 */
+    override val agentConfig: com.oruke.tagloom.platform.WorkspaceAgentConfigGateway get() = agentConfigService
 
     /**
      * 返回当前活动的本地工作区会话，供共享能力代理复用同一条索引连接。
@@ -448,6 +461,7 @@ class DesktopWorkspaceGateway(
 
     /** 锁定工作区并销毁会话密钥。 */
     override suspend fun lock(): Unit = withContext(Dispatchers.IO) {
+        agentConfigService.cancelActiveOperations()
         serverRecoveryService.cancelTransfer()
         manager.lock()
     }

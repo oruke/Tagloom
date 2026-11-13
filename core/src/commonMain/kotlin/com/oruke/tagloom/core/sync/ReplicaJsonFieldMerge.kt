@@ -242,6 +242,8 @@ object ReplicaJsonFieldMerge {
         return when (kind to path.single().field) {
             ManifestObjectKind.TAG to "propertyBindings", ManifestObjectKind.SAVED_QUERY to "propertyFilters" -> "propertyId"
             ManifestObjectKind.TAG to "templateBlocks", ManifestObjectKind.PROPERTY to "options" -> "id"
+            ManifestObjectKind.WORKSPACE_CONFIG to "connections" -> "connectionId"
+            ManifestObjectKind.WORKSPACE_CONFIG to "models" -> "id"
             else -> null
         }
     }

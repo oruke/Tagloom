@@ -1,12 +1,9 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.index.BacklinkIndexHit
-import com.oruke.tagloom.core.index.NoteIndexDocument
 import com.oruke.tagloom.core.index.PropertyIndexFilter
-import com.oruke.tagloom.core.index.SearchIndexCheckpoint
 import com.oruke.tagloom.core.index.SearchIndexHit
 import com.oruke.tagloom.core.index.SearchIndexQuery
-import com.oruke.tagloom.core.index.SearchIndexRebuildProgress
 import com.oruke.tagloom.core.model.ActorId
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.Note
@@ -79,6 +76,8 @@ class DesktopWorkspaceSession internal constructor(
     internal val schemaStore: DesktopWorkspaceSchemaStore,
     /** Database 与 View 权威密文读写入口。 */
     internal val databaseStore: DesktopWorkspaceDatabaseStore,
+    /** 工作区级 Agent 配置权威密文读写入口。 */
+    internal val configStore: DesktopWorkspaceConfigStore,
     /** 扫描全部 manifest 密文对象的完整性服务。 */
     private val integrityScanner: DesktopWorkspaceIntegrityScanner,
     /** 验证并提交 Change checkpoint 的桌面维护服务。 */
@@ -153,7 +152,7 @@ class DesktopWorkspaceSession internal constructor(
         }
         integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
             savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
-            databaseStore.inspect(unlocked).issues).distinct()
+            databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues).distinct()
         if (!readOnly && integrityIssues.isEmpty()) {
             DesktopReplicaCodec(this).observeClock()
             DesktopNoteTagSchemaMigration.migrate(schemaStore, unlocked, ::nextSchemaWriteContext)?.let { manifest ->
@@ -197,62 +196,6 @@ class DesktopWorkspaceSession internal constructor(
     suspend fun search(query: SearchIndexQuery): List<SearchIndexHit> = sessionMutex.withLock {
         requireOpen()
         projection.index.search(query)
-    }
-
-    /**
-     * 替换一篇已确认 Note 的派生索引投影。
-     *
-     * 该入口只供 JVM 能力代理使用；权威快照仍必须先由事务服务确认，普通业务写入不会直接调用它。
-     *
-     * @param document 待写入索引的完整 Note 投影。
-     */
-    internal suspend fun replaceIndex(document: NoteIndexDocument) = sessionMutex.withLock {
-        requireOpen()
-        projection.index.replace(document)
-    }
-
-    /**
-     * 从派生索引移除一篇 Note。
-     *
-     * @param noteId 待移除的权威 Note ID。
-     */
-    internal suspend fun removeIndex(noteId: ObjectId) = sessionMutex.withLock {
-        requireOpen()
-        projection.index.remove(noteId)
-    }
-
-    /**
-     * 从已确认快照投影重建派生索引。
-     *
-     * @param documents 当前确认点的 Note 投影集合。
-     * @param checkpoint 重建成功后记录的权威边界。
-     * @param onProgress 每完成一篇文档后的进度回调。
-     */
-    internal suspend fun rebuildIndex(
-        documents: List<NoteIndexDocument>,
-        checkpoint: SearchIndexCheckpoint,
-        onProgress: (SearchIndexRebuildProgress) -> Unit,
-    ) = sessionMutex.withLock {
-        requireOpen()
-        projection.index.rebuild(documents, checkpoint, onProgress)
-    }
-
-    /**
-     * 读取当前索引覆盖的权威 checkpoint。
-     *
-     * @return 索引尚未完整重建时为空。
-     */
-    internal suspend fun readIndexCheckpoint(): SearchIndexCheckpoint? = sessionMutex.withLock {
-        requireOpen()
-        projection.index.readCheckpoint()
-    }
-
-    /**
-     * 清除派生索引数据但保留其数据库结构。
-     */
-    internal suspend fun clearIndex() = sessionMutex.withLock {
-        requireOpen()
-        projection.index.clear()
     }
 
     /**
@@ -307,7 +250,7 @@ class DesktopWorkspaceSession internal constructor(
             refreshManifest(result.encryptedManifest)
             integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
                 savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
-                databaseStore.inspect(unlocked).issues).distinct()
+                databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues).distinct()
             result
         }
 
@@ -372,7 +315,7 @@ class DesktopWorkspaceSession internal constructor(
         refreshManifest()
         integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
             savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
-            databaseStore.inspect(unlocked).issues).distinct()
+            databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues).distinct()
         openState()
     }
 

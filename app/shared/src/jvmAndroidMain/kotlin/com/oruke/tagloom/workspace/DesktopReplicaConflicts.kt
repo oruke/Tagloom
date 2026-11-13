@@ -71,11 +71,32 @@ private fun replicaVersionTitle(snapshot: ObjectSnapshot<JsonElement>): String {
         ?: (objectValue?.get("name") as? JsonPrimitive)?.contentOrNull.orEmpty()
 }
 
+private val PRETTY_REPLICA_JSON = Json { prettyPrint = true }
+
 /** @param snapshot 完整保留版本。 @return 笔记的完整 Markdown，目录对象则为可读字段内容。 */
 private fun replicaVersionContent(snapshot: ObjectSnapshot<JsonElement>): String =
     if (snapshot.header.objectType == ObjectType.NOTE) {
         val note = CanonicalJson.format.decodeFromJsonElement(Note.serializer(), snapshot.payload)
         MarkdownCodec.export(note.copy(title = ""), MarkdownExportMode.TAGLOOM_EXTENDED).markdown
     } else {
-        Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), snapshot.payload)
+        PRETTY_REPLICA_JSON.encodeToString(JsonElement.serializer(), redactSensitiveReplicaPayload(snapshot.payload))
     }
+
+/**
+ * 递归遮蔽同步冲突预览中的同步态密钥字段，防止原始 API Key 在冲突面板回显。
+ * @param element 待展示的快照 JSON 节点。
+ * @return 遮蔽敏感字段后的安全 JSON 节点。
+ */
+internal fun redactSensitiveReplicaPayload(element: JsonElement): JsonElement = when (element) {
+    is JsonObject -> buildJsonObject {
+        element.forEach { (key, value) ->
+            if (key == "syncedApiKey" && value is JsonPrimitive && !value.contentOrNull.isNullOrBlank()) {
+                put(key, JsonPrimitive("••••••••"))
+            } else {
+                put(key, redactSensitiveReplicaPayload(value))
+            }
+        }
+    }
+    is JsonArray -> JsonArray(element.map(::redactSensitiveReplicaPayload))
+    else -> element
+}

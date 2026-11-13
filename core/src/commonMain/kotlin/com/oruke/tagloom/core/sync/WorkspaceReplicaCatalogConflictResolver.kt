@@ -13,8 +13,14 @@ import kotlinx.serialization.builtins.ListSerializer
  */
 object WorkspaceReplicaCatalogConflictResolver {
     /** 必须成组选择、不能逐个对象混选的共享目录类别。 */
-    private val catalogKinds = setOf(ManifestObjectKind.TAG, ManifestObjectKind.PROPERTY,
-        ManifestObjectKind.DATABASE, ManifestObjectKind.VIEW, ManifestObjectKind.SAVED_QUERY)
+    private val catalogKinds = setOf(
+        ManifestObjectKind.TAG,
+        ManifestObjectKind.PROPERTY,
+        ManifestObjectKind.DATABASE,
+        ManifestObjectKind.VIEW,
+        ManifestObjectKind.SAVED_QUERY,
+        ManifestObjectKind.WORKSPACE_CONFIG,
+    )
 
     /**
      * 为合并后的跨对象不变量冲突尝试稳定的完整目录选择，不执行任何持久化。
