@@ -912,7 +912,7 @@ linkType
 
 查询能力覆盖标签、属性、全文、双链、语义与混合查询；查询与数据库视图的筛选、排序统一由第 14.4 节的 QuerySpec 表达。
 
-> DatabaseDefinition / ViewDefinition 加密快照、原子创建、QuerySpec 类型化 AST、DatasetProjection、Table / Kanban / Gallery 受限展示、视图创建切换、按 `creationTypeId` 新建 Note 与 Note expectedRevision 单元格写回已经实现。Database 不再作为侧栏一级页面创建；用户在 Note 编辑器输入 `/database`，原位创建一个 `database` 引用 Block，并在 Block 内修改名称、来源类型和视图。当前 UI 只开放全文筛选和字段显隐；复杂谓词编辑器、多排序器、看板拖动和删除级联仍未实现。BaseTable 正文表格是 Note 内容 Block，定义见第 7.3 节，不属于本节 Database/View 体系。
+> DatabaseDefinition / ViewDefinition 加密快照、原子创建、QuerySpec 类型化 AST、DatasetProjection、Table / Kanban / Gallery 受限展示、视图创建切换、按 `creationTypeId` 新建 Note 与 Note expectedRevision 单元格写回已经实现。用户自定义 Database 不再作为侧栏一级页面创建；用户在 Note 编辑器输入 `/database`，原位创建一个 `database` 引用 Block，并在 Block 内修改名称、来源类型和视图（配合第 18.1 节侧栏收敛为「最近笔记 Top 5」的规划，侧栏固定提供唯一的内置防误删系统默认页「全部笔记」，复用 `sourceTypeId = "default-note-tag"` 且 `includeDescendants = true` 的 `DatabaseDefinition` 全量投影根类型 `Note` 并自动排除容器页自身）。当前 UI 只开放全文筛选和字段显隐；复杂谓词编辑器、多排序器、看板拖动和删除级联仍未实现。BaseTable 正文表格是 Note 内容 Block，定义见第 7.3 节，不属于本节 Database/View 体系。
 
 ## 14.1 DatasetProjection：Database Table View 的派生展示
 
@@ -1012,7 +1012,7 @@ eq / ne / isEmpty / isNotEmpty
 UI 术语与入口边界：
 
 - “正文表格”指 BaseTable Block（第 7.3 节），只从 Note 编辑器的“插入 Block”菜单进入；其工具栏使用行 / 列 / 单元格语义（添加行、添加列、调整等），不得出现“新建数据集 / 添加视图 / 转为看板 / 按类型建表”等数据库入口。
-- “数据集视图”指正文中的 Database Block，通过 `/database` 或 Block 手柄的“在下方插入”菜单原位创建；“表格视图”仅指 Database 的 Table View。Table View 工具栏显示来源类型、视图切换、筛选、排序与属性列配置，侧栏不再提供独立 Database 导航或创建入口。
+- “数据集视图”指正文中的 Database Block，通过 `/database` 或 Block 手柄的“在下方插入”菜单原位创建；“表格视图”仅指 Database 的 Table View。Table View 工具栏显示来源类型、视图切换、筛选、排序与属性列配置，侧栏不再提供用户自定义 Database 的独立导航或创建入口（仅保留内置防误删的系统默认页「全部笔记」复用根类型 `Note` 的 `DatabaseDefinition` 全量投影）。
 - 界面必须可读地提示边界：正文表格标注“只属于当前 Note，不会创建属性，也不会生成新的 Note”；数据集视图标注“编辑单元格会更新对应 Note 的属性”。
 - 删除正文表格中的一行只删除文档内容，不删除 Note；Database 不提供“删除行”，只能通过调整筛选、更改对象类型或删除 Note 表达。
 - 筛选只属于 Database View，不适用于 BaseTable；BaseTable 可提供表格内的局部派生排序 / 过滤（只影响当前展示），不复用 QuerySpec，也不持久化结果。
@@ -1412,11 +1412,12 @@ Nonce size: 192 bit, 每次加密随机生成
 
 # 18. AI Agent
 
-Agent 应通过工具层工作，不直接访问加密文件。
+Agent 应通过受控工具层工作，不直接访问加密文件或持有工作区主密钥。
 
-可用工具：
+可用与规划工具（内置 Harness 与外部 CLI / MCP 同源）：
 
 ```text
+list_notes
 search_notes
 query_notes
 get_note
@@ -1424,15 +1425,22 @@ get_block
 get_backlinks
 get_tags
 get_tag_schema
+get_workspace_schema
+get_saved_queries
+get_saved_query
+run_saved_query
 suggest_tags
 suggest_properties
 create_note
 update_note
-add_tag
-export_note
+add_tag_to_note
+patch_note_blocks      # 规划增量：按稳定 BlockId 局部替换/插入/追加/移除块
+update_note_metadata   # 规划增量：按 expectedRevision 更新标题、类型与属性值
+export_note            # 仅外部受控入口按显式授权与二次确认开放
+delete_note            # 仅外部受控入口按显式高危授权与二次确认开放
 ```
 
-权限建议：
+权限范围（外部授权 token 与内部门禁共用语义）：
 
 ```text
 read_notes
@@ -1441,26 +1449,27 @@ suggest_changes
 write_notes
 delete_notes
 export_notes
-call_remote_ai
 ```
 
-默认策略：
+默认安全与审阅策略：
 
-- 读取当前笔记和用户授权范围。
-- 修改以建议或 diff 形式展示。
-- 写入需要用户确认。
-- 批量修改、删除、导出和远程发送需要二次确认。
-- 所有工具调用写入本地审计日志。
+- 笔记与笔记类型支持系统级三态访问策略 `AiAccessPolicy`（`ALLOW` 默认可读 / `REFERENCE_ONLY` 自动检索与列表隐藏，内置仅手动 `@` 挂载可读，外部 API/CLI/MCP 仅在 `allowedNoteIds` 显式列入该 `noteId` 白名单或凭 owner token 直接按 ID 调用时可读 / `LOCKED` 对任何内置与外部 AI 工具入口硬性禁止读取与修改；沿笔记绑定的自定义笔记类型及多父类型祖先链按最严格档位收敛）。
+- 用户配置模型连接并在对话内发起请求即授权读取本次允许范围内的笔记，不采用打断式的逐批远程外发弹窗。
+- 所有创建与修改均先生成冻结提案或原位块级 diff，经用户确认并通过 `expectedRevision` 复核后由 `TransactionCoordinator` 原子落盘。
+- 删除与导出保持高危权限隔离与二次确认。
+- 所有工具调用写入本地加密审计日志（不记录标题、正文或凭据明文）。
 
-## 18.1 单一 Tagloom Agent Harness（待评审设计）
+## 18.1 单一 Tagloom Agent Harness（待实施设计基线）
 
-首版做 Tagloom 自有的一个 Agent Harness，统一模型流、工具循环、取消、预算、来源与修改提案。编辑器右侧的“Tagloom Agent”支持 `@` 引用指定笔记及显式开启的全部笔记检索；问答与编辑是同一执行器的工具许可模式。设置维护 API 连接、模型和运行偏好。外部 Codex、Pi、OpenCode 等继续使用自己的执行器，通过现有 CLI / MCP 访问统一业务工具。
+首版构建 Tagloom 自有的唯一 Agent Harness，统一流式推理、工具循环、取消、Token 与上下文窗口治理、来源台账与修改提案；不再区分“问答 / 编辑”手动切换模式。界面采用**单一左侧主导航 + 双形态共享同一会话内核**：不设二级会话侧栏且移除冗余的「Agent 工作台」菜单项，直接在左侧唯一主导航提供 `[+ 新建笔记]` / **`[✦ 新会话]`**、内置防误删系统默认笔记 **`全部笔记`**（绑定根类型 `Note` 的 `DatabaseDefinition` 全量投影页，排除容器自身行）、**`最近会话 Top 5`**（附无痕入口与 `全部 ▸` 历史检索/归档弹窗；**仅点击切换会话绝不跳动重排顺序**，仅新建会话或实际发送新消息后置顶）与 **`最近笔记 Top 5`**；同时在笔记编辑页与「全部笔记」页提供右侧伴随面板及正文选区快捷入口。外部 Codex、Claude Code、Pi、OpenCode 等继续使用各自执行器，通过现有 CLI / MCP 调用统一业务工具。
 
-工作区存储、检索范围与模型运行位置独立。全库搜索在本机执行，不默认上传整库。远程调用前审阅问题、历史和必要摘录并确认冻结载荷；运行期间新增搜索结果与正文也按批预览确认。外部程序取得授权数据后的用途不能由 Tagloom 承诺受控。
+工具层在现有查询与整篇写入基础上，新增 `patch_note_blocks`（局部 Markdown 转结构化 Block，完整保留未改动段落的稳定 `BlockId`、`BaseTable`、`Tabs` 与双链）与 `update_note_metadata`（遵循 ADR-008 单自定义笔记类型约束更新标题、笔记类型与属性值）。修改审阅采用**主舞台锚定双方位共享 Diff**：全屏对话主舞台固定在左、点击提案后从**右侧**滑出共享 Diff 审阅面板（支持一键穿透至笔记编辑页）；笔记编辑页正文与原位逐块 Diff 固定在**左**、Agent 伴随栏在右，两边 100% 复用逐属性/逐块采纳状态机与 `expectedRevision` 原子提交流程。作曲框左下功能键（`@` 多类型引用、`🌐` 全库检索开关）与回答消息底部动作栏均采用零文本纯图标按钮，模型切换与深度思考强度合并为右下单一无边框文本按钮。
 
-当前 API、CLI 与 stdio MCP 已有受控入口，笔记读取与全文查询可复用；`AiCompletionPort` 仍是单次完整文本端口。模型适配器、可取消流式工具循环、Agent UI 和 API/模型配置仍需实现，向量检索和 AI Gateway 不作为首版依赖。对话仅保留于本次解锁；持久历史另行设计加密快照与恢复边界。
+上下文与账单管理对标 DeepSeek Harness：作曲框下方状态栏左侧展示**会话累计计费 Token 与前缀缓存命中率**，右侧以 **`14.dp` 环形进度环（`ContextMeter`）**展示当前上下文占所选模型 `contextWindowTokens` 的百分比与三色分段明细；模型目录支持为每个模型配置上下文窗口（`16K ~ 1M`），当活跃上下文达到所选模型窗口的 **80%** 时自动将早期历史与长工具输出折叠为可展开的 `CompactionItem` 摘要节点，同时逐字保留近期 **16%** 对话、活跃 `@` 引用与未决修改提案。
 
-详细界面、交互状态、模块归属及验收依据见 [Agent 功能、UI 与交互设计](docs/agent-design.md)。本节和 ADR-014 为待评审提议，不改变已实现功能的事实边界。
+会话历史通过新增 `AGENT_THREAD` 加密对象快照在新建、回合完成、手动压缩、归档或重命名时低频落盘（流式吐字与纯浏览切换期间不写盘），并随服务器模式完成跨设备密文同步。设置页集中管理 API 连接、模型与上下文窗口、自动压缩运行偏好：落地 `WORKSPACE_CONFIG` 加密对象快照（连同 `AGENT_THREAD` 一并纳入 `ManifestObjectKind`、密钥轮换与细粒度三方合并），使连接骨架、模型列表及 `contextWindowTokens` 默认跨端同步；API Key 默认保存在各设备系统安全存储或桌面环境变量引用中，另提供显式勾选将该连接 API Key 纳入 `WORKSPACE_CONFIG` 双层 AEAD 加密信封（HKDF `WrappingKeyPurpose.SNAPSHOT` + 随机 DEK）跨端同步的选项。
+
+当前 API、CLI 与 stdio MCP 已有受控入口，`AiCompletionPort` 仍是单次完整文本端口，`Snapshot.kt` 仅预留 `ObjectType.WORKSPACE_CONFIG` 常量；流式模型适配器、内置 Harness、`AiAccessPolicy`、「全部笔记」系统投影页、`WORKSPACE_CONFIG` 与 `AGENT_THREAD` 快照持久化、细粒度补丁工具与 Agent UI 仍待编码实现。完整信息架构、交互状态与分阶段验收标准见 [Agent 功能、UI 与交互设计](docs/agent-design.md)。
 
 ---
 
@@ -2130,19 +2139,23 @@ BaseTable 边界：BaseTable 的局部过滤 / 排序与局部 RowId / ColumnId 
 
 **边界**：服务器不获得解密能力，只确认密文恢复点。客户端已按 ADR-016 扩展为双向快照同步，本地模式不产生网络传输；旧设备全部撤销后仍可凭独立恢复材料登记新设备。按 artifact 增量应用及跨主密钥自动合并尚未接入，详见[双向同步设计](docs/workspace-sync-design.md)。
 
-## ADR-014：单一 Agent Harness 复用业务工具，模型发送绑定显式载荷
+## ADR-014：单一双形态 Agent Harness、笔记级 AI 访问策略与加密会话/配置同步
 
-**状态**：Proposed，待评审；用户已明确单一 Harness 与 CLI/MCP 外部入口方向，尚未实现内置执行器。
+**状态**：Proposed（设计已按交互原型评审确认定稿，待编码实现；外部 API / CLI / MCP 受控入口已实现，内置执行器与 UI 尚未实现）。
 
-**背景**：已有 API/CLI/MCP 的统一工具、权限与事务边界，但缺少自有模型循环。用户需要在同一对话引用笔记或检索全库，并配置自己的 API 和模型；外部 Agent 托管目录不作为首版前置功能。
+**背景**：已有 API / CLI / MCP 的统一工具与事务边界，但缺少自有流式模型循环与跨端智能体交互。实际使用中绝大多数连接为远端 API 模型，逐批弹窗审批检索结果会严重打断心流；问答与编辑模式手动切换、双层会话侧栏与多余菜单项会加重界面噪音；整篇 Markdown 覆盖会破坏稳定 `BlockId` 与结构化属性；固定字符裁剪无法适配不同窗口规模模型的长对话续航；仅留内存的临时会话无法满足跨桌面与手机续聊、归档及统一模型配置的需求。
 
-**提议**：只提供一个内置 Harness，以范围明确的工具完成“模型 → 工具 → 模型”循环；CLI/MCP 共享业务工具而非内置运行器。API 连接、模型能力和偏好分开配置。全库搜索显式开启，结果仍受预算与远程许可约束；远程使用 `CALL_REMOTE_AI` 和二次确认。修改经 revision/schema 与持有者审批后由同一事务发布。
+**决定**：
 
-**数据边界**：对话只保留于本次解锁；非敏感 API/模型配置拟用加密快照保存，凭据使用平台安全存储、设备环境变量引用或会话内存。恢复配置不恢复凭据或授权。锁定取消模型流并丢弃晚到结果；已发送内容无法撤回。
+- **单一内核、唯一主侧栏双 Top 5 与系统默认「全部笔记」页**：只实现一套内置 Agent Harness，驱动全屏对话主舞台与笔记编辑器右侧伴随面板 / 选区快捷入口；左侧唯一主导航移除冗余工作台菜单，直接提供 `[✦ 新会话]`、内置防误删的 **`全部笔记`** 系统默认页（复用根类型 `Note` 的 `DatabaseDefinition` 全量投影并排除容器自身行）、**`最近会话 Top 5`**（点击切换查看绝不跳序，仅新建或实际发送新消息后置顶；附无痕与 `全部 ▸` 归档管理弹窗）及 **`最近笔记 Top 5`**。取消问答/编辑模式切换，作曲框左下功能键（`@`、`🌐`）与消息底部动作栏采用纯图标按钮，模型与深度思考档位合并于单一无边框文本按钮；外部 Agent 继续经 CLI / MCP 共享底层业务工具，并清理未使用的 `CALL_REMOTE_AI` 遗留枚举。
+- **笔记与类型级 `AiAccessPolicy` 替代逐批外发弹窗**：在 `Note` 与 `TagDefinition` 引入系统级三态策略（`ALLOW` 默认可读 / `REFERENCE_ONLY` 自动发现隐藏，内置仅手动 `@` 可读、外部仅显式单篇 `allowedNoteIds` 白名单或 owner token 直接按 ID 调用可读 / `LOCKED` 对所有内置与外部 AI 工具入口硬性禁读禁改；沿自定义笔记类型及多父类型祖先链按最严格档位收敛），禁止任何工具篡改该策略。
+- **细粒度补丁与主舞台锚定双方位共享 Diff**：新增 `patch_note_blocks`（按 `BlockId` 局部块增删改）与 `update_note_metadata`（标题、单自定义笔记类型与属性更新）；全屏对话在**右侧**滑出共享 Diff 审阅面板，笔记编辑页在**左侧正文**展开原位逐块 Diff，100% 复用逐项采纳组件，经 `expectedRevision` 复核与 `TransactionCoordinator` 原子提交。
+- **Token 账单、上下文环形表与模型窗口 80% 自动压缩**：对标 DeepSeek Harness，在作曲框下方并列展示会话累计计费 Token / 前缀缓存命中率与 `14.dp` `ContextMeter` 上下文进度环；每个模型在 `WORKSPACE_CONFIG` 独立配置 `contextWindowTokens`（`16K ~ 1M`），活跃上下文达到窗口 **80%** 时自动折叠早期轮次与长工具输出为可展开的 `CompactionItem` 摘要节点，逐字保留近期 **16%** 对话、活跃 `@` 引用与未决修改提案。
+- **会话与配置分层加密同步**：在 `ManifestObjectKind` 同时落地 `AGENT_THREAD` 与 `WORKSPACE_CONFIG` 加密对象快照（接入 `EncryptionEnvelope` 双层 AEAD、主密钥轮换与细粒度三方合并）。会话在新建、回合完成、压缩、归档或重命名时落盘并参与盲同步；Provider 连接骨架与模型列表（含 `contextWindowTokens`）存入 `WORKSPACE_CONFIG` 默认同步，API Key 默认存本机安全存储或环境变量引用，并提供显式勾选将其纳入 `WORKSPACE_CONFIG` 双层加密信封（HKDF `WrappingKeyPurpose.SNAPSHOT` + 随机 DEK，兼容主密钥轮换）跨端同步的选项。
 
-**取舍**：直接复用工具比内置 Agent 绕行 MCP 简洁，但需补齐事件端口、能力检测、预算与循环状态。远程逐批确认保持新增结果边界，代价是检索过程中暂停待确认。首版不引入明文聊天库、任意命令执行、多 Agent 宿主或未验收 Gateway。
+**取舍**：用确定性的 `AiAccessPolicy` 取代逐批外发确认，显著提升多跳检索体验，代价是需要维护类型继承收敛与索引层分页前统一过滤；将侧栏收敛为稳定排序的「最近会话/最近笔记 Top 5」加「全部笔记」Database 页并采用双方位共享 Diff，消除了双层侧栏与跨页跳闪；`AGENT_THREAD` 参与同步增加了快照类别与按稳定消息/压缩节点 ID 合并规则，但换取了桌面与手机一致的长对话压缩续聊与归档体验，且全程不引入明文聊天库。
 
-**验证**：真实模型搜索读取未预选笔记、准确来源、API/模型配置与降级、流式取消、请求与许可一致、问答工具范围、批准后持久化及旧 revision 拒绝、锁定失效和 CLI/MCP 权限不回归。条件见 [Agent 设计方案](docs/agent-design.md)。
+**验证**：侧栏无冗余菜单且点击最近会话零跳序、`全部笔记` 根投影准确防删、全屏右 Diff 与编辑页左 Diff 实时互通、80% 自动压缩保留活跃引用与提案且不清零累计账单、`LOCKED` / `REFERENCE_ONLY` 在内置检索与 CLI / MCP 的严格隔离、跨端加密同步与主密钥轮换兼容、未勾选同步时零密钥入库、`patch_note_blocks` 保留稳定 `BlockId` 与结构化块、旧 `revision` 拒绝覆盖及锁定即时失效。完整条件见 [Agent 设计方案](docs/agent-design.md)。
 
 ---
 
