@@ -85,7 +85,7 @@ class NoteSnapshotTransactionService(
      * @param request 完整 Note 写入请求。
      * @return 尚未确认的密文和对象记录。
      */
-    private suspend fun prepare(unlocked: UnlockedWorkspaceManifest, request: NoteSnapshotTransactionRequest): PreparedNoteSnapshot {
+    internal suspend fun prepare(unlocked: UnlockedWorkspaceManifest, request: NoteSnapshotTransactionRequest): PreparedNoteSnapshot {
         cryptoProvider.initialize()
         val normalizedNote = NoteNormalizer.normalize(request.note)
         require(NoteValidator.validate(normalizedNote).isEmpty()) { "Note 结构校验失败" }

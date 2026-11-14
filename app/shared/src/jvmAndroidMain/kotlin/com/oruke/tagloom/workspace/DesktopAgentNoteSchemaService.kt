@@ -50,11 +50,13 @@ internal class DesktopAgentNoteSchemaService(
         for (propertyId in normalized.propertyValues.keys + previous?.propertyValues.orEmpty().keys) {
             val old = previous?.propertyValues?.get(propertyId)
             val replacement = normalized.propertyValues[propertyId]
+            val propDef = properties[propertyId]
             val readonly = inherited[propertyId]?.binding?.readonly == true ||
-                before[propertyId]?.binding?.readonly == true
+                before[propertyId]?.binding?.readonly == true ||
+                propDef?.type == PropertyTypes.FORMULA
             if (readonly && old != replacement) throw ExternalCallException("property_readonly")
             if (replacement != null && old != replacement && !PropertyValueValidator.accepts(replacement.value,
-                    properties[propertyId] ?: throw ExternalCallException("schema_invalid"))) {
+                    propDef ?: throw ExternalCallException("schema_invalid"))) {
                 throw ExternalCallException("property_value_invalid")
             }
         }

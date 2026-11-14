@@ -70,6 +70,8 @@ object AgentAuthorizationService {
         AgentToolName.CREATE_NOTE,
         AgentToolName.UPDATE_NOTE,
         AgentToolName.ADD_TAG_TO_NOTE,
+        AgentToolName.PATCH_NOTE_BLOCKS,
+        AgentToolName.UPDATE_NOTE_METADATA,
         -> AgentPermissionScope.WRITE_NOTES
 
         AgentToolName.DELETE_NOTE -> AgentPermissionScope.DELETE_NOTES
@@ -86,6 +88,8 @@ object AgentAuthorizationService {
         AgentToolName.CREATE_NOTE,
         AgentToolName.UPDATE_NOTE,
         AgentToolName.ADD_TAG_TO_NOTE,
+        AgentToolName.PATCH_NOTE_BLOCKS,
+        AgentToolName.UPDATE_NOTE_METADATA,
         -> AgentConfirmationLevel.SINGLE
 
         AgentToolName.DELETE_NOTE,

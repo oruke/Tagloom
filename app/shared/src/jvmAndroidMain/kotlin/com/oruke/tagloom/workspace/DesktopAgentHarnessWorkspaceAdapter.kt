@@ -5,6 +5,7 @@ import com.oruke.tagloom.core.agent.AgentPrincipal
 import com.oruke.tagloom.core.agent.AgentToolName
 import com.oruke.tagloom.core.ai.AgentContextRef
 import com.oruke.tagloom.core.ai.AgentHarnessWorkspacePort
+import com.oruke.tagloom.core.ai.AgentProposalToolOutcome
 import com.oruke.tagloom.core.ai.AgentRawSourceCandidate
 import com.oruke.tagloom.core.ai.AgentReadToolExecutionOutcome
 import com.oruke.tagloom.core.ai.AgentResolvedContextPayload
@@ -44,7 +45,10 @@ import kotlinx.serialization.json.put
 internal class DesktopAgentHarnessWorkspaceAdapter(
     private val session: DesktopWorkspaceSession,
 ) : AgentHarnessWorkspacePort {
+    /** 内置检索范围与 `@` 引用解析器。 */
     private val contextResolver = DesktopAgentHarnessContextResolver(session)
+    /** 细粒度写提案预演构建器。 */
+    private val proposalPreviewBuilder = DesktopAgentProposalPreviewBuilder(session, contextResolver)
 
     /**
      * 解析作曲框挂载的 `@` 引用并按单轮上下文预算裁剪。
@@ -55,6 +59,28 @@ internal class DesktopAgentHarnessWorkspaceAdapter(
     ): AgentResolvedContextPayload = session.sessionMutex.withLock {
         session.requireOpen()
         contextResolver.resolveLocked(refs, budget)
+    }
+
+    /**
+     * 在受控范围、`AiAccessPolicy` 与 Schema 门禁下预演内置写工具并生成待确认 Diff 提案。
+     */
+    override suspend fun prepareWriteProposal(
+        callId: String,
+        tool: AgentToolName,
+        argumentsJson: String,
+        assistantMessageId: String,
+        retrievalScope: AiRetrievalScope,
+        activeRefs: List<AgentContextRef>,
+    ): AgentProposalToolOutcome = session.sessionMutex.withLock {
+        session.requireOpen()
+        proposalPreviewBuilder.prepareWriteProposalLocked(
+            callId = callId,
+            tool = tool,
+            argumentsJson = argumentsJson,
+            assistantMessageId = assistantMessageId,
+            retrievalScope = retrievalScope,
+            activeRefs = activeRefs,
+        )
     }
 
     /**

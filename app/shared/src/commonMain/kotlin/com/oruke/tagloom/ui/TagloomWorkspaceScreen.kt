@@ -311,6 +311,7 @@ internal fun TagloomWorkspaceScreen(
                                 savedQueries = agentController.savedQueriesSnapshot,
                                 enabledModels = agentController.enabledModels,
                                 isCompactViewport = isCompact,
+                                isWideViewport = maxWidth >= 1120.dp,
                                 showMenuButton = showNavButton,
                                 onOpenMenu = onToggleNav,
                                 onOpenSettings = openAgentSettingsAction,
@@ -329,6 +330,18 @@ internal fun TagloomWorkspaceScreen(
                                 onToggleCompanion = if (agentController.available) agentController::toggleCompanionPane else null,
                                 companionActive = agentController.companionVisible,
                             )
+                        }
+                        document == null && agentController?.activeReviewProposal != null -> {
+                            androidx.compose.material3.Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = MaterialTheme.colorScheme.surface,
+                            ) {
+                                AgentSharedDiffDocumentView(
+                                    controller = agentController,
+                                    proposal = agentController.activeReviewProposal!!,
+                                    targetDocument = null,
+                                )
+                            }
                         }
                         document == null -> {
                             EmptyWorkspace(onCreate = createDocument, modifier = Modifier.fillMaxSize())

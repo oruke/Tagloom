@@ -1,10 +1,27 @@
 package com.oruke.tagloom.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import tagloom.app.shared.generated.resources.Res
+import tagloom.app.shared.generated.resources.agent_toggle_companion
+import tagloom.app.shared.generated.resources.editor_page_breadcrumb_note
+import tagloom.app.shared.generated.resources.editor_page_saved
+import tagloom.app.shared.generated.resources.editor_page_saving
+import tagloom.app.shared.generated.resources.editor_page_unsaved
+import tagloom.app.shared.generated.resources.ic_sparkle
 import com.oruke.tagloom.editor.search.NoteSearchState
 import com.oruke.tagloom.ui.search.LocalNoteSearch
 import com.oruke.tagloom.ui.search.NoteSearchOverlay
@@ -95,7 +112,9 @@ internal fun EditorPane(
     }
     val listState = rememberLazyListState()
     val links = LocalWorkspaceLinks.current
-    val agentHighlight = LocalWorkspaceAgentHarness.current?.highlightedCitation
+    val agentController = LocalWorkspaceAgentHarness.current
+    val activeDiffProposal = agentController?.activeReviewProposalForEditor(document.id)
+    val agentHighlight = agentController?.highlightedCitation
     LaunchedEffect(agentHighlight?.version, document.id) {
         val highlight = agentHighlight ?: return@LaunchedEffect
         if (highlight.noteId != document.id) return@LaunchedEffect
@@ -141,6 +160,72 @@ internal fun EditorPane(
             DocumentSelectionScope(state, listState, onCursorRequest = { cursorRequest = it }) {
                 val drag = LocalEditorBlockDrag.current
                 Surface(Modifier.fillMaxSize().testTag("editor-pane"), color = MaterialTheme.colorScheme.surface) {
+                    if (activeDiffProposal != null) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().testTag("editor-inplace-diff-container"),
+                        ) {
+                            CenteredEditorContent(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Text(
+                                        stringResource(Res.string.editor_page_breadcrumb_note),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text("/", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                                    val revSuffix = document.revision?.let {
+                                        " · ${formatShortRevision("${it.actorId.value}:${it.sequence}")}"
+                                    }.orEmpty()
+                                    Text(
+                                        text = when {
+                                            saving -> stringResource(Res.string.editor_page_saving)
+                                            document.dirty -> stringResource(Res.string.editor_page_unsaved)
+                                            else -> stringResource(Res.string.editor_page_saved)
+                                        } + revSuffix,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (document.dirty) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Spacer(Modifier.weight(1f))
+                                    NoteAiAccessPolicyControl(
+                                        state = state,
+                                        document = document,
+                                        onSaveRequest = onSaveRequest,
+                                    )
+                                    Surface(
+                                        color = if (agentController.companionVisible) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surface,
+                                        shape = MaterialTheme.shapes.small,
+                                    ) {
+                                        IconButton(
+                                            onClick = agentController::toggleCompanionPane,
+                                            modifier = Modifier.size(30.dp).testTag("editor-companion-toggle"),
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_sparkle),
+                                                contentDescription = stringResource(Res.string.agent_toggle_companion),
+                                                modifier = Modifier.size(16.dp),
+                                                tint = if (agentController.companionVisible) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            CenteredEditorContent(modifier = Modifier.weight(1f)) {
+                                AgentSharedDiffDocumentView(
+                                    controller = agentController,
+                                    proposal = activeDiffProposal,
+                                    targetDocument = document,
+                                    contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp),
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                    } else {
                     NoteSearchOverlay(search, onCloseSearch) { searchEntryModifier ->
                         Box(Modifier.fillMaxSize()) {
                             LazyColumn(
@@ -210,6 +295,7 @@ internal fun EditorPane(
                                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
                             )
                         }
+                    }
                     }
                 }
             }

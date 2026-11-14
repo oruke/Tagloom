@@ -16,6 +16,7 @@ import com.oruke.tagloom.core.ai.SourceLedger
 import com.oruke.tagloom.core.ai.WorkspaceConfig
 import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.platform.WorkspaceAgentHarnessGateway
+import com.oruke.tagloom.platform.WorkspaceAgentProposalCommitOutcome
 import com.oruke.tagloom.platform.WorkspaceAgentThreadEntry
 import com.oruke.tagloom.platform.WorkspaceAgentTurnResult
 import com.oruke.tagloom.sync.ai.KtorAiStreamPort
@@ -289,6 +290,56 @@ internal class DesktopAgentHarnessGateway(
                 }
             }
         }
+
+    /**
+     * 切换待审阅提案中单个细粒度变更项的「采纳 / 跳过」状态。
+     */
+    override suspend fun updateProposalItemAccepted(
+        threadId: ObjectId,
+        proposalId: String,
+        itemId: String,
+        accepted: Boolean,
+    ): WorkspaceAgentThreadEntry = withContext(Dispatchers.IO) {
+        val session = ensureSessionBound()
+        DesktopAgentProposalService(session, incognitoThreads, onThreadCommitted)
+            .updateItemAccepted(threadId, proposalId, itemId, accepted)
+    }
+
+    /**
+     * 放弃指定待确认修改提案。
+     */
+    override suspend fun discardProposal(
+        threadId: ObjectId,
+        proposalId: String,
+    ): WorkspaceAgentThreadEntry = withContext(Dispatchers.IO) {
+        val session = ensureSessionBound()
+        DesktopAgentProposalService(session, incognitoThreads, onThreadCommitted)
+            .discardProposal(threadId, proposalId)
+    }
+
+    /**
+     * 基于目标笔记最新已确认快照重算过期提案的 `expectedRevision` 与旧值预览。
+     */
+    override suspend fun recalculateProposal(
+        threadId: ObjectId,
+        proposalId: String,
+    ): WorkspaceAgentThreadEntry = withContext(Dispatchers.IO) {
+        val session = ensureSessionBound()
+        DesktopAgentProposalService(session, incognitoThreads, onThreadCommitted)
+            .recalculateProposal(threadId, proposalId)
+    }
+
+    /**
+     * 在单次 `TransactionCoordinator` 原子确认点中同时提交所选笔记修改与会话提案 `APPLIED` 状态。
+     */
+    override suspend fun applyProposal(
+        threadId: ObjectId,
+        proposalId: String,
+    ): WorkspaceAgentProposalCommitOutcome = withContext(Dispatchers.IO) {
+        val session = ensureSessionBound()
+        DesktopAgentProposalService(session, incognitoThreads, onThreadCommitted)
+            .applyProposal(threadId, proposalId)
+    }
 
     /**
      * 在工作区锁定或主密钥轮换关闭会话时立即中断在途 HTTP/SSE 流，并清空全部无痕会话内存。

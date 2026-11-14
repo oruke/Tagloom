@@ -218,6 +218,15 @@ internal fun AgentCompanionPane(
                     onJumpToCitation = { src -> controller.jumpToCitation(src, isCompactViewport) },
                     onAppendToNote = { md -> controller.appendMessageToCurrentNote(md, onSaveEditorChanges) },
                     onSaveAsNewNote = { md, title -> controller.saveMessageAsNewNote(md, title, onSaveEditorChanges) },
+                    proposalSlot = { msgId, streaming, onNotice ->
+                        AgentProposalCardList(
+                            controller = controller,
+                            messageId = msgId,
+                            isStreaming = streaming,
+                            inFullScreenHub = false,
+                            onNotice = onNotice,
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                 )
 

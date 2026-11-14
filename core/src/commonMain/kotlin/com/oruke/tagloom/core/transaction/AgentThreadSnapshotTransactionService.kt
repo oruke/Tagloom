@@ -49,6 +49,37 @@ class AgentThreadSnapshotTransactionService(
         unlocked: UnlockedWorkspaceManifest,
         request: AgentThreadSnapshotTransactionRequest,
     ): AgentThreadSnapshotTransactionResult {
+        val prepared = prepare(unlocked, request)
+        val encryptedManifest = manifestService.confirmTransaction(
+            unlocked = unlocked,
+            transactionId = request.transactionId,
+            upserts = prepared.records,
+            removedPaths = emptySet(),
+        )
+        val commit = transactionCoordinator.commit(
+            EncryptedTransactionPlan(
+                transactionId = request.transactionId,
+                baseManifestRevision = unlocked.payload.revision,
+                targetManifestRevision = unlocked.payload.revision + 1L,
+                artifacts = prepared.artifacts,
+                encryptedManifest = encryptedManifest,
+                manifestSha256 = sha256(encryptedManifest),
+            ),
+        )
+        return AgentThreadSnapshotTransactionResult(prepared.snapshot, prepared.change, encryptedManifest, commit)
+    }
+
+    /**
+     * 校验并加密一个 `AgentThread` 快照与对应 `ObjectChange`，不发布文件，供单会话确认与跨对象原子提案确认共同使用。
+     *
+     * @param unlocked 当前已认证工作区 manifest 与主密钥。
+     * @param request 完整写入上下文与目标会话。
+     * @return 尚未确认的密文材料与 manifest 记录。
+     */
+    internal suspend fun prepare(
+        unlocked: UnlockedWorkspaceManifest,
+        request: AgentThreadSnapshotTransactionRequest,
+    ): PreparedAgentThreadSnapshot {
         require(request.thread.id == request.objectId) { "AgentThread payload ID 与请求对象 ID 不一致" }
         if (!request.deleted) {
             val violations = AgentThreadValidator.validate(request.thread)
@@ -134,43 +165,29 @@ class AgentThreadSnapshotTransactionService(
         )
         val snapshotDigest = sha256(snapshotBytes)
         val changeDigest = sha256(changeBytes)
-        val encryptedManifest = manifestService.confirmTransaction(
-            unlocked = unlocked,
-            transactionId = request.transactionId,
-            upserts = listOf(
-                ManifestObjectRecord(
-                    kind = ManifestObjectKind.AGENT_THREAD,
-                    objectId = request.objectId.value,
-                    revision = revisionText,
-                    path = snapshotPath,
-                    encryptedSha256 = snapshotDigest,
-                    keyId = unlocked.file.publicHeader.activeKeyId,
-                ),
-                ManifestObjectRecord(
-                    kind = ManifestObjectKind.CHANGE,
-                    objectId = change.changeId.value,
-                    revision = revisionText,
-                    path = changePath,
-                    encryptedSha256 = changeDigest,
-                    keyId = unlocked.file.publicHeader.activeKeyId,
-                ),
+        val records = listOf(
+            ManifestObjectRecord(
+                kind = ManifestObjectKind.AGENT_THREAD,
+                objectId = request.objectId.value,
+                revision = revisionText,
+                path = snapshotPath,
+                encryptedSha256 = snapshotDigest,
+                keyId = unlocked.file.publicHeader.activeKeyId,
             ),
-            removedPaths = emptySet(),
-        )
-        val commit = transactionCoordinator.commit(
-            EncryptedTransactionPlan(
-                transactionId = request.transactionId,
-                baseManifestRevision = unlocked.payload.revision,
-                targetManifestRevision = unlocked.payload.revision + 1L,
-                artifacts = listOf(
-                    EncryptedTransactionArtifact(snapshotPath, snapshotBytes, snapshotDigest),
-                    EncryptedTransactionArtifact(changePath, changeBytes, changeDigest),
-                ),
-                encryptedManifest = encryptedManifest,
-                manifestSha256 = sha256(encryptedManifest),
+            ManifestObjectRecord(
+                kind = ManifestObjectKind.CHANGE,
+                objectId = change.changeId.value,
+                revision = revisionText,
+                path = changePath,
+                encryptedSha256 = changeDigest,
+                keyId = unlocked.file.publicHeader.activeKeyId,
             ),
         )
-        return AgentThreadSnapshotTransactionResult(snapshot, change, encryptedManifest, commit)
+        val artifacts = listOf(
+            EncryptedTransactionArtifact(snapshotPath, snapshotBytes, snapshotDigest),
+            EncryptedTransactionArtifact(changePath, changeBytes, changeDigest),
+        )
+        return PreparedAgentThreadSnapshot(snapshot, change, records, artifacts)
     }
 
     /**

@@ -19,7 +19,7 @@ class LocalAutomationEntryIntegrationTest {
         val fixture = AutomationTestWorkspace.create()
         try {
             val discovery = fixture.owner.tools()
-            assertEquals(19, discovery.tools.size)
+            assertEquals(21, discovery.tools.size)
             val create = LocalCallInput("create_note", buildJsonObject {
                 put("title", "Entry sample"); put("markdown", "1. first sample\n2. second sample\n\n```kotlin\nval sample = 1\n```")
             }, "request-create-entry")

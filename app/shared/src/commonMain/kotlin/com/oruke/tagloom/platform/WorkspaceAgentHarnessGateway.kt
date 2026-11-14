@@ -38,6 +38,16 @@ data class WorkspaceAgentTurnResult(
 )
 
 /**
+ * 描述用户确认采纳修改提案并经单次原子事务提交后的目标笔记与会话更新结果。
+ */
+data class WorkspaceAgentProposalCommitOutcome(
+    /** 已标记该提案为 `APPLIED` 并完成确认的最新会话条目。 */
+    val entry: WorkspaceAgentThreadEntry,
+    /** 同一事务中新建或更新确认的权威笔记快照视图。 */
+    val committedNote: WorkspaceNote,
+)
+
+/**
  * 抽象共享双形态 Agent UI（全屏工作台与右侧伴随栏）所需的会话管理与流式推理网关。
  *
  * 实现必须保证：
@@ -140,4 +150,56 @@ interface WorkspaceAgentHarnessGateway {
      * @return `sourceIndex -> AgentCitationStatus` 映射表。
      */
     suspend fun evaluateCitations(entries: List<AgentSourceEntry>): Map<Int, AgentCitationStatus>
+
+    /**
+     * 切换待审阅提案中单个细粒度变更项的「采纳 / 跳过」勾选状态（不修改 `lastMessageAt`）。
+     *
+     * @param threadId 所属会话 ID。
+     * @param proposalId 目标提案 ID。
+     * @param itemId 目标变更项 ID。
+     * @param accepted 为真表示采纳，为假表示跳过。
+     * @return 更新后的会话条目。
+     */
+    suspend fun updateProposalItemAccepted(
+        threadId: ObjectId,
+        proposalId: String,
+        itemId: String,
+        accepted: Boolean,
+    ): WorkspaceAgentThreadEntry
+
+    /**
+     * 放弃指定待确认修改提案（标记为 `DISCARDED`，不改动目标笔记与 `lastMessageAt`）。
+     *
+     * @param threadId 所属会话 ID。
+     * @param proposalId 目标提案 ID。
+     * @return 更新后的会话条目。
+     */
+    suspend fun discardProposal(
+        threadId: ObjectId,
+        proposalId: String,
+    ): WorkspaceAgentThreadEntry
+
+    /**
+     * 当目标笔记在提案冻结后发生手动编辑导致 `expectedRevision` 过期时，基于最新已确认快照重新校验并刷新提案基准。
+     *
+     * @param threadId 所属会话 ID。
+     * @param proposalId 目标提案 ID。
+     * @return 刷新 `expectedRevision` 与旧值预览后的会话条目。
+     */
+    suspend fun recalculateProposal(
+        threadId: ObjectId,
+        proposalId: String,
+    ): WorkspaceAgentThreadEntry
+
+    /**
+     * 将提案中所有勾选采纳的变更项与会话提案 `APPLIED` 状态在单次 `TransactionCoordinator` 原子事务中一并落盘确认。
+     *
+     * @param threadId 所属会话 ID。
+     * @param proposalId 目标提案 ID。
+     * @return 新确认的权威笔记与会话条目。
+     */
+    suspend fun applyProposal(
+        threadId: ObjectId,
+        proposalId: String,
+    ): WorkspaceAgentProposalCommitOutcome
 }

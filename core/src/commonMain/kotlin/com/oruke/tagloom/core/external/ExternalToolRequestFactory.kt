@@ -25,6 +25,26 @@ object ExternalToolRequestFactory {
             ExternalToolArguments.string(arguments, key)?.let(ExternalToolArguments::opaque)
         }
         ExternalToolArguments.strings(arguments, "tagIds", 10).forEach(ExternalToolArguments::opaque)
+        arguments["customTagId"]?.let { element ->
+            if (element != JsonNull) {
+                val primitive = element as? JsonPrimitive ?: throw ExternalCallException("invalid_arguments")
+                if (!primitive.isString) throw ExternalCallException("invalid_arguments")
+                if (primitive.content.isNotEmpty()) ExternalToolArguments.opaque(primitive.content)
+            }
+        }
+        arguments["propertyUpdates"]?.let { element ->
+            val updates = element as? JsonObject ?: throw ExternalCallException("invalid_arguments")
+            if (updates.size > 100) throw ExternalCallException("invalid_arguments")
+            updates.keys.forEach(ExternalToolArguments::opaque)
+        }
+        arguments["operations"]?.let { element ->
+            val ops = element as? JsonArray ?: throw ExternalCallException("invalid_arguments")
+            if (ops.isEmpty() || ops.size > 50) throw ExternalCallException("invalid_arguments")
+            ops.forEach { item ->
+                val obj = item as? JsonObject ?: throw ExternalCallException("invalid_arguments")
+                ExternalToolArguments.string(obj, "blockId")?.let(ExternalToolArguments::opaque)
+            }
+        }
         val paginated = tool in setOf(
             AgentToolName.SEARCH_NOTES, AgentToolName.QUERY_NOTES, AgentToolName.LIST_NOTES,
             AgentToolName.GET_TAGS, AgentToolName.GET_BACKLINKS, AgentToolName.GET_SAVED_QUERIES,

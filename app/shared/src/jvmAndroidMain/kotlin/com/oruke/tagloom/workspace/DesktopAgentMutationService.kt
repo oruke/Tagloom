@@ -1,6 +1,8 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.agent.*
+import com.oruke.tagloom.core.ai.NoteFineGrainedPatchService
+import com.oruke.tagloom.core.ai.ParsedMetadataPatch
 import com.oruke.tagloom.core.domain.property.*
 import com.oruke.tagloom.core.domain.tag.*
 import com.oruke.tagloom.core.external.*
@@ -33,10 +35,43 @@ internal class DesktopAgentMutationService(
         val revision = if (previous == null) null else expected(args, previous)
         val note = when (request.tool) {
             AgentToolName.CREATE_NOTE -> {
-                val title = ExternalToolArguments.string(args, "title", true)!!
+                val title = ExternalToolArguments.string(args, "title", true)!!.trim()
+                if (title.isEmpty()) throw ExternalCallException("invalid_arguments")
                 val tagIds = (listOf(WorkspaceDefaults.DEFAULT_NOTE_TAG_ID) + ExternalToolArguments.strings(args, "tagIds", 10).map(::TagId)).distinct()
                 val imported = importMarkdown(ExternalToolArguments.string(args, "markdown").orEmpty(), title)
-                imported.copy(title = title, directTagIds = tagIds, aiAccessPolicy = null)
+                val baseCreated = imported.copy(title = title, directTagIds = tagIds, aiAccessPolicy = null)
+                val propUpdatesObj = args["propertyUpdates"] as? JsonObject
+                if (propUpdatesObj.isNullOrEmpty()) {
+                    baseCreated
+                } else {
+                    NoteFineGrainedPatchService.applyMetadataPatch(
+                        note = baseCreated,
+                        patch = ParsedMetadataPatch(
+                            propertyUpdates = propUpdatesObj.entries.associate { (k, v) -> PropertyId(ExternalToolArguments.opaque(k)) to v },
+                        ),
+                        updatedAt = session.timestampProvider(),
+                    )
+                }
+            }
+            AgentToolName.PATCH_NOTE_BLOCKS -> {
+                val current = requireNotNull(previous).snapshot.payload
+                val ops = NoteFineGrainedPatchService.parseBlockOperations(args)
+                NoteFineGrainedPatchService.applyBlockOperations(
+                    note = current,
+                    operations = ops,
+                    importedAt = session.timestampProvider(),
+                    blockIdFactory = { BlockId(session.idFactory()) },
+                    tableIdFactory = session.idFactory,
+                )
+            }
+            AgentToolName.UPDATE_NOTE_METADATA -> {
+                val current = requireNotNull(previous).snapshot.payload
+                val patch = NoteFineGrainedPatchService.parseMetadataPatch(args)
+                NoteFineGrainedPatchService.applyMetadataPatch(
+                    note = current,
+                    patch = patch,
+                    updatedAt = session.timestampProvider(),
+                )
             }
             AgentToolName.UPDATE_NOTE -> {
                 val current = requireNotNull(previous).snapshot.payload

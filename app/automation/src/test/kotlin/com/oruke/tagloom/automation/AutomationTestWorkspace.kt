@@ -174,9 +174,11 @@ internal class AutomationTestProcess(
 ) : AutoCloseable {
     /** 安装分发物提供的实际 CLI 进程。 */
     private val process = ProcessBuilder(buildList {
-        add(Path.of(System.getProperty("java.home"), "bin", if (System.getProperty("os.name").startsWith("Windows")) "java.exe" else "java").toString())
+        val isWindows = System.getProperty("os.name").startsWith("Windows")
+        add(Path.of(System.getProperty("java.home"), "bin", if (isWindows) "java.exe" else "java").toString())
         add("-cp"); add(Path.of(System.getProperty("tagloom.cli.home"), "lib").toString() + java.io.File.separator + "*")
-        add("com.oruke.tagloom.automation.MainKt"); addAll(arguments)
+        add("com.oruke.tagloom.automation.MainKt")
+        addAll(if (isWindows) arguments.map { it.replace("\"", "\\\"") } else arguments.toList())
     }).apply { environment()["TAGLOOM_API_URL"] = fixture.url; environment()["TAGLOOM_API_TOKEN"] = token }.start()
     /** 标准输入，MCP 只写 JSON-RPC；CLI 审批写人工确认文本。 */
     private val input = process.outputStream.bufferedWriter(Charsets.UTF_8)

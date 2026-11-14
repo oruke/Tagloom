@@ -109,8 +109,10 @@ Configure TAGLOOM_API_URL and TAGLOOM_API_TOKEN, then unlock the desktop workspa
   tools | list | search <text> | get <noteId> | block <noteId> <blockId>
   query --tag <typeId> --where '<propertyId> = <JSON value>'
   tags | tag-schema <typeId> | schema | queries | saved-query <queryId> | run-query <queryId>
-  create --title <title> --content <markdown> [--tag <typeId>]
+  create --title <title> --content <markdown> [--tag <typeId>] [--set-properties <json-object>]
   update <noteId> --revision <revision> --title <title> [--content <markdown>]
+  patch-blocks <noteId> --revision <revision> --ops <json-array>
+  update-metadata <noteId> --revision <revision> [--title <title>] [--customTagId <typeId|null>] [--set-properties <json-object>]
   add-tag <noteId> --revision <revision> --tagId <typeId>
   export <noteId> --revision <revision> [--mode extended]
   delete <noteId> --revision <revision>

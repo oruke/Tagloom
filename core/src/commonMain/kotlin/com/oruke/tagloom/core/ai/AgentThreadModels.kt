@@ -197,6 +197,8 @@ data class AgentThread(
     val activeContextRefs: List<AgentContextRef> = emptyList(),
     /** 按时间与因果顺序排列的完整历史消息列表（自动压缩后仍无损保留）。 */
     val messages: List<AgentThreadMessage> = emptyList(),
+    /** 会话中由内置写工具生成的待审阅、已应用或已放弃细粒度修改提案列表。 */
+    val proposals: List<AgentMutationProposal> = emptyList(),
     /** 历次自动或手动上下文压缩生成的摘要节点列表。 */
     val compactions: List<AgentCompactionItem> = emptyList(),
     /** 当前生效的最新压缩节点 ID；为空表示尚未执行过压缩。 */

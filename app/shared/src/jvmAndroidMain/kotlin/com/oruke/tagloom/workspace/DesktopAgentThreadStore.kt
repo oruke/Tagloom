@@ -32,9 +32,9 @@ import java.nio.file.LinkOption
  */
 class DesktopAgentThreadStore(
     private val paths: JvmWorkspacePaths,
-    private val cryptoProvider: CryptoProvider,
+    internal val cryptoProvider: CryptoProvider,
     private val envelopeService: AgentThreadSnapshotEnvelopeService,
-    private val transactionService: AgentThreadSnapshotTransactionService,
+    internal val transactionService: AgentThreadSnapshotTransactionService,
 ) {
     /**
      * 读取并认证当前工作区的全部持久化 `AgentThread` 快照，按稳定活动顺序排列。

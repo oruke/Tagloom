@@ -80,6 +80,12 @@ enum class AgentToolName {
     /** 给 Note 添加 Tag。 */
     ADD_TAG_TO_NOTE,
 
+    /** 按稳定 BlockId 局部增删改 Note 段落，保留其余未改动 Block 稳定 ID。 */
+    PATCH_NOTE_BLOCKS,
+
+    /** 更新 Note 标题、单自定义笔记类型与结构化属性值。 */
+    UPDATE_NOTE_METADATA,
+
     /** 删除 Note 或 Block。 */
     DELETE_NOTE,
 

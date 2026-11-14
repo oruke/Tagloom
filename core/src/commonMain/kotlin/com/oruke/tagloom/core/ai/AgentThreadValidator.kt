@@ -78,6 +78,36 @@ object AgentThreadValidator {
         if (thread.activeCompactionId != null && thread.activeCompactionId !in compactionIds) {
             issues += "missing_active_compaction"
         }
+        val proposalIds = linkedSetOf<String>()
+        thread.proposals.forEach { proposal ->
+            if (!OPAQUE_ID_REGEX.matches(proposal.id)) {
+                issues += "invalid_proposal_id"
+            }
+            if (!proposalIds.add(proposal.id)) {
+                issues += "duplicate_proposal_id"
+            }
+            if (proposal.messageId !in messageIds) {
+                issues += "dangling_proposal_message"
+            }
+            if (proposal.noteTitle.isBlank() || proposal.createdAt.isBlank() || proposal.updatedAt.isBlank()) {
+                issues += "invalid_proposal_metadata"
+            }
+            if (proposal.kind != AgentProposalKind.CREATE_NOTE && proposal.expectedRevision.isNullOrBlank()) {
+                issues += "missing_proposal_target_revision"
+            }
+            if (proposal.items.isEmpty()) {
+                issues += "empty_proposal_items"
+            }
+            val itemIds = linkedSetOf<String>()
+            proposal.items.forEach { item ->
+                if (!OPAQUE_ID_REGEX.matches(item.id) || item.label.isBlank()) {
+                    issues += "invalid_proposal_item"
+                }
+                if (!itemIds.add(item.id)) {
+                    issues += "duplicate_proposal_item_id"
+                }
+            }
+        }
         if (thread.latestContextBreakdown.systemTokens < 0 ||
             thread.latestContextBreakdown.toolsTokens < 0 ||
             thread.latestContextBreakdown.messageTokens < 0

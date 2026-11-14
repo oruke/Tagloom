@@ -52,9 +52,21 @@ data class AgentReadToolExecutionOutcome(
 )
 
 /**
- * 抽象内置 [AgentHarness] 对当前已解锁工作区会话的只读检索与上下文解析端口。
+ * 描述一次进程内写提案工具预演的返回载荷、待确认修改提案与轨迹摘要（绝不直接写盘）。
+ */
+data class AgentProposalToolOutcome(
+    /** 回传给模型的结构化 JSON 文本（如 `status: pending_confirmation` 或门禁拒绝原因）。 */
+    val resultJson: String,
+    /** 预演校验通过时生成的待确认细粒度修改提案；校验拒绝时为空。 */
+    val proposal: AgentMutationProposal? = null,
+    /** 面向界面可折叠轨迹条的摘要记录。 */
+    val trace: AgentToolTrace,
+)
+
+/**
+ * 抽象内置 [AgentHarness] 对当前已解锁工作区会话的只读检索与写提案预演端口。
  *
- * 实现必须在同一客户端进程内直接复用应用服务，并在分页前强制执行 `AiAccessPolicy` 过滤。
+ * 实现必须在同一客户端进程内直接复用应用服务，并在分页或预演前强制执行 `AiAccessPolicy` 过滤。
  */
 interface AgentHarnessWorkspacePort {
     /**
@@ -88,12 +100,42 @@ interface AgentHarnessWorkspacePort {
         activeRefs: List<AgentContextRef>,
         maxResultCharacters: Int,
     ): AgentReadToolExecutionOutcome
+
+    /**
+     * 在受控检索范围、`AiAccessPolicy` 与 Schema 校验门禁下预演写工具并生成待确认 Diff 提案。
+     *
+     * @param callId 模型工具调用 ID。
+     * @param tool 待预演的写提案工具枚举（`create_note` / `patch_note_blocks` / `update_note_metadata`）。
+     * @param assistantMessageId 当前正在生成的助手消息 ID。
+     * @param argumentsJson 模型传入的原始参数 JSON 文本。
+     * @param retrievalScope 当前会话激活的检索暴露范围。
+     * @param activeRefs 当前轮次有效的 `@` 上下文引用。
+     * @return 工具 JSON 响应、待审阅提案与轨迹记录。
+     */
+    suspend fun prepareWriteProposal(
+        callId: String,
+        tool: AgentToolName,
+        argumentsJson: String,
+        assistantMessageId: String,
+        retrievalScope: AiRetrievalScope,
+        activeRefs: List<AgentContextRef>,
+    ): AgentProposalToolOutcome = AgentProposalToolOutcome(
+        resultJson = """{"error":"proposal_not_supported"}""",
+        proposal = null,
+        trace = AgentToolTrace(
+            callId = callId,
+            toolName = tool.name.lowercase(),
+            summary = "当前端口未启用写提案预演",
+            succeeded = false,
+        ),
+    )
 }
 
 /**
- * 维护内置 Agent Harness 共享自 [ExternalToolDefinitions] 的 14 个只读知识工具目录。
+ * 维护内置 Agent Harness 共享自 [ExternalToolDefinitions] 的 14 个只读知识工具与 3 个细粒度修改提案工具目录。
  *
- * 首版阶段二严格收敛于查询与读取工具，不暴露 `delete_note` 与文件导出 `export_note`。
+ * 严格遵循 `docs/agent-design.md §3.1`：内置模型绝不暴露 `delete_note` 与文件导出 `export_note`，
+ * 所有写工具仅生成 `PENDING` 待确认 Diff 提案，必须由用户点击确认后方能落盘。
  */
 object AgentReadToolCatalog {
     /** 允许向内置模型暴露的 14 个只读知识工具枚举集合。 */
@@ -114,9 +156,47 @@ object AgentReadToolCatalog {
         AgentToolName.SUGGEST_PROPERTIES,
     )
 
-    /** 转换为流式 Provider 适配器可直接消费的标准 JSON Schema 工具定义列表。 */
-    val definitions: List<AiToolDefinition> = ExternalToolDefinitions.all
-        .filter { definition -> definition.tool in allowedReadTools }
+    /** 允许向内置模型暴露的 3 个受控写提案工具枚举集合（绝不包含 `DELETE_NOTE` 与 `EXPORT_NOTE`）。 */
+    val allowedProposalTools: Set<AgentToolName> = setOf(
+        AgentToolName.CREATE_NOTE,
+        AgentToolName.PATCH_NOTE_BLOCKS,
+        AgentToolName.UPDATE_NOTE_METADATA,
+    )
+
+    /** 仅包含 14 个只读知识工具的标准 JSON Schema 定义列表。 */
+    val definitions: List<AiToolDefinition> = toToolDefinitions(allowedReadTools)
+
+    /** 包含 14 个只读知识工具与 3 个待确认写提案工具的完整标准 JSON Schema 定义列表。 */
+    val allDefinitions: List<AiToolDefinition> = toToolDefinitions(allowedReadTools + allowedProposalTools)
+
+    /**
+     * 按工具函数名查找允许内置 Harness 执行的只读工具枚举。
+     *
+     * @param name 模型返回的工具函数名。
+     * @return 匹配到的只读工具枚举；未知或非只读工具返回 `null`。
+     */
+    fun resolveReadTool(name: String): AgentToolName? = ExternalToolDefinitions.all
+        .firstOrNull { definition -> definition.name == name && definition.tool in allowedReadTools }
+        ?.tool
+
+    /**
+     * 按工具函数名查找允许内置 Harness 预演的写提案工具枚举。
+     *
+     * @param name 模型返回的工具函数名。
+     * @return 匹配到的写提案工具枚举；未知或禁止暴露的工具（如 `delete_note`）返回 `null`。
+     */
+    fun resolveProposalTool(name: String): AgentToolName? = ExternalToolDefinitions.all
+        .firstOrNull { definition -> definition.name == name && definition.tool in allowedProposalTools }
+        ?.tool
+
+    /**
+     * 将指定工具集合转换为流式 Provider 适配器可直接消费的标准 JSON Schema 工具定义。
+     *
+     * @param allowed 允许包含的工具枚举集合。
+     * @return 转换后的 [AiToolDefinition] 列表。
+     */
+    private fun toToolDefinitions(allowed: Set<AgentToolName>): List<AiToolDefinition> = ExternalToolDefinitions.all
+        .filter { definition -> definition.tool in allowed }
         .map { definition ->
             AiToolDefinition(
                 name = definition.name,
@@ -131,16 +211,6 @@ object AgentReadToolCatalog {
                 },
             )
         }
-
-    /**
-     * 按工具函数名查找允许内置 Harness 执行的只读工具枚举。
-     *
-     * @param name 模型返回的工具函数名。
-     * @return 匹配到的只读工具枚举；未知或非只读工具返回 `null`。
-     */
-    fun resolveReadTool(name: String): AgentToolName? = ExternalToolDefinitions.all
-        .firstOrNull { definition -> definition.name == name && definition.tool in allowedReadTools }
-        ?.tool
 
     /**
      * 将连续多次只读工具调用折叠为面向界面的单行摘要标题。

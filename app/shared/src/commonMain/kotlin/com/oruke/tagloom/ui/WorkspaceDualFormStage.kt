@@ -74,10 +74,15 @@ internal fun WorkspaceDualFormStage(
         agentController.companionVisible &&
         !agentController.fullScreenAgentActive &&
         !inOverlaySubpage
+    val hubDiffSplitActive = agentController?.available == true &&
+        agentController.fullScreenAgentActive &&
+        agentController.activeReviewProposal != null &&
+        !inOverlaySubpage
+    val anyRightSplitActive = companionSplitActive || hubDiffSplitActive
 
     val showPersistentSidebar = isWide ||
-        (isMedium && (!companionSplitActive || agentController.mediumSidebarExpandedOverride))
-    val showMediumSidebarToggle = isMedium && companionSplitActive
+        (isMedium && (!anyRightSplitActive || agentController.mediumSidebarExpandedOverride))
+    val showMediumSidebarToggle = isMedium && anyRightSplitActive
 
     Box(navigationModifier) {
         Row(Modifier.fillMaxSize()) {

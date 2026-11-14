@@ -108,4 +108,42 @@
     <string name="agent_citation_updated">Updated since chat</string>
     <string name="agent_citation_removed">Target removed</string>
     <string name="agent_citation_open_note">Open in note</string>
+
+    <string name="agent_proposal_card_patch_title">Edit proposal · “%1$s”</string>
+    <string name="agent_proposal_card_create_title">New note proposal · “%1$s”</string>
+    <string name="agent_proposal_summary_both">Fine-grained changes: %1$d metadata updates, %2$d block patches (untouched BlockIds preserved)</string>
+    <string name="agent_proposal_summary_meta_only">Fine-grained changes: %1$d metadata updates (all body BlockIds preserved)</string>
+    <string name="agent_proposal_summary_blocks_only">Fine-grained changes: %1$d block patches (untouched BlockIds preserved)</string>
+    <string name="agent_proposal_summary_create">Includes initial metadata and draft body (%1$d items to review before creating)</string>
+    <string name="agent_proposal_summary_applied">Applied %1$s fine-grained changes atomically</string>
+    <string name="agent_proposal_status_base_ok">Base %1$s verified</string>
+    <string name="agent_proposal_status_new_draft">Pending creation</string>
+    <string name="agent_proposal_status_stale">Base changed (was %1$s)</string>
+    <string name="agent_proposal_status_dirty">Unsaved editor changes</string>
+    <string name="agent_proposal_status_missing">Target note missing</string>
+    <string name="agent_proposal_status_applied">Applied · %1$s</string>
+    <string name="agent_proposal_status_discarded">Discarded</string>
+    <string name="agent_proposal_review_right">Review Diff on right</string>
+    <string name="agent_proposal_review_left">Review in note on left</string>
+    <string name="agent_proposal_reviewing_active">Reviewing Diff</string>
+    <string name="agent_proposal_action_discard">Discard</string>
+    <string name="agent_proposal_action_recalc">Recalculate on latest note</string>
+    <string name="agent_proposal_action_copy_text">Copy suggested text</string>
+    <string name="agent_proposal_copied_toast">Copied suggested text</string>
+
+    <string name="agent_diff_banner_title">In-place Diff review · %1$d / %2$d changes selected</string>
+    <string name="agent_diff_banner_subtitle">Accept or skip each item; confirmed changes commit atomically in a single TransactionCoordinator transaction.</string>
+    <string name="agent_diff_apply_selected">Apply selected (%1$d)</string>
+    <string name="agent_diff_exit_review">Exit review</string>
+    <string name="agent_diff_item_accept">Accept</string>
+    <string name="agent_diff_item_skip">Skip</string>
+    <string name="agent_diff_open_in_note_page">Open in note page</string>
+    <string name="agent_diff_back_to_chat">← Back to chat</string>
+    <string name="agent_diff_untouched_caption">Untouched · Preserved</string>
+    <string name="agent_diff_empty_old_value">(Empty)</string>
+    <string name="agent_diff_removed_new_value">(Cleared / Tombstoned)</string>
+    <string name="agent_diff_conflict_stale">Target note revision changed to %1$s (proposal froze %2$s). Direct overwrite blocked — recalculate or copy suggested text.</string>
+    <string name="agent_diff_conflict_dirty">Target note has unsaved edits in the editor. Save first or recalculate against the latest note.</string>
+    <string name="agent_diff_conflict_missing">Target note was deleted or is inaccessible. Copy the suggested text instead.</string>
+    <string name="agent_diff_error_apply_failed">Failed to apply proposal. Recalculate against the latest note and retry.</string>
 </resources>

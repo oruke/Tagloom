@@ -46,7 +46,8 @@ object CliCommandParser {
         val positional = arguments.take(optionsStart)
         val positionalNames = when (tool) {
             AgentToolName.GET_NOTE, AgentToolName.GET_BACKLINKS, AgentToolName.UPDATE_NOTE,
-            AgentToolName.ADD_TAG_TO_NOTE, AgentToolName.DELETE_NOTE, AgentToolName.EXPORT_NOTE,
+            AgentToolName.ADD_TAG_TO_NOTE, AgentToolName.PATCH_NOTE_BLOCKS, AgentToolName.UPDATE_NOTE_METADATA,
+            AgentToolName.DELETE_NOTE, AgentToolName.EXPORT_NOTE,
             AgentToolName.SUGGEST_PROPERTIES -> listOf("noteId")
             AgentToolName.GET_BLOCK -> listOf("noteId", "blockId")
             AgentToolName.GET_TAG_SCHEMA -> listOf("tagId")
@@ -69,6 +70,8 @@ object CliCommandParser {
                 "revision" -> "expectedRevision"
                 "tag" -> "tagIds"
                 "where" -> "properties"
+                "ops" -> "operations"
+                "set-properties" -> "propertyUpdates"
                 else -> pair[0].removePrefix("--")
             }
             if (name !in ExternalToolDefinitions.definition(tool).properties) throw CliCommandException("unknown_option")
@@ -76,7 +79,9 @@ object CliCommandParser {
             result[name] = when (name) {
                 "limit", "offset" -> JsonPrimitive(pair[1].toIntOrNull() ?: throw CliCommandException("invalid_arguments"))
                 "tagIds" -> JsonArray((result[name] as? JsonArray).orEmpty() + JsonPrimitive(pair[1]))
-                "note", "properties" -> if (pair[0] == "--where") {
+                "customTagId" -> if (pair[1] == "null" || pair[1] == "none") JsonNull else JsonPrimitive(pair[1])
+                "operations" -> Json.parseToJsonElement(pair[1]).takeIf { it is JsonArray } ?: throw CliCommandException("invalid_arguments")
+                "note", "properties", "propertyUpdates" -> if (pair[0] == "--where") {
                     val components = pair[1].split('=', limit = 2)
                     if (components.size != 2) throw CliCommandException("invalid_arguments")
                     val value = Json.parseToJsonElement(components[1].trim())

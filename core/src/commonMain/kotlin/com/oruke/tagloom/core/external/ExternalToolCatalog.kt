@@ -87,6 +87,8 @@ object ExternalToolCatalog {
         tool(AgentToolName.CREATE_NOTE, "create", "create_note", AgentPermissionScope.WRITE_NOTES),
         tool(AgentToolName.UPDATE_NOTE, "update", "update_note", AgentPermissionScope.WRITE_NOTES),
         tool(AgentToolName.ADD_TAG_TO_NOTE, "add-tag", "add_tag_to_note", AgentPermissionScope.WRITE_NOTES),
+        tool(AgentToolName.PATCH_NOTE_BLOCKS, "patch-blocks", "patch_note_blocks", AgentPermissionScope.WRITE_NOTES),
+        tool(AgentToolName.UPDATE_NOTE_METADATA, "update-metadata", "update_note_metadata", AgentPermissionScope.WRITE_NOTES),
         tool(AgentToolName.EXPORT_NOTE, "export", "export_note", AgentPermissionScope.EXPORT_NOTES),
         tool(AgentToolName.DELETE_NOTE, "delete", "delete_note", AgentPermissionScope.DELETE_NOTES, dangerous = true),
     )

@@ -22,13 +22,14 @@ internal object AgentHarnessPromptService {
         appendLine("3. 界面术语遵循 ADR-008：称呼分类体系为“笔记类型”（不带 # 前缀），# 仅用于普通标签属性。")
         if (canUseTools) {
             val scopeNote = if (scope == AiRetrievalScope.ALL_NOTES) {
-                "当前已授权在工作区允许访问（ALLOW）的全部笔记内按需调用只读检索与读取工具。"
+                "当前已授权在工作区允许访问（ALLOW）的全部笔记内按需调用只读检索工具，并可在用户要求修改或新建笔记时调用细粒度写提案工具。"
             } else {
-                "当前处于受限范围模式，仅可在已挂载的笔记类型或保存查询范围内调用只读工具。"
+                "当前处于仅引用上下文（CITED_ONLY）范围，仅可读取或修改本轮显式 @ 挂载的笔记（以及在已挂载笔记类型/保存查询范围内检索，或按需调用 create_note 新建笔记）。"
             }
             appendLine("4. $scopeNote")
+            appendLine("5. 当用户要求修改已有笔记时，优先调用 update_note_metadata 更新标题/笔记类型/结构化属性，调用 patch_note_blocks 基于真实 expectedRevision 与稳定 BlockId 执行局部块替换、插入或移除，绝不整篇重写未触碰段落；写工具仅生成待用户审阅确认的 Diff 提案，在用户点击采纳前不会落盘。")
         } else {
-            appendLine("4. 当前会话仅分析本轮显式挂载的引用片段或进行通用问答。")
+            appendLine("4. 当前模型未启用工具调用，仅分析本轮显式挂载的引用片段或进行通用问答。")
         }
     }
 

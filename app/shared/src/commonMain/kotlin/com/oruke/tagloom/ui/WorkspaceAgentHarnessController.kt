@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import com.oruke.tagloom.core.ai.AgentCitationStatus
 import com.oruke.tagloom.core.ai.AgentContextRef
 import com.oruke.tagloom.core.ai.AgentHarnessProgress
+import com.oruke.tagloom.core.ai.AgentProposalStatus
 import com.oruke.tagloom.core.ai.AiModelConfig
 import com.oruke.tagloom.core.ai.AiRetrievalScope
 import com.oruke.tagloom.core.ai.AiThinkingEffort
@@ -98,6 +99,18 @@ internal class WorkspaceAgentHarnessController(
 
     /** 最近一次对话失败的脱敏错误编码。 */
     var turnErrorCode: String? by mutableStateOf(null)
+        internal set
+
+    /** 当前正在双方位共享 Diff 面板（全屏右侧或编辑页左侧正文）中对照审阅的提案 ID。 */
+    var activeReviewProposalId: String? by mutableStateOf(null)
+        internal set
+
+    /** 当前是否正在提交或重算修改提案事务。 */
+    var proposalBusy: Boolean by mutableStateOf(false)
+        internal set
+
+    /** 最近一次提案提交或重算的脱敏提示编码。 */
+    var proposalNoticeCode: String? by mutableStateOf(null)
         internal set
 
     private var recentNoteOrder: List<ObjectId> by mutableStateOf(emptyList())
@@ -403,12 +416,19 @@ internal class WorkspaceAgentHarnessController(
         activeContextRefs = emptyList(); blockedRefIds = emptySet(); selectedModelId = null
         thinkingEffort = AiThinkingEffort.OFF; retrievalScope = AiRetrievalScope.CITED_ONLY
         runningThreadId = null; liveProgress = null; citationStatuses = emptyMap()
-        highlightedCitation = null; turnErrorCode = null; recentNoteOrder = emptyList(); loadedForMarker = null
+        highlightedCitation = null; turnErrorCode = null; activeReviewProposalId = null
+        proposalBusy = false; proposalNoticeCode = null; recentNoteOrder = emptyList(); loadedForMarker = null
     }
 
     /** 将选中会话的模型、思考、检索范围与活跃草稿引用同步至作曲框。 */
     internal fun applySelectedThreadToComposer(entry: WorkspaceAgentThreadEntry) {
         selectedThreadId = entry.id
+        if (activeReviewProposalId != null &&
+            entry.thread.proposals.none { it.id == activeReviewProposalId && it.status == AgentProposalStatus.PENDING }
+        ) {
+            activeReviewProposalId = null
+            proposalNoticeCode = null
+        }
         val model = resolveEffectiveAgentModel(workspace.agentSettings.snapshot, entry.thread.selectedModelId)
         selectedModelId = model?.id ?: entry.thread.selectedModelId
         thinkingEffort = coerceThinkingEffortForModel(entry.thread.thinkingEffort, model)

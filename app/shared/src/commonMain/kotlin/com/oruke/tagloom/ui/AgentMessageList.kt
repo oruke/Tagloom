@@ -84,6 +84,7 @@ internal fun AgentMessageList(
     onJumpToCitation: (AgentSourceEntry) -> Unit,
     onAppendToNote: (String) -> Boolean,
     onSaveAsNewNote: (String, String) -> Unit,
+    proposalSlot: (@Composable (messageId: String, isStreaming: Boolean, onNotice: (String) -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -165,6 +166,9 @@ internal fun AgentMessageList(
                                 onSaveAsNewNote(msg.content, title)
                                 actionNotice = savedNewLabel
                             },
+                            proposalContent = proposalSlot?.let { slot ->
+                                { slot(msg.id, false) { toast -> actionNotice = toast } }
+                            },
                         )
                     }
                 }
@@ -184,6 +188,9 @@ internal fun AgentMessageList(
                             onCopied = {},
                             onAppend = {},
                             onSaveNew = {},
+                            proposalContent = proposalSlot?.let { slot ->
+                                { slot(liveProgress.assistantMessageId, true) { toast -> actionNotice = toast } }
+                            },
                         )
                     }
                 }
@@ -284,6 +291,7 @@ private fun AssistantMessageCard(
     onCopied: () -> Unit,
     onAppend: () -> Unit,
     onSaveNew: () -> Unit,
+    proposalContent: (@Composable () -> Unit)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     var tracesExpanded by remember(messageId) { mutableStateOf(false) }
@@ -423,6 +431,8 @@ private fun AssistantMessageCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        proposalContent?.invoke()
 
         if (!isStreaming && content.isNotBlank()) {
             Row(

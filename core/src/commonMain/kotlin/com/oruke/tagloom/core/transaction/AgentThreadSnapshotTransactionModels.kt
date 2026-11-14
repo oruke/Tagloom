@@ -51,3 +51,17 @@ data class AgentThreadSnapshotTransactionResult(
     /** 底层文件事务发布结果。 */
     val commit: TransactionCommitResult,
 )
+
+/**
+ * 单个 `AgentThread` 在发布前生成的加密事务材料，供单会话确认与提案复合事务共用。
+ */
+internal data class PreparedAgentThreadSnapshot(
+    /** 待确认会话快照。 */
+    val snapshot: ObjectSnapshot<AgentThread>,
+    /** 与快照对应的逻辑历史节点。 */
+    val change: ObjectChange,
+    /** 待写入下一版 manifest 的对象记录列表。 */
+    val records: List<com.oruke.tagloom.core.workspace.ManifestObjectRecord>,
+    /** 与记录一一对应的密文文件列表。 */
+    val artifacts: List<EncryptedTransactionArtifact>,
+)

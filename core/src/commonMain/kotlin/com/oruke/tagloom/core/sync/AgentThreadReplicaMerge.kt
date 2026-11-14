@@ -2,6 +2,9 @@ package com.oruke.tagloom.core.sync
 
 import com.oruke.tagloom.core.ai.AgentCompactionItem
 import com.oruke.tagloom.core.ai.AgentContextRef
+import com.oruke.tagloom.core.ai.AgentMutationProposal
+import com.oruke.tagloom.core.ai.AgentProposalItem
+import com.oruke.tagloom.core.ai.AgentProposalStatus
 import com.oruke.tagloom.core.ai.AgentThread
 import com.oruke.tagloom.core.ai.AgentThreadMessage
 import com.oruke.tagloom.core.ai.AgentThreadValidator
@@ -35,6 +38,7 @@ internal object AgentThreadReplicaMerge {
         "retrievalScope",
         "activeContextRefs",
         "messages",
+        "proposals",
         "compactions",
         "activeCompactionId",
         "cumulativeUsage",
@@ -83,6 +87,13 @@ internal object AgentThreadReplicaMerge {
         val mergedMessages = mergeMessages(base.messages, local.messages, remote.messages, winner)
         val mergedMessageIds = mergedMessages.mapTo(linkedSetOf(), AgentThreadMessage::id)
         val messageIndexById = mergedMessages.withIndex().associate { (idx, msg) -> msg.id to idx }
+        val mergedProposals = mergeProposals(
+            base = base.proposals,
+            local = local.proposals,
+            remote = remote.proposals,
+            validMessageIds = mergedMessageIds,
+            winner = winner,
+        )
         val mergedCompactions = mergeCompactions(
             base = base.compactions,
             local = local.compactions,
@@ -123,6 +134,7 @@ internal object AgentThreadReplicaMerge {
             retrievalScope = mergeScalarField("retrievalScope", base.retrievalScope, local.retrievalScope, remote.retrievalScope),
             activeContextRefs = mergedActiveRefs,
             messages = mergedMessages,
+            proposals = mergedProposals,
             compactions = mergedCompactions,
             activeCompactionId = mergedActiveCompactionId,
             latestContextBreakdown = mergedBreakdown,
@@ -184,6 +196,94 @@ internal object AgentThreadReplicaMerge {
                 if (timeCmp != 0) timeCmp else left.id.compareTo(right.id)
             }
         }
+    }
+
+    /**
+     * 按稳定提案 ID 执行三方合并，对同提案并发操作按 `APPLIED > DISCARDED > PENDING` 状态单调性与逐项采纳标志收敛。
+     *
+     * @param base 基线提案列表。
+     * @param local 本地提案列表。
+     * @param remote 远端提案列表。
+     * @param validMessageIds 合并后有效的助手消息 ID 集合。
+     * @param winner 并发平局胜者。
+     * @return 保序且满足协议不变量的提案列表。
+     */
+    private fun mergeProposals(
+        base: List<AgentMutationProposal>,
+        local: List<AgentMutationProposal>,
+        remote: List<AgentMutationProposal>,
+        validMessageIds: Set<String>,
+        winner: MergeSide,
+    ): List<AgentMutationProposal> {
+        val baseMap = base.associateBy(AgentMutationProposal::id)
+        val localMap = local.associateBy(AgentMutationProposal::id)
+        val remoteMap = remote.associateBy(AgentMutationProposal::id)
+        val retainedIds = (baseMap.keys + localMap.keys + remoteMap.keys).filter { id ->
+            ThreeWayValueMerge.merge(id in baseMap, id in localMap, id in remoteMap).value
+        }
+        return retainedIds
+            .map { id -> mergeSingleProposal(baseMap[id], localMap[id], remoteMap[id], winner) }
+            .filter { proposal -> proposal.messageId in validMessageIds }
+            .sortedWith { left, right ->
+                val timeCmp = compareTimestamps(left.createdAt, right.createdAt)
+                if (timeCmp != 0) timeCmp else left.id.compareTo(right.id)
+            }
+    }
+
+    /**
+     * 合并单个提案的三方状态与逐项 `accepted` 选择。
+     *
+     * @param base 基线提案。
+     * @param local 本地提案。
+     * @param remote 远端提案。
+     * @param winner 并发平局胜者。
+     * @return 收敛后的提案对象。
+     */
+    private fun mergeSingleProposal(
+        base: AgentMutationProposal?,
+        local: AgentMutationProposal?,
+        remote: AgentMutationProposal?,
+        winner: MergeSide,
+    ): AgentMutationProposal {
+        if (local == null) return requireNotNull(remote)
+        if (remote == null) return local
+        if (local == remote) return local
+        if (local == base) return remote
+        if (remote == base) return local
+        if (local.status == AgentProposalStatus.APPLIED || remote.status == AgentProposalStatus.APPLIED) {
+            return when {
+                local.status == AgentProposalStatus.APPLIED && remote.status != AgentProposalStatus.APPLIED -> local
+                remote.status == AgentProposalStatus.APPLIED && local.status != AgentProposalStatus.APPLIED -> remote
+                else -> if (winner == MergeSide.LOCAL) local else remote
+            }
+        }
+        if (local.status == AgentProposalStatus.DISCARDED || remote.status == AgentProposalStatus.DISCARDED) {
+            return when {
+                local.status == AgentProposalStatus.DISCARDED && remote.status != AgentProposalStatus.DISCARDED -> local
+                remote.status == AgentProposalStatus.DISCARDED && local.status != AgentProposalStatus.DISCARDED -> remote
+                else -> if (winner == MergeSide.LOCAL) local else remote
+            }
+        }
+        val preferred = if (winner == MergeSide.LOCAL) local else remote
+        val baseItems = base?.items.orEmpty().associateBy(AgentProposalItem::id)
+        val localItems = local.items.associateBy(AgentProposalItem::id)
+        val remoteItems = remote.items.associateBy(AgentProposalItem::id)
+        val mergedItems = preferred.items.map { item ->
+            val lItem = localItems[item.id]
+            val rItem = remoteItems[item.id]
+            if (lItem != null && rItem != null) {
+                val bAccepted = baseItems[item.id]?.accepted ?: true
+                val mergedAcc = ThreeWayValueMerge.merge(bAccepted, lItem.accepted, rItem.accepted)
+                val finalAccepted = if (!mergedAcc.conflicted) mergedAcc.value else item.accepted
+                item.copy(accepted = finalAccepted)
+            } else {
+                item
+            }
+        }
+        return preferred.copy(
+            items = mergedItems,
+            updatedAt = maxTimestamp(local.updatedAt, remote.updatedAt),
+        )
     }
 
     /**

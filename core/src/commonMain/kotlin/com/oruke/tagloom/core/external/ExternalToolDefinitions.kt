@@ -38,6 +38,49 @@ object ExternalToolDefinitions {
     private val tagIds = buildJsonObject {
         put("type", "array"); put("items", id); put("maxItems", 10); put("uniqueItems", true)
     }
+    /** 可选单自定义笔记类型 ID（传空字符串或 null 表示清除自定义类型并仅保留根 Note）。 */
+    private val optionalCustomTagId = buildJsonObject {
+        put("type", "string"); put("maxLength", 128)
+        put("description", "单自定义笔记类型 ID；传空字符串表示清除自定义笔记类型仅保留内置根 Note。")
+    }
+    /** 单条按稳定 BlockId 局部增删改段落的操作 Schema。 */
+    private val blockPatchOperation = buildJsonObject {
+        put("type", "object")
+        put(
+            "properties",
+            buildJsonObject {
+                put(
+                    "op",
+                    buildJsonObject {
+                        put("type", "string")
+                        put(
+                            "enum",
+                            JsonArray(
+                                listOf(
+                                    "replace_block",
+                                    "insert_after_block",
+                                    "prepend_blocks",
+                                    "append_blocks",
+                                    "remove_block",
+                                ).map(::JsonPrimitive),
+                            ),
+                        )
+                    },
+                )
+                put("blockId", id)
+                put("markdown", text())
+            },
+        )
+        put("required", JsonArray(listOf(JsonPrimitive("op"))))
+        put("additionalProperties", false)
+    }
+    /** 有界局部块补丁操作数组 Schema。 */
+    private val blockPatchOperations = buildJsonObject {
+        put("type", "array")
+        put("items", blockPatchOperation)
+        put("minItems", 1)
+        put("maxItems", 50)
+    }
     /** 全部已实现工具的稳定协议定义。 */
     val all: List<ExternalToolDefinition> = listOf(
         entry(AgentToolName.LIST_NOTES, "list_notes", "分页列出授权笔记摘要，不返回正文。", pagination),
@@ -64,14 +107,36 @@ object ExternalToolDefinitions {
             pagination + mapOf("text" to text(), "noteId" to id)),
         entry(AgentToolName.SUGGEST_PROPERTIES, "suggest_properties", "根据笔记类型继承计算当前笔记的有效默认值，不直接写入。",
             mapOf("noteId" to id), listOf("noteId")),
-        entry(AgentToolName.CREATE_NOTE, "create_note", "从 Markdown 创建笔记；先返回预览，由持有者确认后写入。",
-            mapOf("title" to text(), "markdown" to text(), "tagIds" to tagIds), listOf("title"), readOnly = false),
+        entry(AgentToolName.CREATE_NOTE, "create_note", "从 Markdown 创建带可选笔记类型与结构化属性的笔记；先返回预览，由持有者确认后写入。",
+            mapOf("title" to text(), "markdown" to text(), "tagIds" to tagIds, "propertyUpdates" to objectValue), listOf("title"), readOnly = false),
         entry(AgentToolName.UPDATE_NOTE, "update_note", "凭 expectedRevision 更新标题、Markdown 或完整 Note（含 Block 和属性）；先预览再确认。",
             mapOf("noteId" to id, "expectedRevision" to text(), "title" to text(), "markdown" to text(), "note" to objectValue),
             listOf("noteId", "expectedRevision"), readOnly = false),
         entry(AgentToolName.ADD_TAG_TO_NOTE, "add_tag_to_note", "凭 expectedRevision 设置笔记类型，保留内置 Note；需要持有者确认。",
             mapOf("noteId" to id, "expectedRevision" to text(), "tagId" to id),
             listOf("noteId", "expectedRevision", "tagId"), readOnly = false),
+        entry(
+            AgentToolName.PATCH_NOTE_BLOCKS,
+            "patch_note_blocks",
+            "凭 expectedRevision 按稳定 BlockId 局部替换、插入、前插、追加或移除段落，完整保留其余未改动段落的稳定 BlockId、表格与双链；先生成冻结提案，确认后原子落盘。",
+            mapOf("noteId" to id, "expectedRevision" to text(), "operations" to blockPatchOperations),
+            listOf("noteId", "expectedRevision", "operations"),
+            readOnly = false,
+        ),
+        entry(
+            AgentToolName.UPDATE_NOTE_METADATA,
+            "update_note_metadata",
+            "凭 expectedRevision 局部更新笔记标题、单自定义笔记类型（customTagId）或结构化属性值（propertyUpdates，传 null 清空该属性）；先生成冻结提案，确认后原子落盘。",
+            mapOf(
+                "noteId" to id,
+                "expectedRevision" to text(),
+                "title" to text(),
+                "customTagId" to optionalCustomTagId,
+                "propertyUpdates" to objectValue,
+            ),
+            listOf("noteId", "expectedRevision"),
+            readOnly = false,
+        ),
         entry(AgentToolName.EXPORT_NOTE, "export_note", "导出标准或 Tagloom 扩展 Markdown，预览有损能力后由持有者二次确认。",
             mapOf("noteId" to id, "expectedRevision" to text(), "mode" to buildJsonObject {
                 put("type", "string"); put("enum", JsonArray(listOf(JsonPrimitive("standard"), JsonPrimitive("extended"))))

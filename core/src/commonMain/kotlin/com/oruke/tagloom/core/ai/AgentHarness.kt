@@ -14,16 +14,18 @@ data class AgentHarnessProgress(
     val streamingContent: String,
     /** 已流式接收的思考推理摘要。 */
     val streamingThinking: String,
-    /** 已执行完毕或进行中的只读工具轨迹列表。 */
+    /** 已执行完毕或进行中的工具轨迹列表。 */
     val toolTraces: List<AgentToolTrace>,
     /** 当前轮次已在 `SourceLedger` 登记的真实来源列表。 */
     val sources: List<AgentSourceEntry>,
+    /** 当前轮次已预演生成的待确认细粒度修改提案列表。 */
+    val proposals: List<AgentMutationProposal> = emptyList(),
     /** 因策略变为 `LOCKED` 而被自动拦截未发送的 `@` 引用 ID 集合。 */
     val blockedRefIds: Set<String> = emptySet(),
 )
 
 /**
- * 描述调用内置 [AgentHarness] 执行单轮问答与受控只读工具循环的输入上下文。
+ * 描述调用内置 [AgentHarness] 执行单轮问答、只读工具与受控修改提案循环的输入上下文。
  */
 data class AgentHarnessTurnInput(
     /** 当前会话快照载荷。 */
@@ -54,12 +56,14 @@ data class AgentHarnessTurnInput(
  * 描述内置 [AgentHarness] 单轮运行完成（或被用户手动停止）后的确定性内存结果，供调用方执行单次低频持久化。
  */
 data class AgentHarnessTurnOutput(
-    /** 追加了本轮用户消息、助手回复、累计 Token 账单与最新上下文分段基准的完整会话。 */
+    /** 追加了本轮用户消息、助手回复、待审阅提案、累计 Token 账单与最新上下文分段基准的完整会话。 */
     val updatedThread: AgentThread,
     /** 本轮新生成的用户消息。 */
     val userMessage: AgentThreadMessage,
     /** 本轮新生成的助手消息。 */
     val assistantMessage: AgentThreadMessage,
+    /** 本轮新预演生成的待审阅修改提案列表。 */
+    val generatedProposals: List<AgentMutationProposal> = emptyList(),
     /** 因策略变为 `LOCKED` 而被拦截失效的 `@` 引用 ID 集合。 */
     val blockedRefIds: Set<String>,
 )
@@ -67,8 +71,8 @@ data class AgentHarnessTurnOutput(
 /**
  * Tagloom 唯一内置 Agent Harness 执行状态机。
  *
- * 负责在进程内组装 `@` 上下文、按模型能力分级挂载只读知识工具、驱动多步流式推理循环、
- * 维护防幻觉 [SourceLedger] 来源编号并计算混合上下文水位基准。
+ * 负责在进程内组装 `@` 上下文、按模型能力挂载 14 个只读知识工具与 3 个待确认修改提案工具、
+ * 驱动多步流式推理循环、维护防幻觉 [SourceLedger] 来源编号、合并同篇笔记细粒度 Diff 提案并计算混合上下文水位基准。
  *
  * @param streamPort 底层可取消流式模型通信端口。
  */
@@ -76,10 +80,10 @@ class AgentHarness(
     private val streamPort: AiStreamPort,
 ) {
     /**
-     * 执行一轮完整的用户提问与受控只读工具循环。
+     * 执行一轮完整的用户提问、受控只读检索与写提案预演循环。
      *
      * @param input 单轮执行输入参数与连接上下文。
-     * @param workspacePort 当前已解锁工作区只读检索端口。
+     * @param workspacePort 当前已解锁工作区只读检索与提案预演端口。
      * @param onProgress 增量流式回调（仅更新内存 UI 状态，禁止写盘）。
      * @return 可用于单次快照事务确认的会话更新结果。
      */
@@ -108,11 +112,8 @@ class AgentHarness(
         } else {
             input.thread.retrievalScope
         }
-        val canUseTools = input.model.toolsState != AiModelToolsState.CHAT_ONLY &&
-            (effectiveScope == AiRetrievalScope.ALL_NOTES || validContextRefs.any { ref ->
-                ref.kind == AgentContextRefKind.TAG_SCOPE || ref.kind == AgentContextRefKind.SAVED_QUERY_SCOPE
-            })
-        val exposedTools = if (canUseTools) AgentReadToolCatalog.definitions else emptyList()
+        val canUseTools = input.model.toolsState != AiModelToolsState.CHAT_ONLY
+        val exposedTools = if (canUseTools) AgentReadToolCatalog.allDefinitions else emptyList()
         val systemPrompt = AgentHarnessPromptService.buildSystemPrompt(effectiveScope, canUseTools)
         val userMessage = AgentThreadMessage(
             id = input.userMessageId,
@@ -131,6 +132,7 @@ class AgentHarness(
         ).toMutableList()
 
         val toolTraces = mutableListOf<AgentToolTrace>()
+        val turnProposals = mutableListOf<AgentMutationProposal>()
         val contentBuffer = StringBuilder()
         val thinkingBuffer = StringBuilder()
         var turnUsage = AiTokenUsage()
@@ -149,6 +151,7 @@ class AgentHarness(
                     streamingThinking = thinkingBuffer.toString(),
                     toolTraces = toolTraces.toList(),
                     sources = ledger.entries(),
+                    proposals = turnProposals.toList(),
                     blockedRefIds = resolvedContext.blockedRefIds,
                 ),
             )
@@ -220,60 +223,82 @@ class AgentHarness(
                 )
 
                 for (call in readyCalls) {
-                    val toolEnum = AgentReadToolCatalog.resolveReadTool(call.name)
-                    if (toolEnum == null) {
-                        val unsupportedJson = """{"error":"tool_not_allowed"}"""
-                        toolTraces += AgentToolTrace(
-                            callId = call.callId,
-                            toolName = call.name,
-                            summary = "拒绝未开放工具 ${call.name}",
-                            succeeded = false,
-                        )
-                        conversationMessages += AiChatMessage(
-                            role = AiChatRole.TOOL,
-                            content = unsupportedJson,
-                            toolCallId = call.callId,
-                            toolName = call.name,
-                        )
-                        emitProgress()
-                        continue
+                    val readTool = AgentReadToolCatalog.resolveReadTool(call.name)
+                    val proposalTool = if (readTool == null) AgentReadToolCatalog.resolveProposalTool(call.name) else null
+                    when {
+                        readTool != null -> {
+                            val outcome = workspacePort.executeReadTool(
+                                callId = call.callId,
+                                tool = readTool,
+                                argumentsJson = call.argumentsJson,
+                                retrievalScope = effectiveScope,
+                                activeRefs = validContextRefs,
+                                maxResultCharacters = budget.maxCharacters,
+                            )
+                            val assignedIndices = outcome.sources.map { raw ->
+                                ledger.register(
+                                    noteId = raw.noteId,
+                                    noteTitle = raw.noteTitle,
+                                    blockId = raw.blockId,
+                                    revision = raw.revision,
+                                    rawExcerpt = raw.excerpt,
+                                ).sourceIndex
+                            }.distinct()
+                            toolTraces += outcome.trace
+                            val enrichedToolContent = if (assignedIndices.isEmpty()) {
+                                outcome.resultJson
+                            } else {
+                                val indexHint = assignedIndices.joinToString(", ") { "[$it]" }
+                                "${outcome.resultJson}\n(可用来源角标: $indexHint)"
+                            }
+                            conversationMessages += AiChatMessage(
+                                role = AiChatRole.TOOL,
+                                content = enrichedToolContent,
+                                toolCallId = call.callId,
+                                toolName = call.name,
+                            )
+                        }
+                        proposalTool != null -> {
+                            val outcome = workspacePort.prepareWriteProposal(
+                                callId = call.callId,
+                                tool = proposalTool,
+                                argumentsJson = call.argumentsJson,
+                                assistantMessageId = input.assistantMessageId,
+                                retrievalScope = effectiveScope,
+                                activeRefs = validContextRefs,
+                            )
+                            toolTraces += outcome.trace
+                            outcome.proposal?.let { generated ->
+                                coalesceOrAppendProposal(turnProposals, generated)
+                            }
+                            conversationMessages += AiChatMessage(
+                                role = AiChatRole.TOOL,
+                                content = outcome.resultJson,
+                                toolCallId = call.callId,
+                                toolName = call.name,
+                            )
+                        }
+                        else -> {
+                            val unsupportedJson = """{"error":"tool_not_allowed"}"""
+                            toolTraces += AgentToolTrace(
+                                callId = call.callId,
+                                toolName = call.name,
+                                summary = "拒绝未开放工具 ${call.name}",
+                                succeeded = false,
+                            )
+                            conversationMessages += AiChatMessage(
+                                role = AiChatRole.TOOL,
+                                content = unsupportedJson,
+                                toolCallId = call.callId,
+                                toolName = call.name,
+                            )
+                        }
                     }
-                    val outcome = workspacePort.executeReadTool(
-                        callId = call.callId,
-                        tool = toolEnum,
-                        argumentsJson = call.argumentsJson,
-                        retrievalScope = effectiveScope,
-                        activeRefs = validContextRefs,
-                        maxResultCharacters = budget.maxCharacters,
-                    )
-                    val assignedIndices = outcome.sources.map { raw ->
-                        ledger.register(
-                            noteId = raw.noteId,
-                            noteTitle = raw.noteTitle,
-                            blockId = raw.blockId,
-                            revision = raw.revision,
-                            rawExcerpt = raw.excerpt,
-                        ).sourceIndex
-                    }.distinct()
-                    toolTraces += outcome.trace
-                    val enrichedToolContent = if (assignedIndices.isEmpty()) {
-                        outcome.resultJson
-                    } else {
-                        val indexHint = assignedIndices.joinToString(", ") { "[$it]" }
-                        "${outcome.resultJson}\n(可用来源角标: $indexHint)"
-                    }
-                    conversationMessages += AiChatMessage(
-                        role = AiChatRole.TOOL,
-                        content = enrichedToolContent,
-                        toolCallId = call.callId,
-                        toolName = call.name,
-                    )
                     emitProgress()
                 }
 
                 if (round == maxRounds) {
                     guardrails += "已达到单轮最大工具循环步数（$maxRounds 步），以下基于已获取证据总结回答"
-                    // 最后追加一次不带工具定义的收尾生成，保证用户获得完整结论而非停在半截工具调用上。
                     streamPort.stream(
                         AiStreamRequest(
                             connection = input.connection,
@@ -281,7 +306,7 @@ class AgentHarness(
                             modelId = input.model.modelId,
                             messages = conversationMessages + AiChatMessage(
                                 role = AiChatRole.USER,
-                                content = "已达到单轮最大工具读取步数，请直接基于上面已经获取到的笔记证据给出准确回答，并标注已登记的 [序号] 来源角标。",
+                                content = "已达到单轮最大工具读取步数，请直接基于上面已经获取到的笔记证据与待确认提案给出准确回答，并标注已登记的 [序号] 来源角标。",
                             ),
                             tools = emptyList(),
                             thinkingEffort = effectiveThinking,
@@ -364,6 +389,7 @@ class AgentHarness(
             retrievalScope = effectiveScope,
             activeContextRefs = validContextRefs,
             messages = updatedMessages,
+            proposals = input.thread.proposals + turnProposals,
             latestContextBreakdown = breakdown,
         )
         val finalThread = draftUpdated.copy(cumulativeUsage = draftUpdated.recomputeCumulativeUsage())
@@ -371,7 +397,61 @@ class AgentHarness(
             updatedThread = finalThread,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
+            generatedProposals = turnProposals.toList(),
             blockedRefIds = resolvedContext.blockedRefIds,
         )
+    }
+
+    /**
+     * 将同一助手回合内针对同一篇已有笔记与相同 `expectedRevision` 的元数据更新与块级补丁合并为单张复合提案卡片。
+     *
+     * @param accumulator 当前回合已收集的提案列表。
+     * @param incoming 新生成的待确认提案。
+     */
+    private fun coalesceOrAppendProposal(
+        accumulator: MutableList<AgentMutationProposal>,
+        incoming: AgentMutationProposal,
+    ) {
+        if (incoming.kind == AgentProposalKind.CREATE_NOTE) {
+            accumulator += incoming
+            return
+        }
+        val existingIdx = accumulator.indexOfFirst { candidate ->
+            candidate.kind != AgentProposalKind.CREATE_NOTE &&
+                candidate.noteId == incoming.noteId &&
+                candidate.expectedRevision == incoming.expectedRevision
+        }
+        if (existingIdx < 0) {
+            accumulator += incoming
+            return
+        }
+        val existing = accumulator[existingIdx]
+        val incomingMetaKeys = incoming.items.mapNotNull(::metadataDedupeKey).toSet()
+        val retainedExistingItems = existing.items.filter { item ->
+            val key = metadataDedupeKey(item)
+            key == null || key !in incomingMetaKeys
+        }
+        val combinedItems = retainedExistingItems + incoming.items
+        val updatedTitle = combinedItems.lastOrNull { it.kind == AgentProposalItemKind.TITLE }?.newTitle ?: existing.noteTitle
+        accumulator[existingIdx] = existing.copy(
+            kind = AgentProposalKind.PATCH_NOTE,
+            noteTitle = updatedTitle,
+            schemaRevisions = existing.schemaRevisions + incoming.schemaRevisions,
+            items = combinedItems,
+            updatedAt = incoming.updatedAt,
+        )
+    }
+
+    /**
+     * 计算单条元数据变更项的覆盖去重键；正文块操作返回空以保持顺序追加。
+     *
+     * @param item 待检查的提案变更项。
+     * @return 元数据去重键或 `null`。
+     */
+    private fun metadataDedupeKey(item: AgentProposalItem): String? = when (item.kind) {
+        AgentProposalItemKind.TITLE -> "meta:title"
+        AgentProposalItemKind.CUSTOM_TAG -> "meta:customTag"
+        AgentProposalItemKind.PROPERTY -> "meta:prop:${item.propertyId?.value.orEmpty()}"
+        else -> null
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +76,7 @@ internal fun AgentWorkspaceScreen(
     savedQueries: List<WorkspaceSavedQuery>,
     enabledModels: List<AiModelConfig>,
     isCompactViewport: Boolean,
+    isWideViewport: Boolean = true,
     showMenuButton: Boolean,
     onOpenMenu: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -212,39 +214,78 @@ internal fun AgentWorkspaceScreen(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                Column(
-                    modifier = Modifier
-                        .widthIn(max = 820.dp)
-                        .fillMaxSize()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    AgentReadinessAndErrorBanner(
-                        readiness = controller.readiness,
-                        turnErrorCode = controller.turnErrorCode,
-                        onOpenSettings = onOpenSettings,
-                    )
+            val activeProposal = controller.activeReviewProposal
+            val targetDoc = activeProposal?.let { prop ->
+                editorState.documents.firstOrNull { it.id == prop.noteId }
+            }
 
-                    val liveForSelected = controller.liveProgress?.takeIf {
-                        it.threadId == controller.selectedThreadId || controller.selectedThreadId == null
+            Box(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                        Column(
+                            modifier = Modifier
+                                .widthIn(max = 820.dp)
+                                .fillMaxSize()
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            AgentReadinessAndErrorBanner(
+                                readiness = controller.readiness,
+                                turnErrorCode = controller.turnErrorCode,
+                                onOpenSettings = onOpenSettings,
+                            )
+
+                            val liveForSelected = controller.liveProgress?.takeIf {
+                                it.threadId == controller.selectedThreadId || controller.selectedThreadId == null
+                            }
+                            AgentMessageList(
+                                messages = entry?.thread?.messages.orEmpty(),
+                                liveProgress = liveForSelected,
+                                citationStatuses = controller.citationStatuses,
+                                onJumpToCitation = { src -> controller.jumpToCitation(src, isCompactViewport) },
+                                onAppendToNote = { md -> controller.appendMessageToCurrentNote(md, onSaveEditorChanges) },
+                                onSaveAsNewNote = { md, title -> controller.saveMessageAsNewNote(md, title, onSaveEditorChanges) },
+                                proposalSlot = { msgId, streaming, onNotice ->
+                                    AgentProposalCardList(
+                                        controller = controller,
+                                        messageId = msgId,
+                                        isStreaming = streaming,
+                                        inFullScreenHub = true,
+                                        onNotice = onNotice,
+                                    )
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            AgentComposerBar(
+                                controller = controller,
+                                editorState = editorState,
+                                savedQueries = savedQueries,
+                                enabledModels = enabledModels,
+                                onOpenSettings = onOpenSettings,
+                            )
+                        }
                     }
-                    AgentMessageList(
-                        messages = entry?.thread?.messages.orEmpty(),
-                        liveProgress = liveForSelected,
-                        citationStatuses = controller.citationStatuses,
-                        onJumpToCitation = { src -> controller.jumpToCitation(src, isCompactViewport) },
-                        onAppendToNote = { md -> controller.appendMessageToCurrentNote(md, onSaveEditorChanges) },
-                        onSaveAsNewNote = { md, title -> controller.saveMessageAsNewNote(md, title, onSaveEditorChanges) },
-                        modifier = Modifier.weight(1f),
-                    )
 
-                    AgentComposerBar(
+                    if (activeProposal != null && !isCompactViewport) {
+                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        AgentHubRightDiffPane(
+                            controller = controller,
+                            proposal = activeProposal,
+                            targetDocument = targetDoc,
+                            isCompactOverlay = false,
+                            modifier = Modifier.width(if (isWideViewport) 460.dp else 400.dp),
+                        )
+                    }
+                }
+
+                if (activeProposal != null && isCompactViewport) {
+                    AgentHubRightDiffPane(
                         controller = controller,
-                        editorState = editorState,
-                        savedQueries = savedQueries,
-                        enabledModels = enabledModels,
-                        onOpenSettings = onOpenSettings,
+                        proposal = activeProposal,
+                        targetDocument = targetDoc,
+                        isCompactOverlay = true,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }

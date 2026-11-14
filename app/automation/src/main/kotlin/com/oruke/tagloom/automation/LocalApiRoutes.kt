@@ -78,6 +78,16 @@ fun Application.localAutomationApi(controller: LocalAutomationController) {
                 val args = call.receiveLocalJson(JsonObject.serializer())
                 call.respondCall(controller, token, LocalCallInput("update_note", JsonObject(args + ("noteId" to JsonPrimitive(call.localId("noteId"))))))
             }
+            patch("/notes/{noteId}/blocks") {
+                val token = call.localBearer()
+                val args = call.receiveLocalJson(JsonObject.serializer())
+                call.respondCall(controller, token, LocalCallInput("patch_note_blocks", JsonObject(args + ("noteId" to JsonPrimitive(call.localId("noteId"))))))
+            }
+            patch("/notes/{noteId}/metadata") {
+                val token = call.localBearer()
+                val args = call.receiveLocalJson(JsonObject.serializer())
+                call.respondCall(controller, token, LocalCallInput("update_note_metadata", JsonObject(args + ("noteId" to JsonPrimitive(call.localId("noteId"))))))
+            }
             delete("/notes/{noteId}") {
                 val args = buildJsonObject {
                     put("noteId", call.localId("noteId"))
