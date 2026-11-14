@@ -7,21 +7,33 @@ import com.oruke.tagloom.core.model.*
 import com.oruke.tagloom.core.protocol.CanonicalJson
 import kotlinx.serialization.json.*
 
-/** 复用权威快照和派生索引执行外部读取，所有返回结果均先经过授权范围过滤。 */
+/** 复用权威快照和派生索引执行外部与内置只读工具，所有返回结果均在分页前经过授权范围与 `AiAccessPolicy` 过滤。 */
 internal class DesktopAgentReadService(
     /** 唯一已解锁会话，调用方持有会话锁。 */
     private val session: DesktopWorkspaceSession,
-    /** 当前外部身份与 Note 可读范围。 */
+    /** 当前调用身份与 Note 可读范围。 */
     private val principal: AgentPrincipal,
+    /** 当前调用是否直接持有本机 owner token（决定是否可按 ID 直读 `REFERENCE_ONLY` 笔记）。 */
+    private val isOwnerDirectCall: Boolean = false,
 ) {
     /**
-     * 读取指定授权 Note，越权目标在协调器与本服务双重拒绝。
+     * 读取指定授权 Note，越权目标与 `LOCKED` / 未白名单 `REFERENCE_ONLY` 笔记在协调器与本服务双重拒绝。
      * @param id 目标 Note。
-     * @return 活动权威快照，不返回 tombstone。
+     * @return 活动权威快照，不返回 tombstone 或受保护系统容器页。
      */
     suspend fun note(id: ObjectId): DesktopStoredNote {
+        if (SystemDatabaseDefinitions.isProtectedSystemPage(id)) throw ExternalCallException("authorization_denied")
         if (principal.allowedNoteIds?.contains(id) == false) throw ExternalCallException("authorization_denied")
-        return session.loadActiveNotes().singleOrNull { it.id == id } ?: throw ExternalCallException("not_found")
+        val stored = session.loadActiveNotes().singleOrNull { it.id == id } ?: throw ExternalCallException("not_found")
+        val effectivePolicy = session.loadAiAccessPolicyResolver().resolveEffectiveNotePolicy(stored.snapshot.payload)
+        val denial = AgentNotePolicyGate.checkExternalDirectAccess(
+            effectivePolicy = effectivePolicy,
+            noteId = id,
+            principal = principal,
+            isOwnerDirectCall = isOwnerDirectCall,
+        )
+        if (denial != null) throw ExternalCallException(denial.name.lowercase())
+        return stored
     }
 
     /**
@@ -44,13 +56,30 @@ internal class DesktopAgentReadService(
                 put("noteId", target.id.value); put("revision", target.snapshot.header.revision.externalText())
                 put("block", CanonicalJson.format.encodeToJsonElement(Block.serializer(), block))
             }
-            AgentToolName.LIST_NOTES -> externalPage(session.loadActiveNotes()
-                .filter { principal.allowedNoteIds?.contains(it.id) != false }
-                .sortedBy { it.id.value }.map { externalNoteJson(it, includeContent = false) }, limit, offset)
+            AgentToolName.LIST_NOTES -> {
+                val policyResolver = session.loadAiAccessPolicyResolver()
+                externalPage(
+                    session.loadActiveNotes()
+                        .filter { stored ->
+                            !SystemDatabaseDefinitions.isProtectedSystemPage(stored.id) &&
+                                principal.allowedNoteIds?.contains(stored.id) != false &&
+                                AgentNotePolicyGate.canDiscover(policyResolver.resolveEffectiveNotePolicy(stored.snapshot.payload))
+                        }
+                        .sortedBy { it.id.value }
+                        .map { externalNoteJson(it, includeContent = false) },
+                    limit,
+                    offset,
+                )
+            }
             AgentToolName.SEARCH_NOTES, AgentToolName.QUERY_NOTES -> search(args, limit, offset)
             AgentToolName.GET_BACKLINKS -> externalPage(session.projection.index.backlinks(
-                requireNotNull(target).id, ExternalToolArguments.string(args, "blockId")?.let(::BlockId),
-            ).filter { principal.allowedNoteIds?.contains(it.sourceNoteId) != false }.map { hit ->
+                requireNotNull(target).id,
+                ExternalToolArguments.string(args, "blockId")?.let(::BlockId),
+                allowedAiPolicies = setOf(AiAccessPolicy.ALLOW),
+            ).filter {
+                !SystemDatabaseDefinitions.isProtectedSystemPage(it.sourceNoteId) &&
+                    principal.allowedNoteIds?.contains(it.sourceNoteId) != false
+            }.map { hit ->
                 buildJsonObject {
                     put("noteId", hit.sourceNoteId.value); put("title", hit.sourceTitle)
                     put("sourceBlockId", hit.sourceBlockId?.value?.let(::JsonPrimitive) ?: JsonNull)
@@ -114,9 +143,14 @@ internal class DesktopAgentReadService(
             tagIds = ExternalToolArguments.strings(args, "tagIds", 10).map(::TagId).toSet(),
             propertyFilters = properties.map { (id, value) ->
                 PropertyIndexFilter(PropertyId(ExternalToolArguments.opaque(id)), CanonicalJson.encodeToString(JsonElement.serializer(), value))
-            }, limit = limit + 1, offset = offset, allowedNoteIds = principal.allowedNoteIds,
+            },
+            limit = limit + 1,
+            offset = offset,
+            allowedNoteIds = principal.allowedNoteIds,
+            allowedAiPolicies = setOf(AiAccessPolicy.ALLOW),
         )
         val hits = session.projection.index.search(query)
+            .filterNot { SystemDatabaseDefinitions.isProtectedSystemPage(it.noteId) }
         return buildJsonObject {
             put("items", JsonArray(hits.take(limit).map { hit -> buildJsonObject {
                 put("noteId", hit.noteId.value); put("title", hit.title); put("snippet", hit.snippet)

@@ -16,6 +16,8 @@ internal class DesktopAgentMutationService(
     private val session: DesktopWorkspaceSession,
     /** 外部请求授权身份。 */
     private val principal: AgentPrincipal,
+    /** 当前请求是否直接持有本机 owner token。 */
+    private val isOwnerDirectCall: Boolean = false,
 ) {
     /**
      * 生成创建、更新、设定类型或删除的冻结写入计划。
@@ -26,7 +28,7 @@ internal class DesktopAgentMutationService(
         session.requireWritable()
         val args = request.arguments as JsonObject
         val previous = ExternalToolArguments.string(args, "noteId")?.let {
-            DesktopAgentReadService(session, principal).note(ObjectId(it))
+            DesktopAgentReadService(session, principal, isOwnerDirectCall).note(ObjectId(it))
         }
         val revision = if (previous == null) null else expected(args, previous)
         val note = when (request.tool) {
@@ -34,14 +36,22 @@ internal class DesktopAgentMutationService(
                 val title = ExternalToolArguments.string(args, "title", true)!!
                 val tagIds = (listOf(WorkspaceDefaults.DEFAULT_NOTE_TAG_ID) + ExternalToolArguments.strings(args, "tagIds", 10).map(::TagId)).distinct()
                 val imported = importMarkdown(ExternalToolArguments.string(args, "markdown").orEmpty(), title)
-                imported.copy(title = title, directTagIds = tagIds)
+                imported.copy(title = title, directTagIds = tagIds, aiAccessPolicy = null)
             }
             AgentToolName.UPDATE_NOTE -> {
                 val current = requireNotNull(previous).snapshot.payload
                 if (args["note"] != null && (args["title"] != null || args["markdown"] != null)) {
                     throw ExternalCallException("invalid_arguments")
                 }
-                val replacement = args["note"]?.let { CanonicalJson.format.decodeFromJsonElement(Note.serializer(), it) }
+                val rawNoteJson = args["note"]?.let {
+                    it as? JsonObject ?: throw ExternalCallException("invalid_arguments")
+                }
+                if (rawNoteJson != null && !AgentNotePolicyGate.isPolicyUnchangedInJson(current.aiAccessPolicy, rawNoteJson)) {
+                    throw ExternalCallException("ai_access_policy_immutable")
+                }
+                val replacement = rawNoteJson?.let {
+                    CanonicalJson.format.decodeFromJsonElement(Note.serializer(), it).copy(aiAccessPolicy = current.aiAccessPolicy)
+                }
                 if (replacement != null) replacement else {
                     if (args["title"] == null && args["markdown"] == null) throw ExternalCallException("invalid_arguments")
                     val title = ExternalToolArguments.string(args, "title") ?: current.title
@@ -85,7 +95,7 @@ internal class DesktopAgentMutationService(
      */
     suspend fun export(request: AgentToolRequest): JsonObject {
         val args = request.arguments as JsonObject
-        val stored = DesktopAgentReadService(session, principal).note(ObjectId(ExternalToolArguments.string(args, "noteId", true)!!))
+        val stored = DesktopAgentReadService(session, principal, isOwnerDirectCall).note(ObjectId(ExternalToolArguments.string(args, "noteId", true)!!))
         expected(args, stored)
         val mode = when (ExternalToolArguments.string(args, "mode") ?: "standard") {
             "standard" -> MarkdownExportMode.STANDARD

@@ -100,7 +100,8 @@ internal fun WorkspaceSearchPopover(
                     onClick = {
                         onDismiss()
                         if (controller.editorState.documents.any { document -> document.id == hit.noteId }) {
-                            controller.editorState.selectDocument(hit.noteId)
+                            controller.agentHarness.selectNoteFromSidebarRecent(hit.noteId)
+                            controller.agentHarness.promoteRecentNote(hit.noteId)
                         }
                     },
                 )

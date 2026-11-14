@@ -26,6 +26,7 @@ internal fun TagloomEditorState.buildTagDefinitionDraft(
     propertyBindings: List<TagPropertyBinding>,
     iconKey: String? = existing.iconKey,
     availableProperties: List<com.oruke.tagloom.core.model.PropertyDefinition> = propertyDefinitions,
+    aiAccessPolicy: com.oruke.tagloom.core.model.AiAccessPolicy = existing.aiAccessPolicy,
 ): TagDefinition {
     val normalizedName = name.trim()
     val normalizedParents = parentTagIds.distinct()
@@ -43,6 +44,7 @@ internal fun TagloomEditorState.buildTagDefinitionDraft(
         parentTagIds = normalizedParents,
         propertyBindings = propertyBindings,
         iconKey = iconKey,
+        aiAccessPolicy = aiAccessPolicy,
     )
     val errors = validateTagDefinition(definition)
     require(errors.isEmpty()) { errors.joinToString(separator = "；") }

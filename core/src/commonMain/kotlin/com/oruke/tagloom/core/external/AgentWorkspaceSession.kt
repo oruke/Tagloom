@@ -21,9 +21,14 @@ interface AgentWorkspaceSession {
      * 授权并生成无业务副作用的预览。
      * @param principal 可信认证层提供的身份与可访问范围。
      * @param request 根据协议参数推导的工具请求。
+     * @param isOwnerDirectCall 当前请求是否直接持有本机 owner token（用于区分 `REFERENCE_ONLY` 按 ID 直读与普通全库 Agent token）。
      * @return 与当前会话绑定的授权结果和预览。
      */
-    suspend fun prepare(principal: AgentPrincipal, request: AgentToolRequest): AgentPreparedToolCall
+    suspend fun prepare(
+        principal: AgentPrincipal,
+        request: AgentToolRequest,
+        isOwnerDirectCall: Boolean = false,
+    ): AgentPreparedToolCall
 
     /**
      * 在同一工作区会话执行请求，成功写入与审计必须原子确认。

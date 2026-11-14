@@ -3,6 +3,8 @@ package com.oruke.tagloom.workspace
 import com.oruke.tagloom.core.crypto.CryptoProvider
 import com.oruke.tagloom.core.crypto.EnvelopeCryptoService
 import com.oruke.tagloom.core.model.ActorId
+import com.oruke.tagloom.core.transaction.AgentThreadSnapshotEnvelopeService
+import com.oruke.tagloom.core.transaction.AgentThreadSnapshotTransactionService
 import com.oruke.tagloom.core.transaction.DatabaseCatalogSnapshotEnvelopeService
 import com.oruke.tagloom.core.transaction.DatabaseCatalogSnapshotTransactionService
 import com.oruke.tagloom.core.transaction.NoteSnapshotEnvelopeService
@@ -73,6 +75,7 @@ object DesktopWorkspaceSessionFactory {
                 workspaceMasterKey = unlocked.workspaceMasterKey,
                 index = openedIndex,
                 noteEnvelopeService = NoteSnapshotEnvelopeService(envelopeService),
+                schemaEnvelopeService = workspaceSchemaEnvelopeService,
             )
             val verifier = JvmWorkspaceContentVerifier(
                 workspaceId = unlocked.file.publicHeader.workspaceId,
@@ -143,6 +146,17 @@ object DesktopWorkspaceSessionFactory {
                     cryptoProvider = cryptoProvider,
                     envelopeService = WorkspaceConfigSnapshotEnvelopeService(envelopeService),
                     transactionService = WorkspaceConfigSnapshotTransactionService(
+                        cryptoProvider,
+                        envelopeService,
+                        manifestService,
+                        coordinator,
+                    ),
+                ),
+                threadStore = DesktopAgentThreadStore(
+                    paths = paths,
+                    cryptoProvider = cryptoProvider,
+                    envelopeService = AgentThreadSnapshotEnvelopeService(envelopeService),
+                    transactionService = AgentThreadSnapshotTransactionService(
                         cryptoProvider,
                         envelopeService,
                         manifestService,

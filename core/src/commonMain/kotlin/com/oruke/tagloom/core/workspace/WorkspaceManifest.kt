@@ -42,6 +42,9 @@ enum class ManifestObjectKind {
     /** 工作区级 Agent 连接、模型上下文窗口与偏好加密快照。 */
     WORKSPACE_CONFIG,
 
+    /** Agent 对话历史、工具轨迹与上下文压缩游标加密快照。 */
+    AGENT_THREAD,
+
     /** 冲突证据或审计历史。 */
     HISTORY,
 }

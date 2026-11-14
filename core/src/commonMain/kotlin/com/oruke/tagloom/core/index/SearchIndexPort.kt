@@ -1,5 +1,6 @@
 package com.oruke.tagloom.core.index
 
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.ObjectId
 
@@ -32,15 +33,25 @@ interface SearchIndexPort {
     suspend fun search(query: SearchIndexQuery): List<SearchIndexHit>
 
     /**
+     * 统计在相同文本、标签、属性与 `allowedNoteIds` 条件下，因不满足 [SearchIndexQuery.allowedAiPolicies] 而被分页前排除的笔记篇数。
+     *
+     * @param query 包含 `allowedAiPolicies` 约束的查询。
+     * @return 被策略保护排除的命中篇数。
+     */
+    suspend fun countExcludedByPolicy(query: SearchIndexQuery): Int = 0
+
+    /**
      * 查询指向目标 Note 或指定 Block 的反向链接。
      *
      * @param targetNoteId 目标 Note。
      * @param targetBlockId 可选目标 Block；为空时返回指向整篇 Note 与其任意 Block 的链接。
+     * @param allowedAiPolicies 来源笔记允许的 AI 访问策略集合；为空表示人类持有者查看全部反向链接。
      * @return 稳定排序的反向链接列表。
      */
     suspend fun backlinks(
         targetNoteId: ObjectId,
         targetBlockId: BlockId? = null,
+        allowedAiPolicies: Set<AiAccessPolicy>? = null,
     ): List<BacklinkIndexHit>
 
     /**

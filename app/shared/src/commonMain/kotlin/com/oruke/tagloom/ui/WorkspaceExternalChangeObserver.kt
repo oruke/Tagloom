@@ -59,6 +59,7 @@ internal suspend fun WorkspaceUiController.refreshConfirmedWorkspace() {
         savedQueries = confirmed.savedQueries
         databaseController.load(confirmed.databaseDefinitions, confirmed.viewDefinitions)
         agentSettings.reloadIfLoaded(sessionMarker)
+        agentHarness.reloadThreadsIfLoaded(sessionMarker)
     } catch (error: CancellationException) { throw error }
     catch (_: Exception) {
         // 已结束会话的失败由生命周期处理；当前会话刷新失败必须给出脱敏的本地化提示。

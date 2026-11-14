@@ -1,5 +1,6 @@
 package com.oruke.tagloom.core.index
 
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.PropertyId
@@ -53,6 +54,8 @@ data class NoteIndexDocument(
     val outboundLinks: List<IndexedNoteLink>,
     /** 快照是否为 tombstone；为真时适配器必须移除旧索引行。 */
     val deleted: Boolean,
+    /** 笔记经过多父类型继承收敛后的有效 AI 访问策略（默认 `ALLOW`）。 */
+    val aiAccessPolicy: AiAccessPolicy = AiAccessPolicy.ALLOW,
 )
 
 /** 描述属性精确匹配过滤条件。 */
@@ -79,6 +82,8 @@ data class SearchIndexQuery(
     val offset: Int = 0,
     /** 外部 principal 可读 Note 范围；为空表示全工作区，空集合表示无可读对象。 */
     val allowedNoteIds: Set<ObjectId>? = null,
+    /** 允许命中的有效 `AiAccessPolicy` 集合；为空表示人类持有者本地搜索不过滤策略，Agent 搜索传 `setOf(ALLOW)` 在分页前过滤。 */
+    val allowedAiPolicies: Set<AiAccessPolicy>? = null,
 ) {
     init {
         require(limit in 1..500) { "索引查询 limit 必须在 1 到 500 之间" }

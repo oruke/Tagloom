@@ -41,7 +41,7 @@ internal class LocalAccessRegistry(
         val actual = digest(token)
         return try {
             if (MessageDigest.isEqual(ownerDigest, actual)) LocalAccess(
-                AgentPrincipal(ownerId, AgentPermissionScope.entries.toSet() - AgentPermissionScope.CALL_REMOTE_AI), true, true,
+                AgentPrincipal(ownerId, AgentPermissionScope.entries.toSet()), true, true,
             ) else grants.values.firstOrNull { MessageDigest.isEqual(it.first, actual) }?.second
                 ?: throw LocalApiException(401, "unauthorized")
         } finally { actual.fill(0) }
@@ -56,7 +56,7 @@ internal class LocalAccessRegistry(
     @Synchronized
     fun grant(input: LocalGrantInput, sessionId: String): LocalGrantResponse {
         if (grants.size >= 128) throw LocalApiException(429, "grant_limit")
-        if (input.scopes.isEmpty() || AgentPermissionScope.CALL_REMOTE_AI in input.scopes ||
+        if (input.scopes.isEmpty() ||
             input.allowedNoteIds?.size?.let { it > 500 } == true) throw LocalApiException(400, "invalid_arguments")
         val id = UUID.randomUUID().toString()
         val random = ByteArray(32).also { SecureRandom().nextBytes(it) }

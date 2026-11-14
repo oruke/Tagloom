@@ -9,8 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +54,7 @@ import com.oruke.tagloom.editor.EditorDocument
 import com.oruke.tagloom.editor.PropertyDefinitionDestination
 import com.oruke.tagloom.editor.TagloomEditorState
 import com.oruke.tagloom.platform.DocumentExportFormat
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import tagloom.app.shared.generated.resources.*
 
@@ -119,6 +124,31 @@ internal fun PageHeader(
                 color = if (document.dirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
+            NoteAiAccessPolicyControl(
+                state = state,
+                document = document,
+                onSaveRequest = onSaveRequest,
+            )
+            LocalWorkspaceAgentHarness.current?.takeIf { it.available }?.let { agentController ->
+                Surface(
+                    color = if (agentController.companionVisible) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surface,
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    IconButton(
+                        onClick = agentController::toggleCompanionPane,
+                        modifier = Modifier.size(30.dp).testTag("editor-companion-toggle"),
+                    ) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_sparkle),
+                            contentDescription = stringResource(Res.string.agent_toggle_companion),
+                            modifier = Modifier.size(16.dp),
+                            tint = if (agentController.companionVisible) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             Box {
                 PageTextAction(stringResource(Res.string.editor_page_export)) { exportMenuOpen = true }
                 TagloomDropdownMenu(

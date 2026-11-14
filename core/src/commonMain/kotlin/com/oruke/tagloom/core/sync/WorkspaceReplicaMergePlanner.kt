@@ -76,6 +76,7 @@ object WorkspaceReplicaMergePlanner {
             ManifestObjectKind.DATABASE to ObjectType.DATABASE,
             ManifestObjectKind.VIEW to ObjectType.VIEW,
             ManifestObjectKind.WORKSPACE_CONFIG to ObjectType.WORKSPACE_CONFIG,
+            ManifestObjectKind.AGENT_THREAD to ObjectType.AGENT_THREAD,
         )
         val indexed = objects.associateBy { candidate ->
             require(candidate.snapshot.header.objectType == expectedTypes[candidate.kind]) { "同步对象类别与快照类型不一致" }
@@ -143,7 +144,16 @@ object WorkspaceReplicaMergePlanner {
             return conflicted(local, remote, candidate, winner, WorkspaceReplicaConflictReason.CONCURRENT_VALUE,
                 basePayload, parents, conflictIdFactory, merge.fields)
         }
-        if (local.kind != ManifestObjectKind.NOTE && basePayload != null) {
+        if (local.kind == ManifestObjectKind.AGENT_THREAD && basePayload != null) {
+            val merge = AgentThreadReplicaMerge.merge(basePayload, local.snapshot.payload, remote.snapshot.payload, winner)
+            val candidate = selected.snapshot.copy(payload = merge.payload)
+            if (!merge.conflicted) {
+                return decision(selected.copy(snapshot = candidate), WorkspaceReplicaAction.MERGE, parents)
+            }
+            return conflicted(local, remote, candidate, winner, WorkspaceReplicaConflictReason.CONCURRENT_VALUE,
+                basePayload, parents, conflictIdFactory, merge.fields)
+        }
+        if (local.kind != ManifestObjectKind.NOTE && local.kind != ManifestObjectKind.AGENT_THREAD && basePayload != null) {
             val merge = ReplicaJsonFieldMerge.merge(local.kind, basePayload, local.snapshot.payload, remote.snapshot.payload, winner)
             val candidate = selected.snapshot.copy(payload = merge.payload)
             if (merge.fields.isEmpty()) return decision(selected.copy(snapshot = candidate), WorkspaceReplicaAction.MERGE, parents)
@@ -189,6 +199,7 @@ object WorkspaceReplicaMergePlanner {
             ManifestObjectKind.DATABASE -> "database-definition"
             ManifestObjectKind.VIEW -> "view-definition"
             ManifestObjectKind.WORKSPACE_CONFIG -> "workspace-config"
+            ManifestObjectKind.AGENT_THREAD -> "agent-thread"
             else -> return null
         }
         val operation = closest.operations.singleOrNull { operation ->

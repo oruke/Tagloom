@@ -52,6 +52,8 @@ internal fun replicaFieldViews(conflict: WorkspaceReplicaConflict, propertyNames
                 "description" -> "DESCRIPTION"
                 "type" -> "TYPE"
                 "defaultValue" -> "DEFAULT_VALUE"
+                "aiAccessPolicy" -> "AI_ACCESS_POLICY"
+                "archived" -> "ARCHIVED"
                 else -> "OTHER"
             }
         }

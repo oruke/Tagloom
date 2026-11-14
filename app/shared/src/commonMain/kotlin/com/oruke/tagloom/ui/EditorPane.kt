@@ -95,6 +95,21 @@ internal fun EditorPane(
     }
     val listState = rememberLazyListState()
     val links = LocalWorkspaceLinks.current
+    val agentHighlight = LocalWorkspaceAgentHarness.current?.highlightedCitation
+    LaunchedEffect(agentHighlight?.version, document.id) {
+        val highlight = agentHighlight ?: return@LaunchedEffect
+        if (highlight.noteId != document.id) return@LaunchedEffect
+        val targetBlockId = highlight.blockId
+        if (targetBlockId == null) {
+            listState.scrollToItem(0)
+            return@LaunchedEffect
+        }
+        val rootId = state.revealLinkBlock(targetBlockId) ?: targetBlockId
+        val position = state.visibleRootEditorBlocks(document.note).indexOfFirst { it.id == rootId }
+        if (position >= 0) {
+            listState.scrollToItem(position + 1)
+        }
+    }
     LaunchedEffect(links?.revealBlockId, document.id) {
         val target = links?.revealBlockId ?: return@LaunchedEffect
         val root = state.revealLinkBlock(target) ?: return@LaunchedEffect

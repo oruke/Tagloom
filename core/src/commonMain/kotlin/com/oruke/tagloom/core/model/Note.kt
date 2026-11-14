@@ -25,6 +25,8 @@ data class Note(
     val annotations: Map<AnnotationId, Annotation> = emptyMap(),
     /** 网页自动字段的加密来源记录；旧笔记没有来源，视为手动内容。 */
     val linkMetadata: LinkMetadataProvenance? = null,
+    /** 单篇笔记显式设定的 AI 访问策略覆盖值；为空时沿关联笔记类型及多父祖先链继承最严格策略。 */
+    val aiAccessPolicy: AiAccessPolicy? = null,
 ) {
     init {
         require(directTagIds.distinct().size == directTagIds.size) { "笔记直接标签不能重复" }

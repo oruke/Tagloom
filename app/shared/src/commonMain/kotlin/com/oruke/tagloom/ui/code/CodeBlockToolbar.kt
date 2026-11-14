@@ -61,7 +61,18 @@ internal fun CodeBlockToolbar(
             Text(stringResource(Res.string.editor_code_wrap), style = MaterialTheme.typography.labelMedium)
         }
         TextButton(
-            onClick = { clipboard.setText(AnnotatedString(code)); copied = true },
+            onClick = {
+                for (attempt in 0 until 8) {
+                    if (runCatching { clipboard.setText(AnnotatedString(code)) }.isSuccess) break
+                    if (attempt < 7) {
+                        val mark = kotlin.time.TimeSource.Monotonic.markNow()
+                        while (mark.elapsedNow().inWholeMilliseconds < 15L) {
+                            // 等待宿主系统剪贴板瞬时占用释放，不引入特定平台线程 API。
+                        }
+                    }
+                }
+                copied = true
+            },
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),

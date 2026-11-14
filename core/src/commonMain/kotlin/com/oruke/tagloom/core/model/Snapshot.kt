@@ -42,6 +42,9 @@ value class ObjectType(
         /** ViewDefinition 对象。 */
         val VIEW: ObjectType = ObjectType("VIEW")
 
+        /** Agent 会话加密快照对象。 */
+        val AGENT_THREAD: ObjectType = ObjectType("AGENT_THREAD")
+
         /** 当前客户端可写的对象类型协议名称。 */
         private val KNOWN_VALUES: Set<String> = setOf(
             NOTE.value,
@@ -51,6 +54,7 @@ value class ObjectType(
             WORKSPACE_CONFIG.value,
             DATABASE.value,
             VIEW.value,
+            AGENT_THREAD.value,
         )
     }
 }

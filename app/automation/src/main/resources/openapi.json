@@ -3036,8 +3036,7 @@
         "required": [
           "title",
           "affectedItems",
-          "destructive",
-          "sendsContentRemotely"
+          "destructive"
         ],
         "properties": {
           "title": {
@@ -3047,9 +3046,6 @@
             "type": "integer"
           },
           "destructive": {
-            "type": "boolean"
-          },
-          "sendsContentRemotely": {
             "type": "boolean"
           },
           "details": {

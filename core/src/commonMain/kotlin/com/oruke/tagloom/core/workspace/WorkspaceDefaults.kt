@@ -14,6 +14,9 @@ object WorkspaceDefaults {
     /** 工作区级 Agent 连接、模型上下文窗口与运行偏好单例配置快照的稳定对象 ID。 */
     val DEFAULT_WORKSPACE_CONFIG_ID: ObjectId = ObjectId("workspace-config")
 
+    /** 系统内置默认笔记「全部笔记」虚拟容器页身份，在根 Database 投影中自动排除自身以避免自指循环。 */
+    val BUILTIN_ALL_NOTES_PAGE_ID: ObjectId = ObjectId("builtin-all-notes-page")
+
     /** MVP 文本属性的稳定 ID。 */
     val DEFAULT_TEXT_PROPERTY_ID: PropertyId = PropertyId("default-note-text-property")
 

@@ -5,6 +5,7 @@ import com.oruke.tagloom.core.index.NoteIndexDocument
 import com.oruke.tagloom.core.index.SearchIndexCheckpoint
 import com.oruke.tagloom.core.index.SearchIndexHit
 import com.oruke.tagloom.core.index.SearchIndexQuery
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.ObjectId
 
@@ -38,8 +39,15 @@ internal class SqliteIndexRepository(
         require(!document.deleted) { "tombstone 不能写入 SQLite 索引" }
         // 文档行先于关联行写入，以保留外键一致性；任何步骤失败均由外层整体回滚。
         connection.execute(
-            "INSERT INTO note_documents(note_id, revision, title, body_text, updated_at) VALUES(?, ?, ?, ?, ?)",
-            listOf(document.noteId.value, document.revision, document.title, document.bodyText, document.updatedAt),
+            "INSERT INTO note_documents(note_id, revision, title, body_text, updated_at, ai_access_policy) VALUES(?, ?, ?, ?, ?, ?)",
+            listOf(
+                document.noteId.value,
+                document.revision,
+                document.title,
+                document.bodyText,
+                document.updatedAt,
+                document.aiAccessPolicy.name,
+            ),
         )
         connection.execute(
             "INSERT INTO note_fts(note_id, title, body_text) VALUES(?, ?, ?)",
@@ -85,20 +93,50 @@ internal class SqliteIndexRepository(
     }
 
     /**
-     * 查询笔记或 Block 的反向链接。
+     * 统计在相同查询条件下因不满足 `allowedAiPolicies` 而在分页前被排除的笔记篇数。
+     * @param query 包含 `allowedAiPolicies` 的查询。
+     * @return 被策略保护排除的篇数。
+     */
+    fun countExcludedByPolicy(query: SearchIndexQuery): Int {
+        val (sql, params) = SqliteSearchQueryBuilder.buildExcludedByPolicyCount(query) ?: return 0
+        return connection.query(sql, params) { rows ->
+            if (rows.next()) rows.text("excluded_count")?.toIntOrNull() ?: 0 else 0
+        }
+    }
+
+    /**
+     * 查询笔记或 Block 的反向链接，并在指定策略白名单时预先过滤来源笔记的 AI 访问策略。
      * @param targetNoteId 目标笔记 ID。
      * @param targetBlockId 可选目标 Block ID。
+     * @param allowedAiPolicies 允许暴露反向链接摘要的来源笔记策略集合；为空表示人类持有者查看全部。
      * @return 稳定排序的反向链接。
      */
-    fun backlinks(targetNoteId: ObjectId, targetBlockId: BlockId?): List<BacklinkIndexHit> {
+    fun backlinks(
+        targetNoteId: ObjectId,
+        targetBlockId: BlockId?,
+        allowedAiPolicies: Set<AiAccessPolicy>? = null,
+    ): List<BacklinkIndexHit> {
+        val sortedPolicies = allowedAiPolicies?.map { it.name }?.sorted()
+        if (sortedPolicies != null && sortedPolicies.isEmpty()) {
+            return emptyList()
+        }
         val blockCondition = if (targetBlockId == null) "" else " AND l.target_block_id = ?"
+        val policyCondition = if (sortedPolicies == null) {
+            ""
+        } else {
+            " AND d.ai_access_policy IN (${sortedPolicies.joinToString { "?" }})"
+        }
         val sql = """
             SELECT l.source_note_id, d.title AS source_title, l.source_block_id, l.target_block_id, l.link_type
             FROM note_links l JOIN note_documents d ON d.note_id = l.source_note_id
-            WHERE l.target_note_id = ?$blockCondition
+            WHERE l.target_note_id = ?$blockCondition$policyCondition
             ORDER BY d.updated_at DESC, l.source_note_id ASC, l.source_block_id ASC, l.link_type ASC
         """.trimIndent()
-        val parameters = listOfNotNull(targetNoteId.value, targetBlockId?.value)
+        val parameters = buildList<Any?> {
+            add(targetNoteId.value)
+            targetBlockId?.value?.let(::add)
+            sortedPolicies?.forEach(::add)
+        }
         return connection.query(sql, parameters) { rows ->
             buildList {
                 while (rows.next()) {

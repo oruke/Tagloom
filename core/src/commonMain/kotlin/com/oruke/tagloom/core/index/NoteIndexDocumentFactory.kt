@@ -1,5 +1,6 @@
 package com.oruke.tagloom.core.index
 
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.Block
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.InlineMarkTypes
@@ -28,11 +29,13 @@ object NoteIndexDocumentFactory {
      *
      * @param snapshot 待投影的已确认 Note 快照。
      * @param relationPropertyIds 已由 Property Definition 判定为 relation 的属性集合。
+     * @param effectiveAiPolicy 结合工作区类型继承收敛后的有效 AI 访问策略；未传入时回退单篇覆盖值或 `ALLOW`。
      * @return 可供任意平台索引适配器消费的完整文档。
      */
     fun fromSnapshot(
         snapshot: ObjectSnapshot<Note>,
         relationPropertyIds: Set<PropertyId> = emptySet(),
+        effectiveAiPolicy: AiAccessPolicy = snapshot.payload.aiAccessPolicy ?: AiAccessPolicy.ALLOW,
     ): NoteIndexDocument {
         require(snapshot.header.objectType == ObjectType.NOTE) { "索引文档只能从 Note 快照生成" }
 
@@ -64,6 +67,7 @@ object NoteIndexDocumentFactory {
             propertyValues = propertyValues,
             outboundLinks = (blockLinks + relationLinks).distinct().sortedWith(LINK_COMPARATOR),
             deleted = snapshot.header.deleted,
+            aiAccessPolicy = effectiveAiPolicy,
         )
     }
 

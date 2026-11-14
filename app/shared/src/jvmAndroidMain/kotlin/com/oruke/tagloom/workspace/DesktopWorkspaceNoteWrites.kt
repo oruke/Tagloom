@@ -19,6 +19,9 @@ internal suspend fun DesktopWorkspaceSession.saveNoteLocked(
 ): DesktopStoredNote {
     requireWritable()
     val targetId = objectId ?: ObjectId(idFactory())
+    if (SystemDatabaseDefinitions.isProtectedSystemPage(targetId)) {
+        throw ExternalCallException("protected_system_page")
+    }
     val previous = projection.loadSnapshots().singleOrNull { it.header.objectId == targetId }
     if (expectedRevision != null && previous?.header?.revision != expectedRevision) {
         throw ExternalCallException("revision_conflict")
@@ -57,6 +60,9 @@ internal suspend fun DesktopWorkspaceSession.deleteNoteLocked(
     objectId: ObjectId, expectedRevision: ObjectRevision? = null, auditEvent: AgentAuditEvent? = null,
 ) {
     requireWritable()
+    if (SystemDatabaseDefinitions.isProtectedSystemPage(objectId)) {
+        throw ExternalCallException("protected_system_page")
+    }
     val previous = projection.loadSnapshots().singleOrNull { it.header.objectId == objectId && !it.header.deleted }
         ?: throw ExternalCallException("not_found")
     if (expectedRevision != null && previous.header.revision != expectedRevision) throw ExternalCallException("revision_conflict")

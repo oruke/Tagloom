@@ -33,11 +33,18 @@ private class JvmEditorClipboard(
      * @param content 待发布的多格式内容。
      * @return 系统写入是否成功。
      */
-    override suspend fun write(content: EditorClipboardContent): Boolean = try {
-        clipboard.setClipEntry(ClipEntry(EditorTransferable(content)))
-        true
-    } catch (_: IllegalStateException) {
-        false
+    override suspend fun write(content: EditorClipboardContent): Boolean {
+        repeat(4) { attempt ->
+            try {
+                clipboard.setClipEntry(ClipEntry(EditorTransferable(content)))
+                return true
+            } catch (_: IllegalStateException) {
+                if (attempt < 3) Thread.sleep(15L * (attempt + 1))
+            }
+        }
+        // 非交互沙盒或受限桌面会话中 Win32 OpenClipboard 可能拒绝跨进程打开，但当前 JVM AppContext 已持有完整副本时可无损粘贴。
+        val verified = read()
+        return verified != null && verified.text == content.text && verified.fragment == content.fragment
     }
 
     /** @return 已校验私有片段及纯文本；系统暂不可访问时为空。 */

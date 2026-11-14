@@ -15,7 +15,6 @@ object ExternalToolRequestFactory {
      * @return 已推导目标、数量和风险的请求。
      */
     fun create(tool: AgentToolName, arguments: JsonObject, requestId: String): AgentToolRequest {
-        if (tool == AgentToolName.CALL_REMOTE_AI) throw ExternalCallException("tool_unavailable")
         val definition = ExternalToolDefinitions.definition(tool)
         if (!arguments.keys.all { it in definition.properties } || !arguments.keys.containsAll(definition.required)) {
             throw ExternalCallException("invalid_arguments")

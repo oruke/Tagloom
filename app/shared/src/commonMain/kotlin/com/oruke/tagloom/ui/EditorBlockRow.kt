@@ -1,5 +1,6 @@
 package com.oruke.tagloom.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -16,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.oruke.tagloom.core.model.BaseTableBlockContent
@@ -73,10 +75,21 @@ internal fun EditorBlockRow(
     var firstLineCenter by remember(block.id, block.type, linkEntryVisible) { mutableStateOf<Dp?>(null) }
     var actionMenuOpen by remember(block.id) { mutableStateOf(false) }
     var typeMenuOpen by remember(block.id) { mutableStateOf(false) }
+    val citedHighlight = LocalWorkspaceAgentHarness.current?.highlightedCitation?.let {
+        it.noteId == state.selectedDocumentId && it.blockId == block.id
+    } == true
+    val citationModifier = if (citedHighlight) {
+        Modifier
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.36f), MaterialTheme.shapes.small)
+            .testTag("cited-highlighted-block-${block.id.value}")
+    } else {
+        Modifier
+    }
     BlockDragFrame(block) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(citationModifier)
                 .padding(start = (depth * 22).dp, top = blockTopSpacing(block), bottom = blockBottomSpacing(block))
                 .hoverable(interactionSource),
         ) {

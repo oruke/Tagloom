@@ -27,6 +27,9 @@ internal enum class ArtifactSchemaKind {
     /** 工作区级 Agent 连接、模型上下文窗口与偏好加密快照。 */
     WORKSPACE_CONFIG,
 
+    /** 工作区级 Agent 对话线程加密快照。 */
+    AGENT_THREAD,
+
     /** Change DAG 单节点。 */
     CHANGE,
 
@@ -82,6 +85,12 @@ internal data class ArtifactRole(
                 ".config.enc",
                 "workspace-config-snapshot",
                 ArtifactSchemaKind.WORKSPACE_CONFIG,
+            )
+            path.startsWith("threads/") -> snapshotRole(
+                path,
+                ".thread.enc",
+                "agent-thread-snapshot",
+                ArtifactSchemaKind.AGENT_THREAD,
             )
             path.startsWith("changes/") -> ArtifactRole(
                 envelopeObjectType = "object-change",

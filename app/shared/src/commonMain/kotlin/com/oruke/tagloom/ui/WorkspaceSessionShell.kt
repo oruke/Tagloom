@@ -86,6 +86,7 @@ internal fun WorkspaceSessionShell(
 
     LaunchedEffect(controller) { controller.serverRecovery.observeAutomaticUpdates() }
     LaunchedEffect(controller) { controller.observeExternalChanges() }
+    LaunchedEffect(controller, controller.workspaceSessionMarker) { controller.agentHarness.ensureInitialized() }
 
     LaunchedEffect(selectedDocument?.id, selectedDocument?.draftVersion, selectedDocument?.dirty, controller.busy, controller.links.creating) {
         if (selectedDocument?.dirty == true && !controller.busy && !controller.links.creating) {
@@ -99,6 +100,7 @@ internal fun WorkspaceSessionShell(
     androidx.compose.runtime.CompositionLocalProvider(
         LocalWorkspaceLinks provides controller.links,
         LocalPropertyOptionCatalog provides controller.propertyOptions,
+        LocalWorkspaceAgentHarness provides controller.agentHarness,
     ) { Box(Modifier.fillMaxSize()) {
         TagloomWorkspaceScreen(
             state = controller.editorState,
@@ -107,6 +109,10 @@ internal fun WorkspaceSessionShell(
             databaseController = controller.databaseController,
             documentFileGateway = documentFileGateway,
             onSaveRequest = onSave,
+            onRequestAgentSettings = if (controller.agentSettings.available) ({
+                serverRecoveryOpen = false
+                agentSettingsOpen = true
+            }) else null,
             settingsContent = { onBack ->
                 if (serverRecoveryOpen) ServerRecoverySettingsPane(controller, coroutineScope, onBack = { serverRecoveryOpen = false })
                 else if (agentSettingsOpen) AgentSettingsScreen(controller.agentSettings, coroutineScope, onBack = { agentSettingsOpen = false })

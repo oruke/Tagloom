@@ -26,6 +26,7 @@ import tagloom.app.shared.generated.resources.workspace_recovery_object_property
 import tagloom.app.shared.generated.resources.workspace_recovery_object_saved_query
 import tagloom.app.shared.generated.resources.workspace_recovery_object_tag
 import tagloom.app.shared.generated.resources.workspace_recovery_object_view
+import tagloom.app.shared.generated.resources.workspace_recovery_object_agent_thread
 import tagloom.app.shared.generated.resources.workspace_recovery_object_workspace_config
 import tagloom.app.shared.generated.resources.workspace_recovery_transaction_entry
 import tagloom.app.shared.generated.resources.workspace_status_backup_created
@@ -189,6 +190,7 @@ private fun ManifestObjectKind.localizedText(): String = when (this) {
     ManifestObjectKind.DATABASE -> stringResource(Res.string.workspace_recovery_object_database)
     ManifestObjectKind.VIEW -> stringResource(Res.string.workspace_recovery_object_view)
     ManifestObjectKind.WORKSPACE_CONFIG -> stringResource(Res.string.workspace_recovery_object_workspace_config)
+    ManifestObjectKind.AGENT_THREAD -> stringResource(Res.string.workspace_recovery_object_agent_thread)
     ManifestObjectKind.HISTORY -> stringResource(Res.string.workspace_recovery_object_history)
 }
 

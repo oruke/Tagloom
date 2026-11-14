@@ -35,7 +35,7 @@ internal object SqliteIndexSchema {
     private const val SCHEMA_VERSION_KEY: String = "schema_version"
 
     /** 当前 SQLite 索引协议版本。 */
-    private const val SCHEMA_VERSION: String = "2"
+    private const val SCHEMA_VERSION: String = "3"
 
     /** 每次打开连接必须恢复的数据库级设置。 */
     private val CONFIGURATION_STATEMENTS: List<String> = listOf(
@@ -62,8 +62,13 @@ internal object SqliteIndexSchema {
             revision TEXT NOT NULL,
             title TEXT NOT NULL,
             body_text TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            ai_access_policy TEXT NOT NULL DEFAULT 'ALLOW'
         )
+        """.trimIndent(),
+        """
+        CREATE INDEX IF NOT EXISTS note_documents_by_ai_policy
+        ON note_documents(ai_access_policy, updated_at DESC, note_id ASC)
         """.trimIndent(),
         """
         CREATE VIRTUAL TABLE IF NOT EXISTS note_fts USING fts5(

@@ -205,6 +205,9 @@ interface WorkspaceGateway {
     /** 当前平台接入的 Agent 与模型配置及本机隔离凭据网关；未提供实现的平台不展示入口。 */
     val agentConfig: WorkspaceAgentConfigGateway? get() = null
 
+    /** 当前平台接入的双形态 Agent 会话管理与流式推理网关；未提供实现的平台不展示入口。 */
+    val agentHarness: WorkspaceAgentHarnessGateway? get() = null
+
     /**
      * 为共享编辑器生成 URL-safe 随机 ID。
      *

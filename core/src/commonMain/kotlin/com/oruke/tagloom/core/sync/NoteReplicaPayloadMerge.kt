@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonObject
 internal object NoteReplicaPayloadMerge {
     /** Note 当前已知的顶层协议字段；未知扩展单独递归合并，不能覆盖正文专用算法的结果。 */
     private val knownNoteFields = setOf("title", "directTagIds", "propertyValues", "manualPropertyBindings",
-        "propertyStyleOverrides", "blocks", "defaultTabId", "annotations", "linkMetadata")
+        "propertyStyleOverrides", "blocks", "defaultTabId", "annotations", "linkMetadata", "aiAccessPolicy")
 
     /**
      * 按已认证基线合并 Note，并把需要人工处理的最小安全范围定位到字段或完整 Block。
@@ -69,7 +69,19 @@ internal object NoteReplicaPayloadMerge {
                 basePayload, localPayload, remotePayload)
             if (metadataWinner == MergeSide.LOCAL) local.linkMetadata else remote.linkMetadata
         }
-        val mergedNote = merge.note.copy(defaultTabId = defaultTabId, linkMetadata = linkMetadata)
+        val policy = ThreeWayValueMerge.merge(base.aiAccessPolicy, local.aiAccessPolicy, remote.aiAccessPolicy)
+        val policyWinner = SyncWinnerResolver.concurrentWinner(localChange, remoteChange,
+            local.aiAccessPolicy == null, remote.aiAccessPolicy == null)
+        val aiAccessPolicy = if (!policy.conflicted) policy.value else {
+            fields += evidence(listOf(ReplicaFieldPathSegment(field = "aiAccessPolicy")), policyWinner,
+                basePayload, localPayload, remotePayload)
+            if (policyWinner == MergeSide.LOCAL) local.aiAccessPolicy else remote.aiAccessPolicy
+        }
+        val mergedNote = merge.note.copy(
+            defaultTabId = defaultTabId,
+            linkMetadata = linkMetadata,
+            aiAccessPolicy = aiAccessPolicy,
+        )
         if (NoteValidator.validate(mergedNote).isNotEmpty()) {
             return NoteReplicaPayloadMergeResult(if (winner == MergeSide.LOCAL) localPayload else remotePayload,
                 emptyList(), conflicted = true)

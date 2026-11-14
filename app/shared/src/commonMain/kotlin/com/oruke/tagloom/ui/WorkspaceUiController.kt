@@ -128,6 +128,9 @@ internal class WorkspaceUiController(
     /** Agent 与模型设置页面状态与探测控制器。 */
     val agentSettings = WorkspaceAgentSettingsController(this)
 
+    /** 双形态 Agent 会话与只读知识库推理控制器。 */
+    val agentHarness = WorkspaceAgentHarnessController(this)
+
     /** 在上传完整恢复副本前提交当前会话的全部草稿。 */
     internal suspend fun flushPendingNotes() = noteSaveDelegate.savePending()
 
@@ -325,6 +328,7 @@ internal class WorkspaceUiController(
      */
     suspend fun saveSelected() = runOperation(failureMessage = WorkspaceUiMessage.NoteSaveFailed) {
         if (noteSaveDelegate.saveSelected()) {
+            editorState.selectedDocumentId?.let(agentHarness::promoteRecentNote)
             searchHits = emptyList()
         }
     }
@@ -397,6 +401,7 @@ internal class WorkspaceUiController(
         links.clear()
         propertyOptions.clear()
         agentSettings.clear()
+        agentHarness.clear()
         gateway.lock()
         serverRecovery.clear()
         editorState.clearWorkspace()
@@ -423,6 +428,7 @@ internal class WorkspaceUiController(
         links.clear()
         propertyOptions.clear()
         agentSettings.clear()
+        agentHarness.clear()
         noteSaveDelegate.resetAutoSaveAttempt()
         recoveryMessages = result.recoveryMessages
         if (result.readOnly) {

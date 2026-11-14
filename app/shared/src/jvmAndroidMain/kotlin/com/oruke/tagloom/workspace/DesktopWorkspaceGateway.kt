@@ -84,16 +84,30 @@ class DesktopWorkspaceGateway(
     /** 只向共享 UI 暴露受控恢复能力。 */
     override val serverRecovery: WorkspaceServerRecoveryGateway get() = serverRecoveryService
 
+    /** 本机私有 Agent 凭据隔离存储，由配置网关与内置 Harness 共用。 */
+    private val agentApiKeyStore = AgentApiKeyStore(recoveryAccessDirectory.resolveSibling("agent-credentials"))
+
     /** 与本机私有凭据隔离存储绑定的 Agent 配置网关。 */
     private val agentConfigService = DesktopAgentConfigGateway(
         gateway = this,
-        apiKeyStore = AgentApiKeyStore(recoveryAccessDirectory.resolveSibling("agent-credentials")),
+        apiKeyStore = agentApiKeyStore,
         streamPort = agentStreamPort,
         onConfigCommitted = { externalChangeNotifications.tryEmit(Unit) },
     )
 
     /** 只向共享 UI 暴露脱敏的 Agent 与模型配置入口。 */
     override val agentConfig: com.oruke.tagloom.platform.WorkspaceAgentConfigGateway get() = agentConfigService
+
+    /** 内置双形态 Agent 会话与流式推理网关。 */
+    private val agentHarnessService = DesktopAgentHarnessGateway(
+        gateway = this,
+        apiKeyStore = agentApiKeyStore,
+        streamPort = agentStreamPort,
+        onThreadCommitted = { externalChangeNotifications.tryEmit(Unit) },
+    )
+
+    /** 只向共享 UI 暴露受控的内置 Agent 会话与推理网关。 */
+    override val agentHarness: com.oruke.tagloom.platform.WorkspaceAgentHarnessGateway get() = agentHarnessService
 
     /**
      * 返回当前活动的本地工作区会话，供共享能力代理复用同一条索引连接。
@@ -461,6 +475,7 @@ class DesktopWorkspaceGateway(
 
     /** 锁定工作区并销毁会话密钥。 */
     override suspend fun lock(): Unit = withContext(Dispatchers.IO) {
+        agentHarnessService.cancelAndClearSessionState()
         agentConfigService.cancelActiveOperations()
         serverRecoveryService.cancelTransfer()
         manager.lock()

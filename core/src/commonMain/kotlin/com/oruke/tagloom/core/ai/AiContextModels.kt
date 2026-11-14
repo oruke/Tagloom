@@ -61,9 +61,9 @@ data class AiContextSelection(
 /** 抽象本地模型、自部署模型或远端 Gateway 的统一调用边界。 */
 interface AiCompletionPort {
     /**
-     * 使用已经完成权限判定和用户预览的最小上下文执行推理。
+     * 使用已经完成 `AiAccessPolicy` 权限判定的最小上下文执行单次推理。
      *
-     * 实现不得自行扩大上下文、扫描工作区或记录正文；远程模式必须由 Agent 权限层先取得 `CALL_REMOTE_AI` 与二次确认。
+     * 实现不得自行扩大上下文、扫描工作区或记录正文；流式交互式对话与工具循环统一走 [AiStreamPort]。
      *
      * @param mode 推理位置。
      * @param task 不包含密钥和隐式工作区访问指令的任务文本。

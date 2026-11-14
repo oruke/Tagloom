@@ -184,10 +184,14 @@ class EditorClipboardFlowTest {
                 .performKeyInput { withKeyDown(Key.CtrlLeft) { withKeyDown(Key.ShiftLeft) { pressKey(Key.V) } } }
             destination.assertTextContains("1. Unselected first\n2. Second strong", substring = true)
             runOnIdle {
-                Toolkit.getDefaultToolkit().systemClipboard.setContents(
-                    StringSelection("External plain"),
-                    null
-                )
+                val externalSelection = StringSelection("External plain")
+                try {
+                    Toolkit.getDefaultToolkit().systemClipboard.setContents(externalSelection, null)
+                } catch (error: IllegalStateException) {
+                    check(Toolkit.getDefaultToolkit().systemClipboard.getData(DataFlavor.stringFlavor) == "External plain") {
+                        error
+                    }
+                }
             }
             destination.performTextInputSelection(TextRange(0, "1. Unselected first".length))
             destination.performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.V) } }

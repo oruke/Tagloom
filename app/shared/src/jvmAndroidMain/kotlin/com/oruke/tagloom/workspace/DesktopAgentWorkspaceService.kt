@@ -20,7 +20,15 @@ class DesktopAgentWorkspaceService(
     /** 预览时冻结的完整笔记计划，执行后立即删除。 */
     private val plans = mutableMapOf<String, DesktopAgentNoteMutation>()
 
-    init { session.onExternalClosed { plans.clear() } }
+    /** 记录待执行请求是否由本机 owner token 直接发起。 */
+    private val ownerFlags = mutableMapOf<String, Boolean>()
+
+    init {
+        session.onExternalClosed {
+            plans.clear()
+            ownerFlags.clear()
+        }
+    }
 
     /**
      * 转交当前解锁会话的同步关闭通知。
@@ -29,17 +37,32 @@ class DesktopAgentWorkspaceService(
     override fun onClosed(listener: () -> Unit) { session.onExternalClosed(listener) }
 
     /**
-     * 从参数重新推导授权元数据，在会话互斥锁中生成确定的预览。
+     * 从参数重新推导授权元数据，在会话互斥锁中执行 `AiAccessPolicy` 门禁并生成确定的预览。
      * @param principal 可信认证身份。
      * @param request 外部工具请求，不信任调用方声明的目标和风险。
+     * @param isOwnerDirectCall 当前请求是否直接持有本机 owner token。
      * @return 授权结果、预览及冻结的写入计划。
      */
-    override suspend fun prepare(principal: AgentPrincipal, request: AgentToolRequest): AgentPreparedToolCall =
+    override suspend fun prepare(
+        principal: AgentPrincipal,
+        request: AgentToolRequest,
+        isOwnerDirectCall: Boolean,
+    ): AgentPreparedToolCall =
         session.sessionMutex.withLock {
             session.requireOpen()
             val canonical = ExternalToolRequestFactory.create(request.tool, request.arguments as? JsonObject
                 ?: throw ExternalCallException("invalid_arguments"), request.requestId)
-            coordinator(principal).prepare(principal, canonical, session.timestampProvider())
+            ownerFlags[canonical.requestId] = isOwnerDirectCall
+            val prepared = try {
+                coordinator(principal, isOwnerDirectCall).prepare(principal, canonical, session.timestampProvider())
+            } catch (error: Throwable) {
+                ownerFlags.remove(canonical.requestId)
+                throw error
+            }
+            if (!prepared.decision.allowed) {
+                ownerFlags.remove(canonical.requestId)
+            }
+            prepared
         }
 
     /**
@@ -51,18 +74,46 @@ class DesktopAgentWorkspaceService(
     override suspend fun execute(prepared: AgentPreparedToolCall, confirmation: AgentConfirmationEvidence?): AgentToolResult =
         session.sessionMutex.withLock {
             session.requireOpen()
-            try { coordinator(prepared.principal).execute(prepared, confirmation, session.timestampProvider()) }
-            finally { plans.remove(prepared.request.requestId) }
+            val isOwnerDirectCall = ownerFlags[prepared.request.requestId] ?: false
+            try {
+                coordinator(prepared.principal, isOwnerDirectCall).execute(prepared, confirmation, session.timestampProvider())
+            } finally {
+                plans.remove(prepared.request.requestId)
+                ownerFlags.remove(prepared.request.requestId)
+            }
         }
 
     /**
-     * 为身份绑定同一预览、执行和审计端口。
+     * 为身份绑定同一预览、执行、策略门禁和审计端口。
      * @param principal 请求身份，执行端口不能脱离其 Note 范围。
+     * @param isOwnerDirectCall 当前调用是否直接持有本机 owner token。
      * @return 共享核心协调器，不引入第二写入实现。
      */
-    private fun coordinator(principal: AgentPrincipal): AgentToolCoordinator = AgentToolCoordinator(
-        DesktopAgentExecutionPort(session, principal, plans, onMutation),
-        AgentAuditPort { event -> appendAgentAuditLocked(session, event) },
+    private fun coordinator(
+        principal: AgentPrincipal,
+        isOwnerDirectCall: Boolean,
+    ): AgentToolCoordinator = AgentToolCoordinator(
+        executionPort = DesktopAgentExecutionPort(session, principal, plans, onMutation, isOwnerDirectCall),
+        auditPort = AgentAuditPort { event -> appendAgentAuditLocked(session, event) },
+        targetPolicyEvaluator = { targetId ->
+            if (com.oruke.tagloom.core.model.SystemDatabaseDefinitions.isProtectedSystemPage(targetId)) {
+                AgentDenialCode.TARGET_OUT_OF_SCOPE
+            } else {
+                val stored = session.loadActiveNotes().singleOrNull { it.id == targetId }
+                if (stored == null) {
+                    null
+                } else {
+                    val effective = session.loadAiAccessPolicyResolver()
+                        .resolveEffectiveNotePolicy(stored.snapshot.payload)
+                    AgentNotePolicyGate.checkExternalDirectAccess(
+                        effectivePolicy = effective,
+                        noteId = targetId,
+                        principal = principal,
+                        isOwnerDirectCall = isOwnerDirectCall,
+                    )
+                }
+            }
+        },
     )
 }
 
@@ -92,6 +143,8 @@ internal class DesktopAgentExecutionPort(
     private val plans: MutableMap<String, DesktopAgentNoteMutation>,
     /** 完成变更后的桌面通知。 */
     private val onMutation: () -> Unit,
+    /** 当前调用是否直接持有本机 owner token。 */
+    private val isOwnerDirectCall: Boolean = false,
 ) : AgentToolExecutionPort {
     /**
      * 验证输入并冻结变化，预览数据只交给持有者确认。
@@ -100,7 +153,7 @@ internal class DesktopAgentExecutionPort(
      */
     override suspend fun preview(request: AgentToolRequest): AgentToolPreview {
         val definition = ExternalToolDefinitions.definition(request.tool)
-        val mutation = DesktopAgentMutationService(session, principal)
+        val mutation = DesktopAgentMutationService(session, principal, isOwnerDirectCall)
         val details = when {
             !definition.readOnly -> {
                 val plan = mutation.plan(request)
@@ -115,7 +168,7 @@ internal class DesktopAgentExecutionPort(
             request.tool == AgentToolName.EXPORT_NOTE -> mutation.export(request)
             else -> null
         }
-        return AgentToolPreview(definition.name, request.itemCount, definition.destructive, false, details)
+        return AgentToolPreview(definition.name, request.itemCount, definition.destructive, details)
     }
 
     /**
@@ -128,6 +181,9 @@ internal class DesktopAgentExecutionPort(
         val definition = ExternalToolDefinitions.definition(request.tool)
         val payload: JsonElement = if (!definition.readOnly) {
             val plan = plans[request.requestId] ?: throw ExternalCallException("preview_required")
+            if (plan.expectedRevision != null) {
+                DesktopAgentReadService(session, principal, isOwnerDirectCall).note(plan.noteId)
+            }
             if (plan.deleted) {
                 session.deleteNoteLocked(plan.noteId, plan.expectedRevision, successAuditEvent)
                 buildJsonObject { put("noteId", plan.noteId.value); put("deleted", true) }
@@ -136,8 +192,11 @@ internal class DesktopAgentExecutionPort(
                 externalNoteJson(session.saveNoteLocked(plan.noteId, plan.note, plan.expectedRevision, successAuditEvent))
             }
         } else {
-            val data = if (request.tool == AgentToolName.EXPORT_NOTE) DesktopAgentMutationService(session, principal).export(request)
-                else DesktopAgentReadService(session, principal).execute(request)
+            val data = if (request.tool == AgentToolName.EXPORT_NOTE) {
+                DesktopAgentMutationService(session, principal, isOwnerDirectCall).export(request)
+            } else {
+                DesktopAgentReadService(session, principal, isOwnerDirectCall).execute(request)
+            }
             appendAgentAuditLocked(session, successAuditEvent)
             data
         }

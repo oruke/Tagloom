@@ -28,12 +28,9 @@ object AgentAuthorizationService {
         if (allowList != null && !allowList.containsAll(request.targetNoteIds)) {
             return denied(requiredScope, AgentDenialCode.TARGET_OUT_OF_SCOPE)
         }
-        if (request.sendsContentRemotely && AgentPermissionScope.CALL_REMOTE_AI !in principal.scopes) {
-            return denied(requiredScope, AgentDenialCode.REMOTE_AI_NOT_ALLOWED)
-        }
 
         var confirmation = baseConfirmation(request.tool)
-        if ((request.itemCount > 1 && confirmation != AgentConfirmationLevel.NONE) || request.sendsContentRemotely) {
+        if (request.itemCount > 1 && confirmation != AgentConfirmationLevel.NONE) {
             confirmation = maxConfirmation(confirmation, AgentConfirmationLevel.SECOND)
         }
         return AgentAuthorizationDecision(
@@ -49,7 +46,7 @@ object AgentAuthorizationService {
      * @param tool 待调用工具。
      * @return 缺失时必须拒绝的 scope。
      */
-    private fun requiredScope(tool: AgentToolName): AgentPermissionScope = when (tool) {
+    fun requiredScope(tool: AgentToolName): AgentPermissionScope = when (tool) {
         AgentToolName.SEARCH_NOTES,
         AgentToolName.QUERY_NOTES,
         AgentToolName.GET_BACKLINKS,
@@ -77,7 +74,6 @@ object AgentAuthorizationService {
 
         AgentToolName.DELETE_NOTE -> AgentPermissionScope.DELETE_NOTES
         AgentToolName.EXPORT_NOTE -> AgentPermissionScope.EXPORT_NOTES
-        AgentToolName.CALL_REMOTE_AI -> AgentPermissionScope.CALL_REMOTE_AI
     }
 
     /**
@@ -94,7 +90,6 @@ object AgentAuthorizationService {
 
         AgentToolName.DELETE_NOTE,
         AgentToolName.EXPORT_NOTE,
-        AgentToolName.CALL_REMOTE_AI,
         -> AgentConfirmationLevel.SECOND
 
         else -> AgentConfirmationLevel.NONE

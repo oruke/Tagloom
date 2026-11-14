@@ -6,6 +6,7 @@ import com.oruke.tagloom.core.index.SearchIndexCheckpoint
 import com.oruke.tagloom.core.index.SearchIndexHit
 import com.oruke.tagloom.core.index.SearchIndexQuery
 import com.oruke.tagloom.core.index.SearchIndexRebuildProgress
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.ObjectId
 
@@ -73,15 +74,25 @@ interface SearchEngine {
     suspend fun search(query: SearchIndexQuery): List<SearchIndexHit>
 
     /**
+     * 统计在相同查询条件下因不满足 `allowedAiPolicies` 而在分页前被排除的笔记篇数。
+     *
+     * @param query 包含 `allowedAiPolicies` 约束的查询。
+     * @return 被策略保护排除的命中篇数。
+     */
+    suspend fun countExcludedByPolicy(query: SearchIndexQuery): Int = 0
+
+    /**
      * 查询指向目标 Note 或 Block 的反向链接。
      *
      * @param targetNoteId 目标 Note ID。
      * @param targetBlockId 可选目标 Block ID；为空时查询整篇 Note。
+     * @param allowedAiPolicies 来源笔记允许的 AI 访问策略集合；为空表示人类持有者查看全部反向链接。
      * @return 稳定排序的反向链接。
      */
     suspend fun backlinks(
         targetNoteId: ObjectId,
         targetBlockId: BlockId? = null,
+        allowedAiPolicies: Set<AiAccessPolicy>? = null,
     ): List<BacklinkIndexHit>
 
     /**

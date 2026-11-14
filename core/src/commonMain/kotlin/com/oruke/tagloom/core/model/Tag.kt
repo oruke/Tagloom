@@ -19,6 +19,8 @@ data class TagDefinition(
     val templateBlocks: List<Block> = emptyList(),
     /** 用户显式选择的图标目录键；旧快照或清除图标时为空，不根据名称推断。 */
     val iconKey: String? = null,
+    /** 笔记类型默认 AI 访问策略；多父继承时与全部祖先链按最严格值收敛。 */
+    val aiAccessPolicy: AiAccessPolicy = AiAccessPolicy.ALLOW,
 ) {
     init {
         require(name.isNotBlank()) { "标签名称不能为空" }

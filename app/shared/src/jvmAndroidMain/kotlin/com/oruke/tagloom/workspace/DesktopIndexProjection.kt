@@ -1,16 +1,21 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.crypto.CryptoProvider
-import com.oruke.tagloom.core.crypto.EnvelopeCryptoService
 import com.oruke.tagloom.core.crypto.SecretKeyMaterial
+import com.oruke.tagloom.core.domain.tag.AiAccessPolicyResolver
 import com.oruke.tagloom.core.index.NoteIndexDocumentFactory
 import com.oruke.tagloom.core.index.SearchIndexCheckpoint
 import com.oruke.tagloom.core.model.Note
 import com.oruke.tagloom.core.model.ObjectId
 import com.oruke.tagloom.core.model.ObjectSnapshot
+import com.oruke.tagloom.core.model.PropertyId
+import com.oruke.tagloom.core.model.PropertyTypes
+import com.oruke.tagloom.core.model.TagDefinition
+import com.oruke.tagloom.core.model.TagId
 import com.oruke.tagloom.core.model.TransactionId
 import com.oruke.tagloom.core.transaction.DerivedStateUpdater
 import com.oruke.tagloom.core.transaction.NoteSnapshotEnvelopeService
+import com.oruke.tagloom.core.transaction.WorkspaceSchemaSnapshotEnvelopeService
 import com.oruke.tagloom.core.workspace.ManifestObjectKind
 import com.oruke.tagloom.core.workspace.WorkspaceManifestPayload
 import com.oruke.tagloom.core.workspace.WorkspaceManifestCodec
@@ -39,6 +44,7 @@ internal class DesktopIndexProjection(
     private val workspaceMasterKey: SecretKeyMaterial,
     val index: JvmSqliteIndexEngine,
     private val noteEnvelopeService: NoteSnapshotEnvelopeService,
+    private val schemaEnvelopeService: WorkspaceSchemaSnapshotEnvelopeService? = null,
 ) : DerivedStateUpdater {
     /**
      * 在事务确认后从磁盘权威 manifest 全量重建派生索引。
@@ -123,7 +129,7 @@ internal class DesktopIndexProjection(
     }
 
     /**
-     * 把指定 manifest 的全部 Note 投影为一个原子索引 checkpoint。
+     * 把指定 manifest 的全部 Note（连同继承收敛的有效 `AiAccessPolicy` 与关联属性）投影为一个原子索引 checkpoint。
      *
      * @param manifest 已认证 manifest 载荷。
      * @param snapshots 已扫描有效快照；为空时重新扫描。
@@ -133,7 +139,15 @@ internal class DesktopIndexProjection(
         snapshots: List<ObjectSnapshot<Note>>? = null,
     ) {
         val verifiedSnapshots = snapshots ?: loadSnapshots()
-        val documents = verifiedSnapshots.map(NoteIndexDocumentFactory::fromSnapshot)
+        val (tagMap, relationPropertyIds) = loadSchemaContextForProjection(manifest)
+        val policyResolver = BoundAiAccessPolicyResolver(tagMap)
+        val documents = verifiedSnapshots.map { snapshot ->
+            NoteIndexDocumentFactory.fromSnapshot(
+                snapshot = snapshot,
+                relationPropertyIds = relationPropertyIds,
+                effectiveAiPolicy = policyResolver.resolveEffectiveNotePolicy(snapshot.payload),
+            )
+        }
         index.rebuild(
             documents = documents,
             checkpoint = SearchIndexCheckpoint(
@@ -142,6 +156,58 @@ internal class DesktopIndexProjection(
             ),
             onProgress = {},
         )
+    }
+
+    /**
+     * 从当前认证 manifest 解密活动 `TagDefinition` 与 `relation` 属性定义集合，以支撑分页前策略过滤与关系双链索引。
+     *
+     * @param manifest 当前已认证 manifest 载荷。
+     * @return 活动类型映射与关系属性 ID 集合。
+     */
+    private suspend fun loadSchemaContextForProjection(
+        manifest: WorkspaceManifestPayload,
+    ): Pair<Map<TagId, TagDefinition>, Set<PropertyId>> = withContext(Dispatchers.IO) {
+        val schemaEnvelope = schemaEnvelopeService ?: return@withContext emptyMap<TagId, TagDefinition>() to emptySet()
+        val workspaceId = WorkspaceManifestCodec.decode(Files.readAllBytes(paths.manifest)).publicHeader.workspaceId
+        val tags = linkedMapOf<TagId, TagDefinition>()
+        val relationIds = linkedSetOf<PropertyId>()
+        for (record in manifest.objects) {
+            if (record.kind != ManifestObjectKind.TAG && record.kind != ManifestObjectKind.PROPERTY) continue
+            val file = paths.target(record.path)
+            if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) continue
+            val encrypted = Files.readAllBytes(file)
+            if (cryptoProvider.sha256(encrypted).toHex() != record.encryptedSha256) continue
+            if (record.kind == ManifestObjectKind.TAG) {
+                val decoded = runCatching {
+                    schemaEnvelope.decryptTag(
+                        encryptedBytes = encrypted,
+                        workspaceId = workspaceId,
+                        objectId = ObjectId(record.objectId),
+                        revision = record.revision,
+                        keyId = record.keyId,
+                        workspaceMasterKey = workspaceMasterKey,
+                    )
+                }.getOrNull()
+                if (decoded != null && !decoded.header.deleted) {
+                    tags[decoded.payload.id] = decoded.payload
+                }
+            } else {
+                val decoded = runCatching {
+                    schemaEnvelope.decryptProperty(
+                        encryptedBytes = encrypted,
+                        workspaceId = workspaceId,
+                        objectId = ObjectId(record.objectId),
+                        revision = record.revision,
+                        keyId = record.keyId,
+                        workspaceMasterKey = workspaceMasterKey,
+                    )
+                }.getOrNull()
+                if (decoded != null && !decoded.header.deleted && decoded.payload.type == PropertyTypes.RELATION) {
+                    relationIds += decoded.payload.id
+                }
+            }
+        }
+        tags to relationIds
     }
 
     /**

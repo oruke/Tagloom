@@ -1,15 +1,21 @@
 package com.oruke.tagloom.core.agent
 
+import com.oruke.tagloom.core.ai.AiRetrievalScope
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.ObjectId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
-/** 验证 Agent 默认拒绝、最小 scope、目标 allow-list 与两阶段确认。 */
+/** 验证 Agent 默认拒绝、最小 scope、目标 allow-list、两阶段确认与 `AiAccessPolicy` 门禁。 */
 class AgentAuthorizationServiceTest {
-    /** 验证只读工具无需确认，而写入、批量、删除和远程发送逐级提高确认强度。 */
+    /** 验证只读工具无需确认，而写入、批量和删除逐级提高确认强度。 */
     @Test
     fun computesLeastPrivilegeAndConfirmationLevel() {
         val principal = AgentPrincipal(
@@ -19,7 +25,6 @@ class AgentAuthorizationServiceTest {
                 AgentPermissionScope.SEARCH_NOTES,
                 AgentPermissionScope.WRITE_NOTES,
                 AgentPermissionScope.DELETE_NOTES,
-                AgentPermissionScope.CALL_REMOTE_AI,
             ),
         )
 
@@ -42,18 +47,11 @@ class AgentAuthorizationServiceTest {
             AgentConfirmationLevel.SECOND,
             AgentAuthorizationService.authorize(principal, request("delete", AgentToolName.DELETE_NOTE)).confirmationLevel,
         )
-        assertEquals(
-            AgentConfirmationLevel.SECOND,
-            AgentAuthorizationService.authorize(
-                principal,
-                request("remote", AgentToolName.GET_NOTE, sendsContentRemotely = true),
-            ).confirmationLevel,
-        )
     }
 
-    /** 验证缺少 scope、越过 Note allow-list 或未获远程发送权限都会稳定拒绝。 */
+    /** 验证缺少 scope 或越过 Note allow-list 都会稳定拒绝。 */
     @Test
-    fun deniesMissingScopeOutOfScopeTargetAndRemoteTransmission() {
+    fun deniesMissingScopeAndOutOfScopeTarget() {
         val noteId = ObjectId("note-allowed")
         val principal = AgentPrincipal(
             principalId = "agent-limited",
@@ -69,14 +67,107 @@ class AgentAuthorizationServiceTest {
             principal,
             request("target", AgentToolName.GET_NOTE, targets = setOf(ObjectId("note-other"))),
         )
-        val remoteDenied = AgentAuthorizationService.authorize(
-            principal,
-            request("remote", AgentToolName.GET_NOTE, targets = setOf(noteId), sendsContentRemotely = true),
-        )
 
         assertEquals(AgentDenialCode.MISSING_SCOPE, missingScope.denialCode)
         assertEquals(AgentDenialCode.TARGET_OUT_OF_SCOPE, targetDenied.denialCode)
-        assertEquals(AgentDenialCode.REMOTE_AI_NOT_ALLOWED, remoteDenied.denialCode)
+    }
+
+    /** 验证 `LOCKED` 与 `REFERENCE_ONLY` 在内置与外部（全库 token、白名单 token、owner token）下的门禁矩阵。 */
+    @Test
+    fun enforcesAiAccessPolicyAcrossInternalAndExternalCallers() {
+        val noteId = ObjectId("note-secret")
+        val workspacePrincipal = AgentPrincipal(
+            principalId = "ext-workspace",
+            scopes = AgentPermissionScope.entries.toSet(),
+            allowedNoteIds = null,
+        )
+        val whitelistedPrincipal = AgentPrincipal(
+            principalId = "ext-whitelist",
+            scopes = AgentPermissionScope.entries.toSet(),
+            allowedNoteIds = setOf(noteId),
+        )
+
+        // 自动发现仅放行 ALLOW
+        assertTrue(AgentNotePolicyGate.canDiscover(AiAccessPolicy.ALLOW))
+        assertFalse(AgentNotePolicyGate.canDiscover(AiAccessPolicy.REFERENCE_ONLY))
+        assertFalse(AgentNotePolicyGate.canDiscover(AiAccessPolicy.LOCKED))
+
+        // LOCKED：无论显式 @、白名单还是 owner token 一律拒绝
+        assertEquals(
+            AgentDenialCode.AI_ACCESS_POLICY_LOCKED,
+            AgentNotePolicyGate.checkInternalRead(
+                effectivePolicy = AiAccessPolicy.LOCKED,
+                retrievalScope = AiRetrievalScope.ALL_NOTES,
+                explicitlyCited = true,
+            ),
+        )
+        assertEquals(
+            AgentDenialCode.AI_ACCESS_POLICY_LOCKED,
+            AgentNotePolicyGate.checkExternalDirectAccess(
+                effectivePolicy = AiAccessPolicy.LOCKED,
+                noteId = noteId,
+                principal = whitelistedPrincipal,
+                isOwnerDirectCall = true,
+            ),
+        )
+
+        // REFERENCE_ONLY：内置必须亲手 @，外部必须白名单或 owner token，全库外部 token 拒绝
+        assertEquals(
+            AgentDenialCode.AI_ACCESS_POLICY_REFERENCE_ONLY,
+            AgentNotePolicyGate.checkInternalRead(
+                effectivePolicy = AiAccessPolicy.REFERENCE_ONLY,
+                retrievalScope = AiRetrievalScope.ALL_NOTES,
+                explicitlyCited = false,
+                inCitedScopeFilter = true,
+            ),
+        )
+        assertNull(
+            AgentNotePolicyGate.checkInternalRead(
+                effectivePolicy = AiAccessPolicy.REFERENCE_ONLY,
+                retrievalScope = AiRetrievalScope.CITED_ONLY,
+                explicitlyCited = true,
+            ),
+        )
+        assertEquals(
+            AgentDenialCode.AI_ACCESS_POLICY_REFERENCE_ONLY,
+            AgentNotePolicyGate.checkExternalDirectAccess(
+                effectivePolicy = AiAccessPolicy.REFERENCE_ONLY,
+                noteId = noteId,
+                principal = workspacePrincipal,
+                isOwnerDirectCall = false,
+            ),
+        )
+        assertNull(
+            AgentNotePolicyGate.checkExternalDirectAccess(
+                effectivePolicy = AiAccessPolicy.REFERENCE_ONLY,
+                noteId = noteId,
+                principal = whitelistedPrincipal,
+                isOwnerDirectCall = false,
+            ),
+        )
+        assertNull(
+            AgentNotePolicyGate.checkExternalDirectAccess(
+                effectivePolicy = AiAccessPolicy.REFERENCE_ONLY,
+                noteId = noteId,
+                principal = workspacePrincipal,
+                isOwnerDirectCall = true,
+            ),
+        )
+
+        // 防篡改 aiAccessPolicy
+        assertTrue(AgentNotePolicyGate.isPolicyUnchangedInJson(AiAccessPolicy.LOCKED, buildJsonObject {}))
+        assertFalse(
+            AgentNotePolicyGate.isPolicyUnchangedInJson(
+                AiAccessPolicy.LOCKED,
+                buildJsonObject { put("aiAccessPolicy", JsonPrimitive("ALLOW")) },
+            ),
+        )
+        assertFalse(
+            AgentNotePolicyGate.isPolicyUnchangedInJson(
+                AiAccessPolicy.LOCKED,
+                buildJsonObject { put("aiAccessPolicy", JsonNull) },
+            ),
+        )
     }
 
     /** 验证二次确认不足时没有执行副作用，充分确认后成功事件交给执行端原子持久化。 */
@@ -128,7 +219,6 @@ class AgentAuthorizationServiceTest {
      * @param tool 工具名称。
      * @param itemCount 条目数。
      * @param targets 目标 Note IDs。
-     * @param sendsContentRemotely 是否远程发送。
      * @return 测试请求。
      */
     private fun request(
@@ -136,13 +226,11 @@ class AgentAuthorizationServiceTest {
         tool: AgentToolName,
         itemCount: Int = 1,
         targets: Set<ObjectId> = emptySet(),
-        sendsContentRemotely: Boolean = false,
     ): AgentToolRequest = AgentToolRequest(
         requestId = id,
         tool = tool,
         targetNoteIds = targets,
         itemCount = itemCount,
-        sendsContentRemotely = sendsContentRemotely,
     )
 }
 
@@ -164,7 +252,6 @@ private class RecordingExecutionPort : AgentToolExecutionPort {
         title = "更新预览",
         affectedItems = request.itemCount,
         destructive = false,
-        sendsContentRemotely = request.sendsContentRemotely,
     )
 
     /**

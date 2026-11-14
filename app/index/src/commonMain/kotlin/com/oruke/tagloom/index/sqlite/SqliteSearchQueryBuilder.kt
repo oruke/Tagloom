@@ -56,9 +56,13 @@ internal object SqliteSearchQueryBuilder {
                 )
             """.trimIndent()
         }
-        // 授权过滤必须先于 LIMIT/OFFSET，避免泄露越权命中或使合法结果分页缺失。
+        // 授权与 AI 访问策略过滤必须先于 LIMIT/OFFSET，避免泄露越权命中或使合法结果分页缺失。
         query.allowedNoteIds?.let { ids ->
             conditions += if (ids.isEmpty()) "0 = 1" else "d.note_id IN (${ids.joinToString { "?" }})"
+        }
+        query.allowedAiPolicies?.let { policies ->
+            val sortedPolicies = policies.map { it.name }.sorted()
+            conditions += if (sortedPolicies.isEmpty()) "0 = 1" else "d.ai_access_policy IN (${sortedPolicies.joinToString { "?" }})"
         }
 
         val projection = if (usesFullText) {
@@ -117,8 +121,84 @@ internal object SqliteSearchQueryBuilder {
             add(filter.canonicalValue)
         }
         query.allowedNoteIds?.sortedBy { it.value }?.forEach { add(it.value) }
+        query.allowedAiPolicies?.map { it.name }?.sorted()?.forEach(::add)
         add(query.limit)
         add(query.offset)
+    }
+
+    /**
+     * 构建统计相同查询条件下因不满足 `allowedAiPolicies` 而被排除的笔记篇数 SQL 与绑定参数。
+     *
+     * @param query 包含 `allowedAiPolicies` 的原始查询；若 `allowedAiPolicies` 为空则返回 `null`（排除数为 0）。
+     * @return 参数化 `COUNT(*)` SQL 与绑定参数列表。
+     */
+    fun buildExcludedByPolicyCount(query: SearchIndexQuery): Pair<String, List<Any?>>? {
+        val allowedPolicies = query.allowedAiPolicies ?: return null
+        val sortedPolicies = allowedPolicies.map { it.name }.sorted()
+        val searchTokens = searchTokens(query.text)
+        val usesLikeFallback = searchTokens.any { token -> token.length < MINIMUM_TRIGRAM_LENGTH }
+        val fullTextQuery = if (usesLikeFallback) null else toFtsLiteralQuery(searchTokens)
+        val likeTokens = if (usesLikeFallback) searchTokens else emptyList()
+        val sortedTagIds = query.tagIds.sortedBy { it.value }
+        val sortedPropertyFilters = query.propertyFilters.sortedBy { it.propertyId.value }
+        val usesFullText = fullTextQuery != null
+        val conditions = mutableListOf<String>()
+
+        if (usesFullText) {
+            conditions += "note_fts MATCH ?"
+        }
+        likeTokens.forEach { _ ->
+            conditions += "(d.title LIKE ? ESCAPE '\\' OR d.body_text LIKE ? ESCAPE '\\')"
+        }
+        sortedTagIds.forEach { _ ->
+            conditions += """
+                EXISTS(
+                    SELECT 1 FROM note_tags tag_filter
+                    WHERE tag_filter.note_id = d.note_id AND tag_filter.tag_id = ?
+                )
+            """.trimIndent()
+        }
+        sortedPropertyFilters.forEach { _ ->
+            conditions += """
+                EXISTS(
+                    SELECT 1 FROM note_properties property_filter
+                    WHERE property_filter.note_id = d.note_id
+                      AND property_filter.property_id = ?
+                      AND property_filter.canonical_value = ?
+                )
+            """.trimIndent()
+        }
+        query.allowedNoteIds?.let { ids ->
+            conditions += if (ids.isEmpty()) "0 = 1" else "d.note_id IN (${ids.joinToString { "?" }})"
+        }
+        if (sortedPolicies.isNotEmpty()) {
+            conditions += "d.ai_access_policy NOT IN (${sortedPolicies.joinToString { "?" }})"
+        }
+
+        val fromClause = if (usesFullText) {
+            "SELECT CAST(COUNT(*) AS TEXT) AS excluded_count FROM note_documents d JOIN note_fts ON note_fts.note_id = d.note_id"
+        } else {
+            "SELECT CAST(COUNT(*) AS TEXT) AS excluded_count FROM note_documents d"
+        }
+        val where = conditions.takeIf(List<String>::isNotEmpty)
+            ?.joinToString(separator = "\nAND ", prefix = "\nWHERE ")
+            .orEmpty()
+        val params = buildList<Any?> {
+            fullTextQuery?.let(::add)
+            likeTokens.forEach { token ->
+                val pattern = "%${escapeLikeLiteral(token)}%"
+                add(pattern)
+                add(pattern)
+            }
+            sortedTagIds.forEach { add(it.value) }
+            sortedPropertyFilters.forEach { filter ->
+                add(filter.propertyId.value)
+                add(filter.canonicalValue)
+            }
+            query.allowedNoteIds?.sortedBy { it.value }?.forEach { add(it.value) }
+            sortedPolicies.forEach(::add)
+        }
+        return (fromClause + where) to params
     }
 
     /**

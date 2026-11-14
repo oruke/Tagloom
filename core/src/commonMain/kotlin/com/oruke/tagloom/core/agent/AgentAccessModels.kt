@@ -24,9 +24,6 @@ enum class AgentPermissionScope {
 
     /** 导出授权内容。 */
     EXPORT_NOTES,
-
-    /** 把明确授权的最小上下文发送到远端 AI。 */
-    CALL_REMOTE_AI,
 }
 
 /** 定义 CLI、MCP 与内置 Agent 共享的稳定知识工具名称。 */
@@ -88,9 +85,6 @@ enum class AgentToolName {
 
     /** 导出 Note。 */
     EXPORT_NOTE,
-
-    /** 调用远端 AI Gateway。 */
-    CALL_REMOTE_AI,
 }
 
 /** 定义工具执行前需要的用户确认强度。 */
@@ -102,7 +96,7 @@ enum class AgentConfirmationLevel {
     /** 展示预览后需要一次明确确认。 */
     SINGLE,
 
-    /** 批量、删除、导出或远程发送需要二次确认。 */
+    /** 批量、删除或导出需要二次确认。 */
     SECOND,
 }
 
@@ -118,8 +112,11 @@ enum class AgentDenialCode {
     /** 请求条目数超过 principal 单次上限。 */
     ITEM_LIMIT_EXCEEDED,
 
-    /** 请求远程发送但缺少远端 AI scope。 */
-    REMOTE_AI_NOT_ALLOWED,
+    /** 目标笔记或其继承笔记类型处于 `LOCKED` 禁读保护态。 */
+    AI_ACCESS_POLICY_LOCKED,
+
+    /** 目标笔记处于 `REFERENCE_ONLY` 保护态，未获显式单篇挂载或白名单授权。 */
+    AI_ACCESS_POLICY_REFERENCE_ONLY,
 }
 
 /** 描述一个外部 Agent 的稳定身份与最小授权范围。 */
@@ -151,8 +148,6 @@ data class AgentToolRequest(
     val targetNoteIds: Set<ObjectId> = emptySet(),
     /** 预计读取、返回或修改的条目数。 */
     val itemCount: Int = 1,
-    /** 本次请求是否会把任何明文发送到工作区之外。 */
-    val sendsContentRemotely: Boolean = false,
     /** 工具协议参数；只在解锁客户端内存和加密审计中存在。 */
     val arguments: JsonElement? = null,
 ) {

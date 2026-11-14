@@ -155,6 +155,15 @@ internal class DesktopReplicaCodec(
                                 "sync_integrity_failed"
                             }
                         }
+                        if (record.kind == ManifestObjectKind.AGENT_THREAD && !snapshot.header.deleted) {
+                            val thread = CanonicalJson.format.decodeFromJsonElement(
+                                com.oruke.tagloom.core.ai.AgentThread.serializer(),
+                                snapshot.payload,
+                            )
+                            require(com.oruke.tagloom.core.ai.AgentThreadValidator.validate(thread).isEmpty()) {
+                                "sync_integrity_failed"
+                            }
+                        }
                         objects += WorkspaceReplicaObject(record.kind, snapshot)
                     }
                 }
@@ -185,6 +194,7 @@ internal fun replicaSnapshotType(kind: ManifestObjectKind): String = when (kind)
     ManifestObjectKind.DATABASE -> "database-snapshot"
     ManifestObjectKind.VIEW -> "view-snapshot"
     ManifestObjectKind.WORKSPACE_CONFIG -> "workspace-config-snapshot"
+    ManifestObjectKind.AGENT_THREAD -> "agent-thread-snapshot"
     else -> error("sync_object_kind_invalid")
 }
 

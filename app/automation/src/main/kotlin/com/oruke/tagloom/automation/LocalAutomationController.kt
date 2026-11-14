@@ -78,7 +78,7 @@ class LocalAutomationController(
         }
         if (calls.size >= 256) throw LocalApiException(429, "call_limit")
         if (calls.values.any { it.prepared.request.requestId == request.requestId }) throw LocalApiException(409, "idempotency_conflict")
-        val prepared = workspace.prepare(auth.principal, request)
+        val prepared = workspace.prepare(auth.principal, request, isOwnerDirectCall = auth.owner)
         if (!prepared.decision.allowed) throw LocalApiException(403, prepared.decision.denialCode?.name?.lowercase() ?: "authorization_denied")
         val preview = prepared.preview?.copy(details = null)
         var response = LocalCallResponse(request.requestId, "pending", prepared.decision.confirmationLevel, preview)

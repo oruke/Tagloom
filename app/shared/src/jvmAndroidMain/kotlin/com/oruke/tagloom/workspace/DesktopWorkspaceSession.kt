@@ -78,6 +78,8 @@ class DesktopWorkspaceSession internal constructor(
     internal val databaseStore: DesktopWorkspaceDatabaseStore,
     /** 工作区级 Agent 配置权威密文读写入口。 */
     internal val configStore: DesktopWorkspaceConfigStore,
+    /** 工作区级持久化 Agent 会话权威密文读写入口。 */
+    internal val threadStore: DesktopAgentThreadStore,
     /** 扫描全部 manifest 密文对象的完整性服务。 */
     private val integrityScanner: DesktopWorkspaceIntegrityScanner,
     /** 验证并提交 Change checkpoint 的桌面维护服务。 */
@@ -152,7 +154,8 @@ class DesktopWorkspaceSession internal constructor(
         }
         integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
             savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
-            databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues).distinct()
+            databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues +
+            threadStore.loadAll(unlocked).issues).distinct()
         if (!readOnly && integrityIssues.isEmpty()) {
             DesktopReplicaCodec(this).observeClock()
             DesktopNoteTagSchemaMigration.migrate(schemaStore, unlocked, ::nextSchemaWriteContext)?.let { manifest ->
@@ -208,9 +211,10 @@ class DesktopWorkspaceSession internal constructor(
     suspend fun backlinks(
         noteId: ObjectId,
         blockId: BlockId? = null,
+        allowedAiPolicies: Set<com.oruke.tagloom.core.model.AiAccessPolicy>? = null,
     ): List<BacklinkIndexHit> = sessionMutex.withLock {
         requireOpen()
-        projection.index.backlinks(noteId, blockId)
+        projection.index.backlinks(noteId, blockId, allowedAiPolicies)
     }
 
     /**
@@ -250,7 +254,8 @@ class DesktopWorkspaceSession internal constructor(
             refreshManifest(result.encryptedManifest)
             integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
                 savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
-                databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues).distinct()
+                databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues +
+                threadStore.loadAll(unlocked).issues).distinct()
             result
         }
 
@@ -315,7 +320,8 @@ class DesktopWorkspaceSession internal constructor(
         refreshManifest()
         integrityIssues = (integrityScanner.inspect(unlocked) + projection.ensureCurrent() +
             savedQueryLoader.inspect(unlocked).issues + schemaStore.inspect(unlocked).issues +
-            databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues).distinct()
+            databaseStore.inspect(unlocked).issues + configStore.load(unlocked).issues +
+            threadStore.loadAll(unlocked).issues).distinct()
         openState()
     }
 

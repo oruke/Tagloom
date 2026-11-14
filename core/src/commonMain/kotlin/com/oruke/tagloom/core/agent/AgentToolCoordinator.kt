@@ -20,17 +20,15 @@ enum class AgentAuditOutcome {
     FAILED,
 }
 
-/** 描述执行前展示给用户的最小变更或数据发送预览。 */
+/** 描述执行前展示给用户的最小变更预览。 */
 @Serializable
 data class AgentToolPreview(
     /** 不包含正文的预览标题。 */
     val title: String,
-    /** 预计读取、修改或发送的条目数。 */
+    /** 预计读取、修改或导出的条目数。 */
     val affectedItems: Int,
     /** 是否包含 tombstone 或物理删除意图。 */
     val destructive: Boolean,
-    /** 是否会把任何明文发送到工作区之外。 */
-    val sendsContentRemotely: Boolean,
     /** 仅向持有者展示的变更差异或导出损失；不进入日志和审计。 */
     val details: JsonElement? = null,
 ) {
@@ -70,8 +68,8 @@ data class AgentAuditEvent(
     val outcome: AgentAuditOutcome,
     /** 随机目标 Note IDs。 */
     val targetNoteIds: Set<com.oruke.tagloom.core.model.ObjectId>,
-    /** 是否涉及远程发送明文。 */
-    val sentContentRemotely: Boolean,
+    /** 历史加密审计保留兼容字段，默认 `false`。 */
+    val sentContentRemotely: Boolean = false,
     /** 事件时间，使用 UTC ISO-8601 文本。 */
     val occurredAt: String,
 ) {
@@ -148,6 +146,8 @@ class AgentToolCoordinator(
     private val executionPort: AgentToolExecutionPort,
     /** 记录拒绝、取消和失败事件的加密审计端口。 */
     private val auditPort: AgentAuditPort,
+    /** 针对直接目标笔记 ID 的可选 `AiAccessPolicy` 门禁评估器；返回非空表示策略拒绝。 */
+    private val targetPolicyEvaluator: suspend (com.oruke.tagloom.core.model.ObjectId) -> AgentDenialCode? = { null },
 ) {
     /**
      * 执行授权判定并仅在允许时生成无副作用预览。
@@ -166,6 +166,19 @@ class AgentToolCoordinator(
         if (!decision.allowed) {
             auditPort.append(auditEvent(principal, request, AgentAuditOutcome.DENIED, occurredAt))
             return AgentPreparedToolCall(principal, request, decision, preview = null)
+        }
+        for (targetId in request.targetNoteIds) {
+            val policyDenial = targetPolicyEvaluator(targetId)
+            if (policyDenial != null) {
+                val deniedDecision = AgentAuthorizationDecision(
+                    allowed = false,
+                    confirmationLevel = AgentConfirmationLevel.NONE,
+                    requiredScope = decision.requiredScope,
+                    denialCode = policyDenial,
+                )
+                auditPort.append(auditEvent(principal, request, AgentAuditOutcome.DENIED, occurredAt))
+                return AgentPreparedToolCall(principal, request, deniedDecision, preview = null)
+            }
         }
         return try {
             AgentPreparedToolCall(principal, request, decision, executionPort.preview(request))
@@ -245,7 +258,7 @@ class AgentToolCoordinator(
         tool = request.tool,
         outcome = outcome,
         targetNoteIds = request.targetNoteIds,
-        sentContentRemotely = request.sendsContentRemotely,
+        sentContentRemotely = false,
         occurredAt = occurredAt,
     )
 }

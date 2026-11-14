@@ -131,7 +131,7 @@ private fun ApplicationCall.paginationArgs(): JsonObject = buildJsonObject {
 internal fun localApiFailure(error: Throwable): LocalApiException = when (error) {
     is LocalApiException -> error
     is ExternalCallException -> LocalApiException(when (error.code) {
-        "authorization_denied" -> 403
+        "authorization_denied", "ai_access_policy_immutable", "system_page_protected" -> 403
         "not_found" -> 404
         "revision_conflict" -> 409
         "workspace_locked", "workspace_read_only" -> 423

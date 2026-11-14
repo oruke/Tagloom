@@ -8,6 +8,7 @@ import com.oruke.tagloom.core.index.SearchIndexHit
 import com.oruke.tagloom.core.index.SearchIndexPort
 import com.oruke.tagloom.core.index.SearchIndexQuery
 import com.oruke.tagloom.core.index.SearchIndexRebuildProgress
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.BlockId
 import com.oruke.tagloom.core.model.ObjectId
 import kotlinx.coroutines.CoroutineDispatcher
@@ -79,17 +80,29 @@ class EncryptedSqliteSearchIndex private constructor(
     }
 
     /**
+     * 统计在相同查询条件下因不满足 `allowedAiPolicies` 而在分页前被排除的笔记篇数。
+     *
+     * @param query 包含 `allowedAiPolicies` 约束的查询。
+     * @return 被策略保护排除的命中篇数。
+     */
+    override suspend fun countExcludedByPolicy(query: SearchIndexQuery): Int = runOpenLocked {
+        repository.countExcludedByPolicy(query)
+    }
+
+    /**
      * 查询指向目标 Note 或 Block 的反向链接。
      *
      * @param targetNoteId 目标 Note。
      * @param targetBlockId 可选目标 Block。
+     * @param allowedAiPolicies 来源笔记允许的 AI 访问策略集合；为空表示人类持有者查看全部反向链接。
      * @return 稳定排序的反向链接。
      */
     override suspend fun backlinks(
         targetNoteId: ObjectId,
         targetBlockId: BlockId?,
+        allowedAiPolicies: Set<AiAccessPolicy>?,
     ): List<BacklinkIndexHit> = runOpenLocked {
-        repository.backlinks(targetNoteId, targetBlockId)
+        repository.backlinks(targetNoteId, targetBlockId, allowedAiPolicies)
     }
 
     /**

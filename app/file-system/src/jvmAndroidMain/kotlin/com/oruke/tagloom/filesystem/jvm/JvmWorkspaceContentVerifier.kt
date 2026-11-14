@@ -1,5 +1,7 @@
 package com.oruke.tagloom.filesystem.jvm
 
+import com.oruke.tagloom.core.ai.AgentThread
+import com.oruke.tagloom.core.ai.AgentThreadValidator
 import com.oruke.tagloom.core.ai.WorkspaceConfig
 import com.oruke.tagloom.core.ai.WorkspaceConfigValidator
 import com.oruke.tagloom.core.crypto.EncryptionEnvelope
@@ -293,6 +295,17 @@ class JvmWorkspaceContentVerifier(
         ) { snapshot ->
             snapshot.payload.id.value == role.objectId &&
                 (snapshot.header.deleted || WorkspaceConfigValidator.validate(snapshot.payload).isEmpty())
+        }
+
+        ArtifactSchemaKind.AGENT_THREAD -> validateSnapshot(
+            role = role,
+            envelope = envelope,
+            plaintext = plaintext,
+            serializer = ObjectSnapshot.serializer(AgentThread.serializer()),
+            expectedType = ObjectType.AGENT_THREAD,
+        ) { snapshot ->
+            snapshot.payload.id.value == role.objectId &&
+                (snapshot.header.deleted || AgentThreadValidator.validate(snapshot.payload).isEmpty())
         }
 
         ArtifactSchemaKind.CHANGE -> {

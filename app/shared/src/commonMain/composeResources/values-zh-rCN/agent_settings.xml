@@ -1,5 +1,6 @@
 <resources>
     <string name="workspace_recovery_object_workspace_config">工作区 Agent 配置</string>
+    <string name="workspace_recovery_object_agent_thread">Agent 对话会话</string>
 
     <string name="agent_settings_title">Agent 与模型</string>
     <string name="agent_settings_back">返回设置</string>

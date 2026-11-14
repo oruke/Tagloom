@@ -1,0 +1,111 @@
+<resources>
+    <string name="agent_sidebar_new_note">新建笔记</string>
+    <string name="agent_sidebar_new_thread">新会话</string>
+    <string name="agent_sidebar_incognito_thread">新建无痕会话</string>
+    <string name="agent_sidebar_all_notes_db">全部笔记</string>
+    <string name="agent_sidebar_recent_threads">最近会话</string>
+    <string name="agent_sidebar_recent_notes">最近笔记</string>
+    <string name="agent_sidebar_view_all">全部 ▸</string>
+    <string name="agent_sidebar_empty_threads">暂无历史会话</string>
+    <string name="agent_sidebar_toggle_nav">切换左侧导航栏</string>
+
+    <string name="agent_policy_allow_short">可读</string>
+    <string name="agent_policy_ref_only_short">仅@</string>
+    <string name="agent_policy_locked_short">禁读</string>
+    <string name="agent_policy_header_allow">AI: 可读</string>
+    <string name="agent_policy_header_ref_only">AI: 仅 @ 引用</string>
+    <string name="agent_policy_header_locked">AI: 禁读</string>
+    <string name="agent_policy_inherit_default">跟随笔记类型继承</string>
+    <string name="agent_policy_option_allow">允许 AI 检索与读取</string>
+    <string name="agent_policy_option_allow_desc">允许出现在内置与已授权外部工具的搜索、列表、保存查询与双链结果中。</string>
+    <string name="agent_policy_option_ref_only">仅显式 @ 引用可读</string>
+    <string name="agent_policy_option_ref_only_desc">在一切自动发现与搜索列表中隐藏；仅当用户手动 @ 挂载或显式白名单授权时可读。</string>
+    <string name="agent_policy_option_locked">完全禁止读取</string>
+    <string name="agent_policy_option_locked_desc">对内置模型与一切外部工具完全隐藏且禁读，即便手动 @ 挂载或白名单调用也严格拦截。</string>
+    <string name="agent_policy_provenance_override">当前笔记已单独覆盖</string>
+    <string name="agent_policy_provenance_inherited">继承自笔记类型：%1$s</string>
+    <string name="agent_policy_supertag_section_title">默认 AI 访问策略</string>
+    <string name="agent_policy_supertag_section_hint">关联该笔记类型（及子类型闭包）且未单独覆盖的笔记，自动沿多父祖先链按「禁读 &gt; 仅@ &gt; 可读」取最严格策略。</string>
+    <string name="agent_policy_supertag_impact">继承影响预览：覆盖 %1$d 个类型闭包 · 关联 %2$d 篇未覆盖笔记（预计变更 %3$d 篇）</string>
+
+    <string name="all_notes_db_title">全部笔记</string>
+    <string name="all_notes_db_system_badge">系统默认数据库 · 防误删保护</string>
+    <string name="all_notes_db_search_placeholder">搜索全部笔记标题或正文…</string>
+    <string name="all_notes_db_all_types">全部笔记类型</string>
+    <string name="all_notes_db_sort_updated">按最近更新</string>
+    <string name="all_notes_db_sort_title">按标题排序</string>
+    <string name="all_notes_db_view_table">表格</string>
+    <string name="all_notes_db_view_kanban">看板</string>
+    <string name="all_notes_db_view_gallery">画廊</string>
+    <string name="all_notes_db_empty">当前筛选条件下暂无匹配笔记。</string>
+    <string name="all_notes_db_col_type">笔记类型</string>
+    <string name="all_notes_db_col_ai_policy">AI 策略</string>
+    <string name="all_notes_db_col_updated">最近更新</string>
+
+    <string name="agent_toggle_companion">切换右侧 Agent 伴随栏 (Ctrl+J)</string>
+    <string name="agent_switch_to_companion">切换到右侧伴随模式</string>
+    <string name="agent_expand_to_fullscreen">展开为全屏 Agent 会话</string>
+    <string name="agent_close_companion">关闭 Agent 伴随栏</string>
+    <string name="agent_return_to_chat">← 返回 Agent 对话</string>
+    <string name="agent_thread_default_title">新对话</string>
+    <string name="agent_thread_incognito_badge">无痕 · 仅驻留内存</string>
+    <string name="agent_thread_archive">归档会话</string>
+    <string name="agent_thread_restore">恢复会话</string>
+    <string name="agent_thread_delete">删除会话</string>
+    <string name="agent_thread_rename_placeholder">输入会话标题…</string>
+
+    <string name="agent_history_title">全部历史会话</string>
+    <string name="agent_history_search_placeholder">搜索历史会话标题…</string>
+    <string name="agent_history_tab_active">活动会话</string>
+    <string name="agent_history_tab_archived">已归档</string>
+    <string name="agent_history_empty">没有匹配的会话记录。</string>
+
+    <string name="agent_banner_no_model">尚未配置启用模型，请前往「设置 · Agent 与模型」连接模型端点。</string>
+    <string name="agent_banner_missing_key">当前设备尚未配置所选连接的本机 API Key，请先在设置中补齐凭据。</string>
+    <string name="agent_banner_open_settings">前往配置</string>
+    <string name="agent_error_turn_failed">模型对话请求未能完成，请检查端点连通性与凭据配置。</string>
+
+    <string name="agent_empty_welcome_title">围绕加密知识库开始对话</string>
+    <string name="agent_empty_welcome_subtitle">输入 @ 挂载单篇笔记、段落、笔记类型或保存查询，或点亮地球仪启用全库可读检索。</string>
+
+    <string name="agent_composer_placeholder">输入问题或分析要求（输入 @ 挂载上下文）…</string>
+    <string name="agent_composer_attach_context">添加引用 (@)</string>
+    <string name="agent_composer_scope_cited">检索范围：仅引用上下文</string>
+    <string name="agent_composer_scope_all">检索范围：全部可读笔记</string>
+    <string name="agent_composer_scope_chat_only">当前模型仅支持纯问答（不调用检索工具）</string>
+    <string name="agent_composer_model_unselected">未选择模型</string>
+    <string name="agent_composer_thinking_off">关</string>
+    <string name="agent_composer_thinking_low">低</string>
+    <string name="agent_composer_thinking_medium">中</string>
+    <string name="agent_composer_thinking_high">高</string>
+    <string name="agent_composer_send">发送消息</string>
+    <string name="agent_composer_stop">停止生成</string>
+    <string name="agent_composer_ref_locked_warning">已设为禁读策略，自动拦截不发送</string>
+
+    <string name="agent_picker_search_placeholder">搜索笔记、笔记类型或保存查询…</string>
+    <string name="agent_picker_tab_notes">单篇笔记</string>
+    <string name="agent_picker_tab_types">笔记类型</string>
+    <string name="agent_picker_tab_queries">保存查询</string>
+    <string name="agent_picker_attach_selection">挂载当前编辑器选中段落（%1$d 段）</string>
+    <string name="agent_picker_blocks_dialog_title">勾选「%1$s」参与引用的段落</string>
+    <string name="agent_picker_blocks_select_all">全选全部活动段落</string>
+
+    <string name="agent_model_popup_title">模型与思考强度</string>
+    <string name="agent_model_popup_thinking_label">思考强度</string>
+    <string name="agent_model_badge_tools">支持工具</string>
+    <string name="agent_model_badge_chat">仅问答</string>
+
+    <string name="agent_msg_thinking_title">思考过程摘要</string>
+    <string name="agent_msg_stopped_badge">已手动停止</string>
+    <string name="agent_msg_action_copy">复制 Markdown</string>
+    <string name="agent_msg_action_append">追加到当前笔记</string>
+    <string name="agent_msg_action_save_new">存为新笔记</string>
+    <string name="agent_msg_copied_toast">已复制 Markdown</string>
+    <string name="agent_msg_appended_toast">已追加到当前笔记末尾</string>
+    <string name="agent_msg_saved_new_toast">已存为新笔记</string>
+
+    <string name="agent_citation_verified">来源已核验</string>
+    <string name="agent_citation_updated">对话后已更新</string>
+    <string name="agent_citation_removed">原段落已删除</string>
+    <string name="agent_citation_open_note">定位到原文</string>
+</resources>

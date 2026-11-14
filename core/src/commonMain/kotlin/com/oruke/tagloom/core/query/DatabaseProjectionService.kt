@@ -1,8 +1,10 @@
 package com.oruke.tagloom.core.query
 
 import com.oruke.tagloom.core.domain.property.EffectivePropertyResolver
+import com.oruke.tagloom.core.domain.tag.AiAccessPolicyResolver
 import com.oruke.tagloom.core.domain.tag.TagResolution
 import com.oruke.tagloom.core.domain.tag.TagResolver
+import com.oruke.tagloom.core.model.AiAccessPolicy
 import com.oruke.tagloom.core.model.DatabaseDefinition
 import com.oruke.tagloom.core.model.DatasetProjection
 import com.oruke.tagloom.core.model.DatasetProjectionColumn
@@ -20,6 +22,7 @@ import com.oruke.tagloom.core.model.PropertyId
 import com.oruke.tagloom.core.model.QueryPredicateOperators
 import com.oruke.tagloom.core.model.SortDirection
 import com.oruke.tagloom.core.model.SortSpec
+import com.oruke.tagloom.core.model.SystemDatabaseDefinitions
 import com.oruke.tagloom.core.model.SystemFieldNames
 import com.oruke.tagloom.core.model.TagDefinition
 import com.oruke.tagloom.core.model.TagId
@@ -62,6 +65,9 @@ class DatabaseProjectionService(
 ) {
     /** 复用工作区标签继承语义。 */
     private val tagResolver = TagResolver(rootTypeId)
+
+    /** 复用笔记与类型多父祖先链 AI 访问控制策略解析器。 */
+    private val aiPolicyResolver = AiAccessPolicyResolver(rootTypeId)
 
     /** 复用属性默认值、继承与冲突语义。 */
     private val propertyResolver = EffectivePropertyResolver()
@@ -126,6 +132,9 @@ class DatabaseProjectionService(
         tags: Map<TagId, TagDefinition>,
         properties: Map<PropertyId, PropertyDefinition>,
     ): DatabaseCandidate? {
+        if (SystemDatabaseDefinitions.isProtectedSystemPage(source.id)) {
+            return null
+        }
         val resolution = tagResolver.resolve(source.note.directTagIds, tags) as? TagResolution.Success ?: return null
         val appliedType = source.note.objectTypeState(rootTypeId).appliedTypeId ?: rootTypeId
         val sourceMatches = if (database.includeDescendants) {
@@ -137,6 +146,7 @@ class DatabaseProjectionService(
             return null
         }
         val effective = propertyResolver.resolve(source.note, resolution, tags, properties)
+        val effectiveAiPolicy = aiPolicyResolver.resolveForNote(source.note, tags).effectivePolicy
         val values = effective.properties.associate { property -> property.propertyId to property.value }
         val searchableText = buildString {
             append(source.note.title)
@@ -149,6 +159,7 @@ class DatabaseProjectionService(
             source = source,
             appliedTypeId = appliedType,
             resolvedTypeIds = resolution.tags.mapTo(mutableSetOf()) { resolved -> resolved.tagId },
+            effectiveAiPolicy = effectiveAiPolicy,
             propertyValues = values,
             searchableText = searchableText,
         )
@@ -310,6 +321,8 @@ class DatabaseProjectionService(
         val appliedTypeId: TagId,
         /** 有效类型闭包，包含根与祖先。 */
         val resolvedTypeIds: Set<TagId>,
+        /** 收敛后的有效 AI 访问控制策略。 */
+        val effectiveAiPolicy: AiAccessPolicy,
         /** 采用 EffectivePropertyResolver 语义的属性值。 */
         val propertyValues: Map<PropertyId, JsonElement?>,
         /** 标题与可搜索 Block 拼接文本。 */
@@ -326,6 +339,7 @@ class DatabaseProjectionService(
                 SystemFieldNames.TITLE -> JsonPrimitive(source.note.title)
                 SystemFieldNames.CREATED_AT -> JsonPrimitive(source.createdAt)
                 SystemFieldNames.UPDATED_AT -> JsonPrimitive(source.updatedAt)
+                SystemFieldNames.AI_ACCESS_POLICY -> JsonPrimitive(effectiveAiPolicy.name)
                 else -> null
             }
             FieldRefKinds.OBJECT_TYPE -> JsonPrimitive(appliedTypeId.value)

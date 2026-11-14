@@ -1,5 +1,7 @@
 package com.oruke.tagloom.core.sync
 
+import com.oruke.tagloom.core.ai.AgentThread
+import com.oruke.tagloom.core.ai.AgentThreadValidator
 import com.oruke.tagloom.core.ai.WorkspaceConfig
 import com.oruke.tagloom.core.ai.WorkspaceConfigValidator
 import com.oruke.tagloom.core.domain.tag.TagResolution
@@ -37,15 +39,26 @@ object WorkspaceReplicaCatalogValidator {
             ObjectType.WORKSPACE_CONFIG,
             WorkspaceConfig.serializer(),
         ) { it.id.value }
+        val agentThreads = decode(
+            objects,
+            ManifestObjectKind.AGENT_THREAD,
+            ObjectType.AGENT_THREAD,
+            AgentThread.serializer(),
+        ) { it.id.value }
         require(
             notes.size + tags.size + properties.size + queries.size +
-                databases.size + views.size + workspaceConfigs.size == objects.size,
+                databases.size + views.size + workspaceConfigs.size + agentThreads.size == objects.size,
         ) {
             "同步目录包含不支持的对象类别"
         }
         workspaceConfigs.filterNot { it.header.deleted }.forEach { snapshot ->
             require(WorkspaceConfigValidator.validate(snapshot.payload).isEmpty()) {
                 "同步工作区 Agent 配置结构无效"
+            }
+        }
+        agentThreads.filterNot { it.header.deleted }.forEach { snapshot ->
+            require(AgentThreadValidator.validate(snapshot.payload).isEmpty()) {
+                "同步工作区 Agent 会话结构无效"
             }
         }
         val activeTags = tags.filterNot { it.header.deleted }.map { it.payload }.associateBy(TagDefinition::id)

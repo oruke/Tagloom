@@ -244,6 +244,9 @@ object ReplicaJsonFieldMerge {
             ManifestObjectKind.TAG to "templateBlocks", ManifestObjectKind.PROPERTY to "options" -> "id"
             ManifestObjectKind.WORKSPACE_CONFIG to "connections" -> "connectionId"
             ManifestObjectKind.WORKSPACE_CONFIG to "models" -> "id"
+            ManifestObjectKind.AGENT_THREAD to "messages" -> "id"
+            ManifestObjectKind.AGENT_THREAD to "compactions" -> "id"
+            ManifestObjectKind.AGENT_THREAD to "activeContextRefs" -> "id"
             else -> null
         }
     }

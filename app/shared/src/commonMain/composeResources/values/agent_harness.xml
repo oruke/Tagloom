@@ -1,0 +1,111 @@
+<resources>
+    <string name="agent_sidebar_new_note">New note</string>
+    <string name="agent_sidebar_new_thread">New chat</string>
+    <string name="agent_sidebar_incognito_thread">New incognito chat</string>
+    <string name="agent_sidebar_all_notes_db">All notes</string>
+    <string name="agent_sidebar_recent_threads">Recent chats</string>
+    <string name="agent_sidebar_recent_notes">Recent notes</string>
+    <string name="agent_sidebar_view_all">All ▸</string>
+    <string name="agent_sidebar_empty_threads">No conversations yet</string>
+    <string name="agent_sidebar_toggle_nav">Toggle navigation sidebar</string>
+
+    <string name="agent_policy_allow_short">Readable</string>
+    <string name="agent_policy_ref_only_short">@ only</string>
+    <string name="agent_policy_locked_short">Locked</string>
+    <string name="agent_policy_header_allow">AI: Readable</string>
+    <string name="agent_policy_header_ref_only">AI: @ Reference only</string>
+    <string name="agent_policy_header_locked">AI: Locked</string>
+    <string name="agent_policy_inherit_default">Inherit from note type</string>
+    <string name="agent_policy_option_allow">Allow AI discovery &amp; reading</string>
+    <string name="agent_policy_option_allow_desc">Discoverable by built-in and authorized external search, list, and backlinks.</string>
+    <string name="agent_policy_option_ref_only">Explicit @ reference only</string>
+    <string name="agent_policy_option_ref_only_desc">Hidden from all discovery; readable only when explicitly attached via @ or allow-list.</string>
+    <string name="agent_policy_option_locked">Strictly locked</string>
+    <string name="agent_policy_option_locked_desc">Never sent to AI or returned to external tools, even if explicitly referenced.</string>
+    <string name="agent_policy_provenance_override">Explicitly set on this note</string>
+    <string name="agent_policy_provenance_inherited">Inherited from note type: %1$s</string>
+    <string name="agent_policy_supertag_section_title">Default AI access policy</string>
+    <string name="agent_policy_supertag_section_hint">Notes of this type (and sub-types) inherit the strictest policy along parent chains unless overridden on an individual note.</string>
+    <string name="agent_policy_supertag_impact">Impact preview: %1$d types in closure · %2$d inheriting notes (%3$d will change)</string>
+
+    <string name="all_notes_db_title">All notes</string>
+    <string name="all_notes_db_system_badge">System root database · Protected</string>
+    <string name="all_notes_db_search_placeholder">Filter notes by title or body…</string>
+    <string name="all_notes_db_all_types">All note types</string>
+    <string name="all_notes_db_sort_updated">Recently updated</string>
+    <string name="all_notes_db_sort_title">Title A–Z</string>
+    <string name="all_notes_db_view_table">Table</string>
+    <string name="all_notes_db_view_kanban">Kanban</string>
+    <string name="all_notes_db_view_gallery">Gallery</string>
+    <string name="all_notes_db_empty">No notes match the current filter.</string>
+    <string name="all_notes_db_col_type">Note type</string>
+    <string name="all_notes_db_col_ai_policy">AI policy</string>
+    <string name="all_notes_db_col_updated">Updated</string>
+
+    <string name="agent_toggle_companion">Toggle Agent companion (Ctrl+J)</string>
+    <string name="agent_switch_to_companion">Switch to right companion pane</string>
+    <string name="agent_expand_to_fullscreen">Expand to full-screen Agent view</string>
+    <string name="agent_close_companion">Close Agent companion</string>
+    <string name="agent_return_to_chat">← Back to Agent chat</string>
+    <string name="agent_thread_default_title">New chat</string>
+    <string name="agent_thread_incognito_badge">Incognito · Memory only</string>
+    <string name="agent_thread_archive">Archive chat</string>
+    <string name="agent_thread_restore">Restore chat</string>
+    <string name="agent_thread_delete">Delete chat</string>
+    <string name="agent_thread_rename_placeholder">Chat title…</string>
+
+    <string name="agent_history_title">Conversation history</string>
+    <string name="agent_history_search_placeholder">Search conversation titles…</string>
+    <string name="agent_history_tab_active">Active</string>
+    <string name="agent_history_tab_archived">Archived</string>
+    <string name="agent_history_empty">No matching conversations.</string>
+
+    <string name="agent_banner_no_model">No enabled AI model configured yet. Open Settings · Agent &amp; models to connect an endpoint.</string>
+    <string name="agent_banner_missing_key">This device does not have the API key for the selected connection yet.</string>
+    <string name="agent_banner_open_settings">Configure</string>
+    <string name="agent_error_turn_failed">Agent request failed. Verify endpoint connectivity and credentials.</string>
+
+    <string name="agent_empty_welcome_title">Ask across your encrypted workspace</string>
+    <string name="agent_empty_welcome_subtitle">Attach notes, blocks, note types, or saved queries with @, or enable workspace-wide retrieval.</string>
+
+    <string name="agent_composer_placeholder">Ask a question or analyze notes (@ to attach context)…</string>
+    <string name="agent_composer_attach_context">Attach context (@)</string>
+    <string name="agent_composer_scope_cited">Retrieval scope: Cited context only</string>
+    <string name="agent_composer_scope_all">Retrieval scope: All readable notes</string>
+    <string name="agent_composer_scope_chat_only">Current model is Chat only (tool retrieval disabled)</string>
+    <string name="agent_composer_model_unselected">Select model</string>
+    <string name="agent_composer_thinking_off">Off</string>
+    <string name="agent_composer_thinking_low">Low</string>
+    <string name="agent_composer_thinking_medium">Med</string>
+    <string name="agent_composer_thinking_high">High</string>
+    <string name="agent_composer_send">Send message</string>
+    <string name="agent_composer_stop">Stop generation</string>
+    <string name="agent_composer_ref_locked_warning">Locked policy — excluded from sending</string>
+
+    <string name="agent_picker_search_placeholder">Search notes, note types, or saved queries…</string>
+    <string name="agent_picker_tab_notes">Notes</string>
+    <string name="agent_picker_tab_types">Note types</string>
+    <string name="agent_picker_tab_queries">Saved queries</string>
+    <string name="agent_picker_attach_selection">Attach current editor selection (%1$d blocks)</string>
+    <string name="agent_picker_blocks_dialog_title">Select blocks in “%1$s”</string>
+    <string name="agent_picker_blocks_select_all">Include all active blocks</string>
+
+    <string name="agent_model_popup_title">Model &amp; thinking</string>
+    <string name="agent_model_popup_thinking_label">Thinking effort</string>
+    <string name="agent_model_badge_tools">Tools</string>
+    <string name="agent_model_badge_chat">Chat only</string>
+
+    <string name="agent_msg_thinking_title">Thinking summary</string>
+    <string name="agent_msg_stopped_badge">Stopped by user</string>
+    <string name="agent_msg_action_copy">Copy Markdown</string>
+    <string name="agent_msg_action_append">Append to current note</string>
+    <string name="agent_msg_action_save_new">Save as new note</string>
+    <string name="agent_msg_copied_toast">Copied Markdown</string>
+    <string name="agent_msg_appended_toast">Appended to current note</string>
+    <string name="agent_msg_saved_new_toast">Saved as new note</string>
+
+    <string name="agent_citation_verified">Verified</string>
+    <string name="agent_citation_updated">Updated since chat</string>
+    <string name="agent_citation_removed">Target removed</string>
+    <string name="agent_citation_open_note">Open in note</string>
+</resources>

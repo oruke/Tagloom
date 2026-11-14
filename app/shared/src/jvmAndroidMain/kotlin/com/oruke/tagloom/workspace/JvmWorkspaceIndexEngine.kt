@@ -88,7 +88,8 @@ internal class JvmWorkspaceIndexEngine(
     override suspend fun backlinks(
         targetNoteId: ObjectId,
         targetBlockId: BlockId?,
-    ): List<BacklinkIndexHit> = requireSession().backlinks(targetNoteId, targetBlockId)
+        allowedAiPolicies: Set<com.oruke.tagloom.core.model.AiAccessPolicy>?,
+    ): List<BacklinkIndexHit> = requireSession().backlinks(targetNoteId, targetBlockId, allowedAiPolicies)
 
     /**
      * 关闭当前 JVM 工作区会话并销毁会话密钥。

@@ -40,6 +40,7 @@ value class WorkspaceRelativePath(
             "databases",
             "views",
             "configs",
+            "threads",
             "history",
         )
     }

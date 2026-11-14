@@ -50,8 +50,11 @@ object SystemFieldNames {
     /** 快照更新时间。 */
     const val UPDATED_AT: String = "updated-at"
 
+    /** 有效 AI 访问控制策略。 */
+    const val AI_ACCESS_POLICY: String = "ai-access-policy"
+
     /** 系统字段稳定集合。 */
-    val ALL: Set<String> = setOf(TITLE, CREATED_AT, UPDATED_AT)
+    val ALL: Set<String> = setOf(TITLE, CREATED_AT, UPDATED_AT, AI_ACCESS_POLICY)
 }
 
 /** 定义 QuerySpec 首版谓词运算符。 */

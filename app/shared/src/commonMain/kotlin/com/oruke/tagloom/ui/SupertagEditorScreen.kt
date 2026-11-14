@@ -51,6 +51,7 @@ internal fun SupertagEditorScreen(
     var name by remember(original.id) { mutableStateOf(if (creating && original.name == NEW_SUPERTAG_DRAFT_NAME) "" else original.name) }
     var icon by remember(original.id) { mutableStateOf(original.iconKey) }
     var parents by remember(original.id) { mutableStateOf(original.parentTagIds) }
+    var aiPolicy by remember(original.id) { mutableStateOf(original.aiAccessPolicy) }
     var bindings by remember(original.id) {
         mutableStateOf(
             original.propertyBindings.map { binding ->
@@ -96,7 +97,7 @@ internal fun SupertagEditorScreen(
                         runCatching {
                             state.buildTagDefinitionDraft(original, name, parents, bindings.map { draft ->
                                 draft.toConfirmedBinding(definitions.single { it.id == draft.propertyId }, draft.order)
-                            }, icon, definitions)
+                            }, icon, definitions, aiPolicy)
                         }.onSuccess {
                             onSave(
                                 it,
@@ -181,6 +182,15 @@ internal fun SupertagEditorScreen(
                     !root && !busy,
                     { parentMenu = it },
                     { id -> parents = if (id in parents) parents - id else parents + id; invalid = false })
+                HorizontalDivider()
+                SupertagAiAccessPolicySection(
+                    state = state,
+                    original = original,
+                    parentTagIds = parents,
+                    selectedPolicy = aiPolicy,
+                    enabled = !root && !busy,
+                    onSelectPolicy = { aiPolicy = it; invalid = false },
+                )
                 HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(Res.string.editor_tag_properties), style = MaterialTheme.typography.titleMedium)
