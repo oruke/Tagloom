@@ -113,6 +113,18 @@ internal class WorkspaceAgentHarnessController(
     var proposalNoticeCode: String? by mutableStateOf(null)
         internal set
 
+    /** 每次从选区或块手柄快捷挂入后自增，驱动作曲框输入区自动获取键盘焦点。 */
+    var composerFocusVersion: Int by mutableStateOf(0)
+        internal set
+
+    /** 当前是否正在执行手动上下文压缩。 */
+    var compactionBusy: Boolean by mutableStateOf(false)
+        internal set
+
+    /** 编辑器选区或块手柄快捷挂载触发的瞬时提示文案（如禁读拦截或成功挂载提示）。 */
+    var editorToastMessage: String? by mutableStateOf(null)
+        internal set
+
     private var recentNoteOrder: List<ObjectId> by mutableStateOf(emptyList())
     private var loadedForMarker: Any? = null
     internal var highlightCounter: Int = 0
@@ -250,6 +262,9 @@ internal class WorkspaceAgentHarnessController(
         if (companionVisible) {
             mediumSidebarExpandedOverride = false
             showReturnToAgentPill = false
+            if (selectedThreadEntry == null && activeContextRefs.isEmpty()) {
+                activeContextRefs = defaultCompanionNoteRefs()
+            }
         }
     }
 
@@ -324,9 +339,10 @@ internal class WorkspaceAgentHarnessController(
         syncComposerDraftInMemory()
     }
 
-    /** 快捷挂载一篇笔记或指定段落列表。 */
+    /** 快捷挂载一篇笔记或指定段落列表（同篇多次挂载段落自动合并为 `N 段` 胶囊）。 */
     fun attachNoteRef(noteId: ObjectId, title: String, blockIds: List<BlockId> = emptyList()) {
-        upsertContextRef(buildNoteContextRef(noteId, title, blockIds))
+        activeContextRefs = mergeNoteOrBlocksContextRef(activeContextRefs, noteId, title, blockIds)
+        syncComposerDraftInMemory()
     }
 
     /** 挂载笔记类型范围引用（严格不带 `#` 前缀）。 */
@@ -380,7 +396,7 @@ internal class WorkspaceAgentHarnessController(
             )
             if (workspace.workspaceSessionMarker !== marker) return
             blockedRefIds = result.output.blockedRefIds
-            activeContextRefs = emptyList()
+            activeContextRefs = result.entry.thread.activeContextRefs
             threads = (listOf(result.entry) + threads.filterNot { it.id == result.entry.id }).sortedWith(
                 compareByDescending<WorkspaceAgentThreadEntry> { it.thread.lastMessageAt }
                     .thenByDescending { it.thread.createdAt }
@@ -417,7 +433,8 @@ internal class WorkspaceAgentHarnessController(
         thinkingEffort = AiThinkingEffort.OFF; retrievalScope = AiRetrievalScope.CITED_ONLY
         runningThreadId = null; liveProgress = null; citationStatuses = emptyMap()
         highlightedCitation = null; turnErrorCode = null; activeReviewProposalId = null
-        proposalBusy = false; proposalNoticeCode = null; recentNoteOrder = emptyList(); loadedForMarker = null
+        proposalBusy = false; proposalNoticeCode = null; composerFocusVersion = 0
+        compactionBusy = false; editorToastMessage = null; recentNoteOrder = emptyList(); loadedForMarker = null
     }
 
     /** 将选中会话的模型、思考、检索范围与活跃草稿引用同步至作曲框。 */

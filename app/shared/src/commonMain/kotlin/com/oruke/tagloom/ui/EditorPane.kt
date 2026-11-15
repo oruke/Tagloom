@@ -290,6 +290,13 @@ internal fun EditorPane(
                             if (state.selection.isNotEmpty && !search.isOpen) {
                                 SelectionFormattingToolbar(state = state)
                             }
+                            if (agentController != null) {
+                                EditorAgentQuickAttachToast(
+                                    controller = agentController,
+                                    documentId = document.id,
+                                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+                                )
+                            }
                             DocumentTimestamps(
                                 document = document,
                                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),

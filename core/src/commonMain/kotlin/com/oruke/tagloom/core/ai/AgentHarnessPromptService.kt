@@ -59,9 +59,13 @@ internal object AgentHarnessPromptService {
         val historyMessages = if (activeCompaction != null) {
             val idx = thread.messages.indexOfFirst { it.id == activeCompaction.upToMessageId }
             if (idx >= 0) {
+                val pendingNotes = thread.proposals
+                    .filter { it.status == AgentProposalStatus.PENDING }
+                    .joinToString("；") { "《${it.noteTitle}》(expectedRevision=${it.expectedRevision.orEmpty()}, ${it.items.size}项待审)" }
+                val pendingSuffix = if (pendingNotes.isNotEmpty()) "\n当前仍待用户确认的修改提案：$pendingNotes" else ""
                 list += AiChatMessage(
                     role = AiChatRole.SYSTEM,
-                    content = "【早期对话已自动压缩脉络摘要】\n${activeCompaction.summary}",
+                    content = "【早期对话已自动压缩脉络摘要】\n${activeCompaction.summary}$pendingSuffix",
                 )
                 thread.messages.drop(idx + 1)
             } else {

@@ -6,7 +6,7 @@
 
 - 产品与架构基线以 [`Tagloom_产品与技术设计草案.md`](./Tagloom_产品与技术设计草案.md) 为准。
 - `README.md` 是面向开发者的项目入口，只描述已经确认的方向和当前真实实现状态。
-- 当前仓库已完成 v0.2 Windows MVP 核心闭环，并将文件系统、派生索引和同步拆分为 `app:file-system`、`app:index`、`app:sync` 三个 KMP 能力模块：JVM Desktop 与 Android 共用工作区生命周期、加密快照与事务、可重建索引、连续 Block/RichText 编辑、Markdown、备份恢复、主密钥轮换、Change checkpoint 以及服务器模式的双向密文快照同步与字段/Block 级冲突恢复（详见 `docs/workspace-sync-design.md`，Windows 与实体 Android 对自部署 HTTPS 服务的双端同步已验收）。本机 API、可执行 CLI 与 stdio MCP 已提供独立受控入口，详见 `docs/local-automation.md`。按 artifact 差集的增量同步装配、WebDAV、iOS 平台能力实现、内置 Agent 执行器/AI Provider 和向量数据库仍未提供完整可用入口。除非代码、测试和真实运行结果已经证明，不得把预留协议写成终端用户可用功能。
+- 当前仓库已完成 v0.2 Windows MVP 核心闭环，并将文件系统、派生索引和同步拆分为 `app:file-system`、`app:index`、`app:sync` 三个 KMP 能力模块：JVM Desktop 与 Android 共用工作区生命周期、加密快照与事务、可重建索引、连续 Block/RichText 编辑、Markdown、备份恢复、主密钥轮换、Change checkpoint、服务器模式的双向密文快照同步与字段/Block 级冲突恢复（详见 `docs/workspace-sync-design.md`，Windows 与实体 Android 对自部署 HTTPS 服务的双端同步已验收），以及内置自有 `AgentHarness`（三协议流式模型适配、`AiAccessPolicy` 三态门禁、`WORKSPACE_CONFIG` / `AGENT_THREAD` 加密同步、细粒度补丁双方位原位 Diff 与 `80%` 两阶段上下文压缩，详见 `docs/agent-design.md`）。本机 API、可执行 CLI 与 stdio MCP 已提供独立受控入口，详见 `docs/local-automation.md`。按 artifact 差集的增量同步装配、WebDAV、iOS 平台能力实现和向量数据库仍未提供完整可用入口。除非代码、测试和真实运行结果已经证明，不得把预留协议写成终端用户可用功能。
 - 架构决策发生变化时，先更新设计文档中的对应章节和 ADR，再实现代码；不得让代码与文档长期维持两套事实。
 - 设计文档中的示例 ID、路径、版本和性能指标是协议说明或设计预算，不得直接当成生产默认值。
 

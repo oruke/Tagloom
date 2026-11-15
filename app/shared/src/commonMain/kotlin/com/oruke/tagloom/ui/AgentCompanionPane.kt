@@ -149,7 +149,15 @@ internal fun AgentCompanionPane(
                 }
 
                 IconButton(
-                    onClick = { scope.launch { controller.startNewThread(incognito = false, openFullScreen = false) } },
+                    onClick = {
+                        scope.launch {
+                            controller.startNewThread(
+                                incognito = false,
+                                openFullScreen = false,
+                                initialRefs = controller.defaultCompanionNoteRefs(),
+                            )
+                        }
+                    },
                     modifier = Modifier.size(30.dp).testTag("agent-companion-new-thread"),
                 ) {
                     Icon(
@@ -161,7 +169,15 @@ internal fun AgentCompanionPane(
                 }
 
                 IconButton(
-                    onClick = { scope.launch { controller.startNewThread(incognito = true, openFullScreen = false) } },
+                    onClick = {
+                        scope.launch {
+                            controller.startNewThread(
+                                incognito = true,
+                                openFullScreen = false,
+                                initialRefs = controller.defaultCompanionNoteRefs(),
+                            )
+                        }
+                    },
                     modifier = Modifier.size(30.dp).testTag("agent-companion-incognito-thread"),
                 ) {
                     Icon(
@@ -213,6 +229,8 @@ internal fun AgentCompanionPane(
                 }
                 AgentMessageList(
                     messages = selectedEntry?.thread?.messages.orEmpty(),
+                    compactions = selectedEntry?.thread?.compactions.orEmpty(),
+                    activeCompactionId = selectedEntry?.thread?.activeCompactionId,
                     liveProgress = liveForSelected,
                     citationStatuses = controller.citationStatuses,
                     onJumpToCitation = { src -> controller.jumpToCitation(src, isCompactViewport) },

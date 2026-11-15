@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.oruke.tagloom.core.ai.AgentCitationStatus
+import com.oruke.tagloom.core.ai.AgentCompactionItem
 import com.oruke.tagloom.core.ai.AgentHarnessProgress
 import com.oruke.tagloom.core.ai.AgentReadToolCatalog
 import com.oruke.tagloom.core.ai.AgentSourceEntry
@@ -79,6 +80,8 @@ import tagloom.app.shared.generated.resources.ic_sparkle
 @Composable
 internal fun AgentMessageList(
     messages: List<AgentThreadMessage>,
+    compactions: List<AgentCompactionItem> = emptyList(),
+    activeCompactionId: String? = null,
     liveProgress: AgentHarnessProgress?,
     citationStatuses: Map<Int, AgentCitationStatus>,
     onJumpToCitation: (AgentSourceEntry) -> Unit,
@@ -89,8 +92,9 @@ internal fun AgentMessageList(
 ) {
     val listState = rememberLazyListState()
     var actionNotice by remember { mutableStateOf<String?>(null) }
+    val compactionsByMessageId = remember(compactions) { compactions.groupBy { it.upToMessageId } }
 
-    LaunchedEffect(messages.size, liveProgress?.streamingContent?.length) {
+    LaunchedEffect(messages.size, compactions.size, liveProgress?.streamingContent?.length) {
         val totalItems = messages.size + if (liveProgress != null) 1 else 0
         if (totalItems > 0) {
             listState.animateScrollToItem(totalItems - 1)
@@ -171,6 +175,13 @@ internal fun AgentMessageList(
                             },
                         )
                     }
+                    compactionsByMessageId[msg.id]?.forEach { compaction ->
+                        AgentCompactionItemCard(
+                            item = compaction,
+                            isActiveCursor = compaction.id == activeCompactionId,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
                 if (liveProgress != null) {
                     item(key = "live-streaming-progress") {
@@ -215,56 +226,6 @@ internal fun AgentMessageList(
                     text = notice,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelMedium,
-                )
-            }
-        }
-    }
-}
-
-/**
- * 渲染右对齐的用户提问气泡及其冻结 `@` 引用标签行。
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun UserMessageBubble(message: AgentThreadMessage) {
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag("agent-user-msg-${message.id}"),
-        horizontalAlignment = Alignment.End,
-    ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 560.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = MaterialTheme.shapes.medium,
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (message.contextRefs.isNotEmpty()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        message.contextRefs.forEach { ref ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.surface,
-                                shape = MaterialTheme.shapes.extraSmall,
-                                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                            ) {
-                                Text(
-                                    text = ref.label,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

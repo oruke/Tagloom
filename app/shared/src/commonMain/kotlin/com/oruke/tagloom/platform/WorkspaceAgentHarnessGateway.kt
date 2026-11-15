@@ -202,4 +202,16 @@ interface WorkspaceAgentHarnessGateway {
         threadId: ObjectId,
         proposalId: String,
     ): WorkspaceAgentProposalCommitOutcome
+
+    /**
+     * 手动对指定会话执行一次两阶段无损上下文压缩（保持 `lastMessageAt` 不变，保留近期 `retainPercent` 对话、活跃 `@` 引用与待审提案）。
+     *
+     * @param threadId 目标会话 ID。
+     * @param activeContextRefs 当前作曲框挂载的活跃 `@` 引用快照；为空时沿用会话已存引用。
+     * @return 追加了手动压缩节点并更新活跃窗口水位后的最新会话条目。
+     */
+    suspend fun compactThread(
+        threadId: ObjectId,
+        activeContextRefs: List<AgentContextRef>? = null,
+    ): WorkspaceAgentThreadEntry
 }

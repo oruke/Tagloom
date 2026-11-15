@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -83,8 +86,15 @@ internal fun AgentComposerBar(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val inputFocusRequester = remember { FocusRequester() }
     var pickerOpen by remember { mutableStateOf(false) }
     var editingBlockRef by remember { mutableStateOf<AgentContextRef?>(null) }
+
+    LaunchedEffect(controller.composerFocusVersion) {
+        if (controller.composerFocusVersion > 0) {
+            runCatching { inputFocusRequester.requestFocus() }
+        }
+    }
 
     val selectedModel = controller.effectiveModel
     val isRunning = controller.runningThreadId != null &&
@@ -104,8 +114,12 @@ internal fun AgentComposerBar(
         )
     }
 
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
     Surface(
-        modifier = modifier.fillMaxWidth().testTag("agent-composer-box"),
+        modifier = Modifier.fillMaxWidth().testTag("agent-composer-box"),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -150,6 +164,7 @@ internal fun AgentComposerBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 44.dp, max = 148.dp)
+                    .focusRequester(inputFocusRequester)
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
                             val sendByEnter = !event.isShiftPressed || event.isCtrlPressed || event.isMetaPressed
@@ -298,6 +313,9 @@ internal fun AgentComposerBar(
                 }
             }
         }
+    }
+
+    AgentComposerDock(controller = controller)
     }
 }
 

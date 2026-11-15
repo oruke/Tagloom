@@ -240,6 +240,8 @@ internal fun AgentWorkspaceScreen(
                             }
                             AgentMessageList(
                                 messages = entry?.thread?.messages.orEmpty(),
+                                compactions = entry?.thread?.compactions.orEmpty(),
+                                activeCompactionId = entry?.thread?.activeCompactionId,
                                 liveProgress = liveForSelected,
                                 citationStatuses = controller.citationStatuses,
                                 onJumpToCitation = { src -> controller.jumpToCitation(src, isCompactViewport) },

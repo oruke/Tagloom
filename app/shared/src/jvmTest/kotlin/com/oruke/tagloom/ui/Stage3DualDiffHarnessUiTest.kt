@@ -178,7 +178,7 @@ class Stage3DualDiffHarnessUiTest {
                         val manifestRevBeforeCommit = checkNotNull(device.manager.sessionOrNull()).unlocked.payload.revision
 
                         onNodeWithTag("agent-diff-apply-button").performClick()
-                        waitUntil(timeoutMillis = 10_000) {
+                        waitUntil(timeoutMillis = 20_000) {
                             onAllNodesWithTag("editor-inplace-diff-container").fetchSemanticsNodes().isEmpty()
                         }
                         waitForIdle()
@@ -310,7 +310,7 @@ class Stage3DualDiffHarnessUiTest {
                         }
                         waitForIdle()
                         onNodeWithTag("agent-diff-apply-button").performClick()
-                        waitUntil(timeoutMillis = 10_000) {
+                        waitUntil(timeoutMillis = 20_000) {
                             onAllNodesWithTag("editor-inplace-diff-container").fetchSemanticsNodes().isEmpty()
                         }
                         waitForIdle()

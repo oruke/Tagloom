@@ -1,6 +1,6 @@
 # Tagloom Agent Harness：功能、UI 与交互设计
 
-状态：已按最新交互原型评审确认定稿的设计基线（待编码实现）。当前仓库已完成本机 API、CLI、stdio MCP 及 `AiContextBuilder` / `AiCompletionPort` 基础端口，`Snapshot.kt` 已预留 `ObjectType.WORKSPACE_CONFIG` 常量；尚未实现流式模型适配器、内置 Agent 执行器、双形态 Compose 页面、系统默认笔记「全部笔记」投影页、`AiAccessPolicy`、`WORKSPACE_CONFIG` 与 `AGENT_THREAD` 的 manifest/快照持久化及细粒度补丁工具。
+状态：四阶段全部已编码落地并完成单元、双端盲同步与多视口 Compose UI 验收。仓库现已完整接入三协议流式模型适配器（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）、内置自有 `AgentHarness` 执行器、单左栏双形态界面（全屏对话主舞台 + 右侧伴随分栏/移动端底部抽屉）、系统默认笔记「全部笔记」投影页、`AiAccessPolicy` 三态门禁、`WORKSPACE_CONFIG` 与 `AGENT_THREAD` 双层加密快照与三方合并、`patch_note_blocks` / `update_note_metadata` 双方位共享原位 Diff 审阅以及 `StatsPills` 累计账单、`14.dp` `ContextMeter` 环形表与模型窗口 `80%` 两阶段无损压缩。
 
 ## 1. 产品目标与核心决策
 

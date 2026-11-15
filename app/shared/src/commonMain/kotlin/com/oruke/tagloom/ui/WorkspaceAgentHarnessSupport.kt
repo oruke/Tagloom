@@ -180,14 +180,50 @@ internal fun buildNoteContextRef(
     return if (blockIds.isEmpty()) {
         AgentContextRef(id = "note:${noteId.value}", kind = AgentContextRefKind.NOTE, noteId = noteId, label = cleanTitle)
     } else {
-        val joined = blockIds.joinToString(",") { it.value }
+        val cleanBlocks = blockIds.distinct()
+        val digestHex = cleanBlocks.joinToString("|") { it.value }.hashCode().toUInt().toString(16)
         AgentContextRef(
-            id = "blocks:${noteId.value}:$joined",
+            id = "blocks:${noteId.value}:${cleanBlocks.size}:$digestHex",
             kind = AgentContextRefKind.BLOCKS,
             noteId = noteId,
-            blockIds = blockIds,
-            label = "$cleanTitle · ${blockIds.size} 段",
+            blockIds = cleanBlocks,
+            label = "$cleanTitle · ${cleanBlocks.size} 段",
         )
+    }
+}
+
+/**
+ * 将新挂载的单篇笔记或段落引用合并进现有活跃引用列表：同篇笔记多次挂载精确段落自动去重合并为 `N 段` 单枚胶囊。
+ *
+ * @param existing 当前作曲框活跃 `@` 引用列表。
+ * @param noteId 目标笔记稳定 ID。
+ * @param title 笔记标题。
+ * @param blockIds 待挂载的稳定段落列表；为空表示整篇笔记挂载。
+ * @return 合并更新后的活跃引用列表。
+ */
+internal fun mergeNoteOrBlocksContextRef(
+    existing: List<AgentContextRef>,
+    noteId: ObjectId,
+    title: String,
+    blockIds: List<BlockId>,
+): List<AgentContextRef> {
+    if (blockIds.isEmpty()) {
+        val wholeRef = buildNoteContextRef(noteId, title, emptyList())
+        val withoutBlocks = existing.filterNot { it.kind == AgentContextRefKind.BLOCKS && it.noteId == noteId }
+        return if (withoutBlocks.any { it.id == wholeRef.id }) {
+            withoutBlocks.map { if (it.id == wholeRef.id) wholeRef else it }
+        } else {
+            withoutBlocks + wholeRef
+        }
+    }
+    val priorBlocksIdx = existing.indexOfFirst { it.kind == AgentContextRefKind.BLOCKS && it.noteId == noteId }
+    return if (priorBlocksIdx >= 0) {
+        val mergedIds = (existing[priorBlocksIdx].blockIds + blockIds).distinct()
+        val mergedRef = buildNoteContextRef(noteId, title, mergedIds)
+        existing.mapIndexed { idx, item -> if (idx == priorBlocksIdx) mergedRef else item }
+    } else {
+        val nextRef = buildNoteContextRef(noteId, title, blockIds)
+        if (existing.any { it.id == nextRef.id }) existing else existing + nextRef
     }
 }
 

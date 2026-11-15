@@ -146,4 +146,38 @@
     <string name="agent_diff_conflict_dirty">Target note has unsaved edits in the editor. Save first or recalculate against the latest note.</string>
     <string name="agent_diff_conflict_missing">Target note was deleted or is inaccessible. Copy the suggested text instead.</string>
     <string name="agent_diff_error_apply_failed">Failed to apply proposal. Recalculate against the latest note and retry.</string>
+
+    <string name="agent_editor_selection_ask_ai">Ask / Polish</string>
+    <string name="agent_editor_block_attach_ai">Attach block to Agent</string>
+    <string name="agent_editor_attach_locked_toast">Current note is Locked — cannot attach to Agent</string>
+    <string name="agent_editor_attach_blocks_toast">Attached %1$d block(s) to Agent companion</string>
+
+    <string name="agent_dock_tokens_only">%1$s tok</string>
+    <string name="agent_dock_tokens_with_cache">%1$s tok · Cache %2$d%</string>
+    <string name="agent_dock_context_meter">%1$d% ~%2$s / %3$s</string>
+
+    <string name="agent_usage_popover_title">Session cumulative tokens</string>
+    <string name="agent_usage_popover_cache_rate">Prefix cache hit rate</string>
+    <string name="agent_usage_popover_uncached_input">Uncached input</string>
+    <string name="agent_usage_popover_cache_read">Cache read</string>
+    <string name="agent_usage_popover_output">Model output</string>
+    <string name="agent_usage_popover_output_with_reasoning">%1$s (reasoning %2$s)</string>
+    <string name="agent_usage_popover_footer">Cumulative billing across turns; context compaction shrinks active window without resetting this ledger.</string>
+
+    <string name="agent_context_popover_title">Context used %1$d%</string>
+    <string name="agent_context_popover_sub">~%1$s / %2$s</string>
+    <string name="agent_context_seg_system">System prompt</string>
+    <string name="agent_context_seg_tools">Tools &amp; note context</string>
+    <string name="agent_context_seg_messages">Messages &amp; thinking</string>
+    <string name="agent_context_auto_line_label">Auto-compact line (%1$d%)</string>
+    <string name="agent_context_auto_line_on">%1$s tok · On</string>
+    <string name="agent_context_auto_line_off">%1$s tok · Off</string>
+    <string name="agent_context_action_compact_now">Compact now</string>
+    <string name="agent_context_compacted_toast">Context compacted losslessly</string>
+
+    <string name="agent_compaction_auto_title">Context auto-compacted</string>
+    <string name="agent_compaction_manual_title">Context compacted manually</string>
+    <string name="agent_compaction_auto_subtitle">Reached %1$d% context threshold · Freed ~%2$s tok</string>
+    <string name="agent_compaction_manual_subtitle">Folded early turns &amp; verbose tool outputs · Freed ~%1$s tok</string>
+    <string name="agent_compaction_active_badge">Active</string>
 </resources>

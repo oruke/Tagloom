@@ -51,6 +51,7 @@ import tagloom.app.shared.generated.resources.*
 internal fun SelectionFormattingToolbar(state: TagloomEditorState) {
     var colorMenuMode by remember { mutableStateOf<InlineColorMode?>(null) }
     var utilityMenuMode by remember { mutableStateOf<SelectionUtilityMode?>(null) }
+    val agentController = LocalWorkspaceAgentHarness.current
     Popup(
         alignment = Alignment.TopCenter,
         offset = IntOffset(0, 58),
@@ -111,6 +112,9 @@ internal fun SelectionFormattingToolbar(state: TagloomEditorState) {
                     modifier = Modifier.padding(horizontal = 8.dp),
                     style = MaterialTheme.typography.labelSmall,
                 )
+                if (agentController?.available == true) {
+                    SelectionAskAiButton(state = state, controller = agentController)
+                }
             }
         }
     }

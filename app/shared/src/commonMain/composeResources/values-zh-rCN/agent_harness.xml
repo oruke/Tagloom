@@ -146,4 +146,38 @@
     <string name="agent_diff_conflict_dirty">目标笔记在编辑器中存在未保存修改，请先保存或基于最新内容重算提案，避免丢失手写草稿。</string>
     <string name="agent_diff_conflict_missing">目标笔记已被删除或不可访问，无法直接应用此提案，可复制建议文本后另存。</string>
     <string name="agent_diff_error_apply_failed">应用提案未成功，请检查笔记状态或基于最新内容重算后重试。</string>
+
+    <string name="agent_editor_selection_ask_ai">询问 / 润色</string>
+    <string name="agent_editor_block_attach_ai">引用此块到 Agent</string>
+    <string name="agent_editor_attach_locked_toast">当前笔记已设为禁读策略，无法挂载到 Agent</string>
+    <string name="agent_editor_attach_blocks_toast">已挂载 %1$d 个精确段落到右侧 Agent</string>
+
+    <string name="agent_dock_tokens_only">%1$s tok</string>
+    <string name="agent_dock_tokens_with_cache">%1$s tok · 缓存命中 %2$d%</string>
+    <string name="agent_dock_context_meter">%1$d% ~%2$s / %3$s</string>
+
+    <string name="agent_usage_popover_title">会话累计 Token</string>
+    <string name="agent_usage_popover_cache_rate">前缀缓存命中率</string>
+    <string name="agent_usage_popover_uncached_input">未命中输入 (Input)</string>
+    <string name="agent_usage_popover_cache_read">缓存读取 (Cache Read)</string>
+    <string name="agent_usage_popover_output">模型输出 (Output)</string>
+    <string name="agent_usage_popover_output_with_reasoning">%1$s（含思考 %2$s）</string>
+    <string name="agent_usage_popover_footer">按回合累计计费统计；上下文自动压缩仅缩减活跃窗口，不会抹除历史累计账单。</string>
+
+    <string name="agent_context_popover_title">上下文已用 %1$d%</string>
+    <string name="agent_context_popover_sub">~%1$s / %2$s</string>
+    <string name="agent_context_seg_system">系统提示词</string>
+    <string name="agent_context_seg_tools">工具定义与笔记上下文</string>
+    <string name="agent_context_seg_messages">对话与思考消息</string>
+    <string name="agent_context_auto_line_label">自动压缩线（窗口 %1$d%）</string>
+    <string name="agent_context_auto_line_on">%1$s tok · 已开启</string>
+    <string name="agent_context_auto_line_off">%1$s tok · 已关闭</string>
+    <string name="agent_context_action_compact_now">立即压缩</string>
+    <string name="agent_context_compacted_toast">已完成上下文无损摘要压缩</string>
+
+    <string name="agent_compaction_auto_title">上下文已自动压缩</string>
+    <string name="agent_compaction_manual_title">已手动压缩上下文</string>
+    <string name="agent_compaction_auto_subtitle">达到模型上下文 %1$d% 阈值 · 已释放 ~%2$s tok</string>
+    <string name="agent_compaction_manual_subtitle">已折叠早期轮次与长工具结果 · 已释放 ~%1$s tok</string>
+    <string name="agent_compaction_active_badge">生效游标</string>
 </resources>

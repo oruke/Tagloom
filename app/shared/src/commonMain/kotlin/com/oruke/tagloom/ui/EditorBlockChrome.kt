@@ -50,6 +50,14 @@ internal fun BlockActionMenus(
             text = stringResource(Res.string.editor_block_insert_after),
             onClick = { onActionMenuChange(false); onInsertAfter() },
         )
+        LocalWorkspaceAgentHarness.current?.takeIf { it.available }?.let { agentController ->
+            BlockMenuAttachToAgentItem(
+                state = state,
+                blockId = block.id,
+                controller = agentController,
+                onDismissMenu = { onActionMenuChange(false) },
+            )
+        }
         TagloomMenuDivider()
         if (block.editableRichText() != null || block.content == DividerBlockContent) {
             TagloomMenuItem(

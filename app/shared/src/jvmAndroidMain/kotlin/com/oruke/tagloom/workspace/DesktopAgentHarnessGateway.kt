@@ -1,6 +1,7 @@
 package com.oruke.tagloom.workspace
 
 import com.oruke.tagloom.core.ai.AgentCitationStatus
+import com.oruke.tagloom.core.ai.AgentCompactionEngine
 import com.oruke.tagloom.core.ai.AgentContextRef
 import com.oruke.tagloom.core.ai.AgentHarness
 import com.oruke.tagloom.core.ai.AgentHarnessProgress
@@ -234,6 +235,7 @@ internal class DesktopAgentHarnessGateway(
                     preferences = config.preferences,
                     nowIsoProvider = gateway::currentUtcTimestamp,
                     isStoppedByUser = { turnHandle.stoppedByUser },
+                    compactionIdFactory = { gateway.createOpaqueId("agent-compact") },
                 ),
                 workspacePort = DesktopAgentHarnessWorkspaceAdapter(session),
                 onProgress = onProgress,
@@ -242,20 +244,20 @@ internal class DesktopAgentHarnessGateway(
             activeTurn.compareAndSet(turnHandle, null)
         }
 
-        // 发送完成后清空作曲框暂存引用，仅保留已冻结在 userMessage 上的快照（单篇锁定拦截除外）。
-        val cleanedThread = output.updatedThread.copy(activeContextRefs = emptyList())
+        // 保留本轮校验通过的活跃 @ 引用（自动压缩与后续追问继续携带，直至用户手动移除或策略收紧拦截）。
+        val persistedThread = output.updatedThread
         val finalEntry = if (isIncognito) {
-            incognitoThreads[threadId] = cleanedThread
-            WorkspaceAgentThreadEntry(cleanedThread, incognito = true, revision = null)
+            incognitoThreads[threadId] = persistedThread
+            WorkspaceAgentThreadEntry(persistedThread, incognito = true, revision = null)
         } else {
             val latestSession = ensureSessionBound()
-            val saved = latestSession.saveAgentThread(cleanedThread)
+            val saved = latestSession.saveAgentThread(persistedThread)
             onThreadCommitted()
             WorkspaceAgentThreadEntry(saved.payload, incognito = false, revision = saved.header.revision)
         }
         WorkspaceAgentTurnResult(
             entry = finalEntry,
-            output = output.copy(updatedThread = cleanedThread),
+            output = output.copy(updatedThread = persistedThread),
         )
     }
 
@@ -339,6 +341,69 @@ internal class DesktopAgentHarnessGateway(
         val session = ensureSessionBound()
         DesktopAgentProposalService(session, incognitoThreads, onThreadCommitted)
             .applyProposal(threadId, proposalId)
+    }
+
+    /**
+     * 手动执行两阶段无损上下文压缩，保持 `lastMessageAt` 不变并以单次事务确认（无痕会话仅更新内存）。
+     */
+    override suspend fun compactThread(
+        threadId: ObjectId,
+        activeContextRefs: List<AgentContextRef>?,
+    ): WorkspaceAgentThreadEntry = withContext(Dispatchers.IO) {
+        val session = ensureSessionBound()
+        val isIncognito = incognitoThreads.containsKey(threadId)
+        val existingSnapshot = if (isIncognito) null else requireNotNull(session.loadAgentThread(threadId)) { "目标会话不存在" }
+        val baseThread = if (isIncognito) {
+            requireNotNull(incognitoThreads[threadId]) { "目标无痕会话不存在" }
+        } else {
+            requireNotNull(existingSnapshot).payload
+        }
+        val currentThread = if (activeContextRefs != null) {
+            baseThread.copy(activeContextRefs = activeContextRefs)
+        } else {
+            baseThread
+        }
+        if (currentThread.messages.isEmpty()) {
+            return@withContext WorkspaceAgentThreadEntry(
+                thread = currentThread,
+                incognito = isIncognito,
+                revision = existingSnapshot?.header?.revision,
+            )
+        }
+        val config = session.loadWorkspaceConfig()?.payload ?: WorkspaceConfig()
+        val targetModelId = currentThread.selectedModelId
+            ?: config.preferences.defaultModelId
+            ?: config.models.firstOrNull { it.enabled }?.id
+        val model = config.models.firstOrNull { it.id == targetModelId && it.enabled }
+            ?: config.models.firstOrNull { it.enabled }
+        val connection = model?.let { m -> config.connections.firstOrNull { it.connectionId == m.connectionId } }
+        val resolvedKey = connection?.let { conn ->
+            if (conn.authMode == AiAuthMode.NONE) null else apiKeyStore.resolveForRequest(session.workspaceId, conn)
+        }
+        val compacted = AgentCompactionEngine.compactWithModelOrFallback(
+            thread = currentThread,
+            compactionId = gateway.createOpaqueId("agent-compact"),
+            triggerPercent = 0,
+            model = model,
+            preferences = config.preferences,
+            createdAt = gateway.currentUtcTimestamp(),
+            connection = if (connection != null && (connection.authMode == AiAuthMode.NONE || !resolvedKey.isNullOrBlank())) {
+                connection
+            } else {
+                null
+            },
+            resolvedApiKey = resolvedKey,
+            streamPort = streamPort,
+        )
+        if (isIncognito) {
+            incognitoThreads[threadId] = compacted
+            WorkspaceAgentThreadEntry(compacted, incognito = true, revision = null)
+        } else {
+            val latestSession = ensureSessionBound()
+            val saved = latestSession.saveAgentThread(compacted)
+            onThreadCommitted()
+            WorkspaceAgentThreadEntry(saved.payload, incognito = false, revision = saved.header.revision)
+        }
     }
 
     /**

@@ -50,6 +50,8 @@ data class AgentHarnessTurnInput(
     val nowIsoProvider: () -> String,
     /** 判断当前取消是否来自用户主动点击「停止」按钮（而非工作区锁定销毁）。 */
     val isStoppedByUser: () -> Boolean = { false },
+    /** 触发窗口 `80%` 自动压缩时生成不透明压缩节点 ID 的工厂。 */
+    val compactionIdFactory: () -> String = { "compact-${assistantMessageId}" },
 )
 
 /**
@@ -66,6 +68,8 @@ data class AgentHarnessTurnOutput(
     val generatedProposals: List<AgentMutationProposal> = emptyList(),
     /** 因策略变为 `LOCKED` 而被拦截失效的 `@` 引用 ID 集合。 */
     val blockedRefIds: Set<String>,
+    /** 本轮完成后若达到模型窗口自动压缩阈值而新生成的压缩节点；未触发时为空。 */
+    val triggeredCompaction: AgentCompactionItem? = null,
 )
 
 /**
@@ -392,13 +396,30 @@ class AgentHarness(
             proposals = input.thread.proposals + turnProposals,
             latestContextBreakdown = breakdown,
         )
-        val finalThread = draftUpdated.copy(cumulativeUsage = draftUpdated.recomputeCumulativeUsage())
+        val withTurnUsage = draftUpdated.copy(cumulativeUsage = draftUpdated.recomputeCumulativeUsage())
+        val finalThread = if (!stoppedByUser && AgentCompactionEngine.shouldAutoCompact(withTurnUsage, input.model, input.preferences)) {
+            AgentCompactionEngine.compactWithModelOrFallback(
+                thread = withTurnUsage,
+                compactionId = input.compactionIdFactory(),
+                triggerPercent = input.preferences.autoCompactPercent.coerceIn(50, 95),
+                model = input.model,
+                preferences = input.preferences,
+                createdAt = input.nowIsoProvider(),
+                connection = input.connection,
+                resolvedApiKey = input.resolvedApiKey,
+                streamPort = streamPort,
+            )
+        } else {
+            withTurnUsage
+        }
+        val triggered = finalThread.compactions.lastOrNull()?.takeIf { finalThread.compactions.size > input.thread.compactions.size }
         return AgentHarnessTurnOutput(
             updatedThread = finalThread,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
             generatedProposals = turnProposals.toList(),
             blockedRefIds = resolvedContext.blockedRefIds,
+            triggeredCompaction = triggered,
         )
     }
 
